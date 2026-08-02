@@ -74,7 +74,9 @@ frozen-corpus validation pass are complete.
 - [x] Detect missing/case-mismatched `$base` clone sources, base cycles,
   explicit foreign keys, and exact installed custom-record dependencies using
   local official REDmod/TweakDB data.
-- [ ] Parse and correlate TweakXL runtime logs.
+- [x] Parse the newest TweakXL runtime log, attribute file-scoped and
+  identity-scoped events, correlate compatible static findings, and consolidate
+  repeated events without discarding log evidence.
 
 ## REDscript analyzer
 

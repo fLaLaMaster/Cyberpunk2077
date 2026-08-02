@@ -6,14 +6,55 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.7.0`
+- Scanner version: `0.8.0`
 - Implemented ecosystems: ArchiveXL and TweakXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 45 passing
+- Automated tests: 47 passing
 - Last complete scan: successful on 2026-08-02
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-02 — TweakXL runtime log correlation
+
+Finished the planned TweakXL runtime-log pass using the user's clean new-save
+launch on the frozen mod collection.
+
+Changes:
+
+- Added newest-log discovery and parsing for timestamped TweakXL logs under the
+  configured game directory.
+- Tracked `Reading "..."` context so import errors map to the responsible
+  deployed tweak file, Vortex staging mod, and source line.
+- Correlated post-import hash-only validation warnings through the owning
+  TweakDB flat and all matching installed source candidates.
+- Added focused rules for failed clones, unknown properties, ambiguous
+  definitions, dangling references, and generic future errors/warnings.
+- Preserved each runtime event as evidence while consolidating results by rule
+  and attributed participant set.
+- Correlated failed clone events with matching static missing/case-mismatched
+  `$base` findings and added runtime coverage to JSON, Markdown, and HTML.
+- Bumped the scanner to version 0.8.0 and documented automatic log analysis.
+
+Validation:
+
+- All 47 automated tests pass.
+- A full cached frozen-corpus scan completed successfully in 31.9 seconds;
+  staging and game inputs were not modified.
+- Parsed the 333-line `TweakXL-2026-08-02-23-33-11.log`: 74 errors and 12
+  warnings became seven consolidated findings, with all 86 events attributed
+  to staging sources.
+- The static capitalization error in Attachments Crafting System was directly
+  confirmed at runtime and maps back to line 94.
+- Runtime-only failures comprise 12 unknown properties in Better Living Buffs,
+  one unknown property in NCEE NPC, 60 ambiguous definitions across More Mods
+  More Fun / its compatible patch / 6 More Weapon Mod Slots, and 12 dangling
+  references from `Items.TechMod2_Common.placementSlots`.
+- Reports now contain 49 findings: 6 conflicts, 7 errors, 3 warnings, 16
+  reviews, and 17 infos.
+- The same launch also produced ArchiveXL errors/warnings suitable for the next
+  planned ArchiveXL runtime-correlation pass; RED4ext and redscript showed no
+  matched error/warning lines in the focused sanity check.
 
 ### 2026-08-02 — TweakXL record dependency analysis
 

@@ -44,6 +44,21 @@ class HtmlReportTests(unittest.TestCase):
                                 }
                             ],
                             "resource_operations": [],
+                            "runtime_logs": [
+                                {
+                                    "name": "latest TweakXL log",
+                                    "status": "analyzed",
+                                    "lines": 10,
+                                    "errors": 1,
+                                    "warnings": 0,
+                                    "events": 1,
+                                    "correlated_events": 1,
+                                    "static_confirmations": 1,
+                                    "findings": 1,
+                                    "log_path": "TweakXL-test.log",
+                                    "note": "Test runtime coverage",
+                                }
+                            ],
                             "payloads": {
                                 "localization": {
                                     "declarations": 1,
@@ -72,6 +87,7 @@ class HtmlReportTests(unittest.TestCase):
             self.assertIn('id="ecosystem"', html)
             self.assertIn('id="coverage"', html)
             self.assertIn("Payload inspection", html)
+            self.assertIn("Runtime log correlation", html)
             self.assertNotIn("</script><script>alert(1)</script>", html)
             match = re.search(
                 r'<script id="report-data" type="application/json">(.*?)</script>',

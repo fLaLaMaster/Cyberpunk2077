@@ -323,6 +323,18 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "note", label: "Coverage note"}
         ]));
       }
+      if ((analyzer.runtime_logs || []).length) {
+        const label = document.createElement("h3"); label.textContent = "Runtime log correlation"; group.append(label);
+        group.append(coverageTable(analyzer.runtime_logs, [
+          {key: "name", label: "Log analyzer"}, {key: "status", label: "Status"},
+          {key: "lines", label: "Lines"}, {key: "errors", label: "Errors"},
+          {key: "warnings", label: "Warnings"}, {key: "events", label: "Events"},
+          {key: "correlated_events", label: "Source-attributed"},
+          {key: "static_confirmations", label: "Static confirmations"},
+          {key: "findings", label: "Findings"}, {key: "log_path", label: "Selected log"},
+          {key: "note", label: "Coverage note"}
+        ]));
+      }
       if (analyzer.payloads) {
         const label = document.createElement("h3"); label.textContent = "Payload inspection"; group.append(label);
         const payloadRows = [];

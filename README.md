@@ -28,6 +28,8 @@ Implemented analysis includes:
   sources, and generated inline record IDs in the local TweakDB binaries;
 - TweakXL base-chain cycle, case-mismatch, missing-record, and compact
   cross-mod custom-record dependency analysis;
+- newest-log TweakXL runtime error/warning parsing, source-file attribution,
+  static-finding confirmation, and compact event consolidation;
 - deterministic JSON and Markdown reports.
 
 Reports include an analyzer-coverage panel that distinguishes analyzed,
@@ -48,6 +50,13 @@ Dependency checks resolve explicit `t"..."`/`TweakDBID("...")` foreign keys and
 implicit values that exactly match an installed custom record provider. Other
 implicit scalar values are intentionally left unclassified until property type
 metadata is available.
+
+Each scan also reads the newest timestamped TweakXL log below the configured
+game directory. Runtime errors emitted while a file is being read are mapped
+back to its Vortex staging artifact and source line where possible. Later
+hash-only validation warnings are correlated through their owning TweakDB flat.
+The runtime log remains a read-only input and repeated events are consolidated
+without discarding their individual log evidence.
 
 ## Run
 

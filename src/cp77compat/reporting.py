@@ -135,6 +135,20 @@ def write_reports(
                         f"missing={dependency['missing']}; "
                         f"cycles={dependency['cycles']} — {dependency['note']}"
                     )
+            runtime_logs = analyzer.get("runtime_logs", [])
+            if runtime_logs:
+                lines.extend(["", "#### Runtime log correlation", ""])
+                for runtime in runtime_logs:
+                    lines.append(
+                        f"- `{runtime['name']}`: {runtime['status']}; "
+                        f"errors={runtime['errors']}; warnings={runtime['warnings']}; "
+                        f"events={runtime['events']}; "
+                        f"source-attributed={runtime['correlated_events']}; "
+                        f"static-confirmations={runtime['static_confirmations']}; "
+                        f"findings={runtime['findings']} — {runtime['note']}"
+                    )
+                    if runtime.get("log_path"):
+                        lines.append(f"  - Log: `{runtime['log_path']}`")
             payloads = analyzer.get("payloads")
             if payloads:
                 lines.extend(["", "#### Payload inspection", ""])

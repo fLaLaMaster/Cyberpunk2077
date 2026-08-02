@@ -11,8 +11,9 @@ resources inside `.archive` files with WolvenKit CLI, and performs
 ecosystem-specific semantic compatibility checks.
 
 The scanner is being developed incrementally. ArchiveXL and TweakXL are the
-currently supported ecosystems. Planned ecosystems include REDscript, CET Lua,
-input/config files, RED4ext native plugins, and runtime logs.
+currently supported ecosystems. TweakXL runtime logs are supported. Planned
+ecosystems include REDscript, CET Lua, input/config files, RED4ext native
+plugins, and runtime correlation for the remaining frameworks.
 
 ## Workspace paths
 
@@ -127,6 +128,11 @@ python -m unittest discover -s tests -v
   `$instances`, extracts concrete record/flat/property operations, and compares
   destructive assignments with additive array mutations. Source lines survive
   aliases and template expansion.
+- `src/cp77compat/tweakxl_runtime.py`
+  Selects the newest timestamped TweakXL log, parses runtime errors and
+  warnings, attributes file-scoped events through `Reading` context, resolves
+  late validation events through TweakDB identities, and correlates compatible
+  static findings.
 - `src/cp77compat/reporting.py`
   Writes inventory, archive manifest, per-ecosystem reference/finding JSON,
   combined findings JSON, Markdown, and HTML reports.
@@ -138,7 +144,8 @@ python -m unittest discover -s tests -v
   Orchestrates the scan and exposes CLI options.
 - `tests/`
   Unit tests for ArchiveXL and TweakXL parsing/comparison, archive output
-  parsing, loose resource resolution, configuration, and safe HTML embedding.
+  parsing, loose resource resolution, TweakXL runtime correlation,
+  configuration, and safe HTML embedding.
 
 ## Data model and report semantics
 
@@ -169,7 +176,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.7.0 scan on 2026-08-02 reported:
+The successful v0.8.0 scan on 2026-08-02 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -202,14 +209,17 @@ The successful v0.7.0 scan on 2026-08-02 reported:
   18,660 of those references form three compact cross-mod dependency
   relationships. No explicit `t"..."`/`TweakDBID("...")` foreign keys occur in
   the frozen TweakXL corpus.
-- 42 consolidated findings overall:
+- The newest 333-line TweakXL runtime log contained 74 errors and 12 warnings.
+  All 86 events were attributed to staging sources and consolidated into seven
+  runtime findings; the static `$base` capitalization error was confirmed.
+- 49 consolidated findings overall:
   - 6 conflict candidates.
-  - 1 error.
-  - 2 warnings.
+  - 7 errors.
+  - 3 warnings.
   - 16 review groups.
   - 17 informational findings.
 - Zero WolvenKit indexing failures.
-- Forty-five automated tests passing.
+- Forty-seven automated tests passing.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
@@ -258,6 +268,17 @@ Important current findings:
     Attachments Unrestricted consumes records from Attachments Crafting System
     and 6 More Weapon Mod Slots, while More Mods More Fun Compatible Patch also
     consumes records from 6 More Weapon Mod Slots.
+14. The latest runtime log directly confirms the Attachments Crafting System
+    capitalization error at source line 94.
+15. Better Living Buffs produces 12 unknown-property errors: `isActive` once
+    and `maxFactor` on 11 records. NCEE NPC separately assigns the unknown
+    `enabledPhotoModePuppet` property at line 5,064.
+16. More Mods More Fun, its compatible patch, and 6 More Weapon Mod Slots each
+    produce 20 ambiguous-definition errors for the same set of weapon-mod
+    records, for 60 runtime events total.
+17. TweakXL validation reports 12 hash-only missing targets from
+    `Items.TechMod2_Common.placementSlots`; all three mods above mutate that
+    flat and are retained as source candidates.
 
 Analyzer coverage is embedded in all primary reports. It currently records 45
 ArchiveXL documents with `resource` sections and marks all five installed
@@ -272,7 +293,10 @@ uninspected outcomes are recorded there as well.
 TweakXL coverage now includes record-provider indexing, `$base` resolution and
 cycle counts, explicit foreign-key results, and conservative implicit
 custom-provider matches. Arbitrary implicit scalar values remain partial rather
-than being guessed without property type metadata.
+than being guessed without property type metadata. The newest TweakXL runtime
+log is also analyzed automatically; coverage records the selected path, line
+and event counts, source attribution, static confirmations, and consolidated
+finding count.
 
 ## Generated reports
 

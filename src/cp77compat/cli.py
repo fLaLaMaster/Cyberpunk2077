@@ -28,6 +28,7 @@ from .models import Finding
 from .reporting import write_reports
 from .tweakxl import compare_tweak_references, parse_tweak_documents
 from .tweakxl_dependencies import analyze_tweak_dependencies
+from .tweakxl_runtime import analyze_tweakxl_runtime_logs
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -109,7 +110,35 @@ def run_scan(args: argparse.Namespace) -> int:
         args.game,
     )
     findings.extend(dependency_findings)
+    runtime_findings, runtime_coverage = analyze_tweakxl_runtime_logs(
+        args.game,
+        artifacts,
+        tweak_references,
+        findings,
+    )
+    findings.extend(runtime_findings)
+    tweak_coverage["runtime_logs"] = [runtime_coverage]
+    tweak_coverage["sections"].append(
+        {
+            "name": "runtime log correlation",
+            "documents": 1 if runtime_coverage["status"] == "analyzed" else 0,
+            "status": runtime_coverage["status"],
+            "note": (
+                f"Latest TweakXL log: {runtime_coverage['errors']} errors, "
+                f"{runtime_coverage['warnings']} warnings, "
+                f"{runtime_coverage['correlated_events']} source-attributed events."
+                if runtime_coverage["status"] == "analyzed"
+                else runtime_coverage["note"]
+            ),
+        }
+    )
     coverage["tweakxl"] = tweak_coverage
+    if runtime_coverage["status"] == "analyzed":
+        print(
+            f"Parsed latest TweakXL runtime log: {runtime_coverage['errors']} errors, "
+            f"{runtime_coverage['warnings']} warnings, "
+            f"{runtime_coverage['findings']} consolidated findings"
+        )
     print(
         f"Found {len(mods)} mods, {len(artifacts)} files, "
         f"{len(documents)} non-empty ArchiveXL configs, and "
