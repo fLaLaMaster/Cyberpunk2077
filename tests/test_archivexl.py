@@ -15,8 +15,10 @@ from cp77compat.archivexl import (
 from cp77compat.archivexl_payload_analysis import (
     compare_factory_entries,
     compare_localization_entries,
+    compare_patch_target_entries,
     parse_factory_payload,
     parse_localization_payload,
+    parse_resource_patch_payload,
     validate_factory_targets,
 )
 from cp77compat.models import ArchiveManifest, ArchiveMember, Artifact, Reference
@@ -35,6 +37,98 @@ def artifact(path: Path, mod: str) -> Artifact:
 
 
 class ArchiveXLTests(unittest.TestCase):
+    def test_patch_payload_named_objects_have_stable_identities(self) -> None:
+        declaration = Reference(
+            "archivexl",
+            "resource.patch",
+            r"base\player.ent",
+            "A",
+            "a.xl",
+            line=5,
+            details={"source": r"mod\patch.ent"},
+        )
+        serialized = {
+            "Data": {
+                "RootChunk": {
+                    "$type": "entEntityTemplate",
+                    "components": [
+                        {"$type": "entMeshComponent", "name": "Body:Example"}
+                    ],
+                }
+            }
+        }
+        references, findings = parse_resource_patch_payload(
+            declaration, serialized, "a.archive"
+        )
+        self.assertEqual([], findings)
+        self.assertEqual(1, len(references))
+        self.assertEqual(
+            "components[name=Body:Example]",
+            references[0].details["inner_identity"],
+        )
+        self.assertEqual(5, references[0].line)
+
+    def test_patch_payload_same_inner_identity_with_different_data_conflicts(self) -> None:
+        declarations = []
+        entries = []
+        for mod, path in (("A", r"a\mesh.mesh"), ("B", r"b\mesh.mesh")):
+            declaration = Reference(
+                "archivexl",
+                "resource.patch",
+                r"base\shared.mesh",
+                mod,
+                f"{mod}.xl",
+                details={"source": path},
+            )
+            declarations.append(declaration)
+            parsed, _findings = parse_resource_patch_payload(
+                declaration,
+                {
+                    "Data": {
+                        "RootChunk": {
+                            "$type": "CMesh",
+                            "appearances": [
+                                {"name": "shared", "value": mod}
+                            ],
+                        }
+                    }
+                },
+                f"{mod}.archive",
+            )
+            entries.extend(parsed)
+        finding = compare_patch_target_entries(declarations, entries, True)
+        self.assertEqual("AXL-RESOURCE-PATCH-INNER-CONFLICT", finding.rule_id)
+        self.assertEqual("conflict", finding.severity)
+
+    def test_patch_payload_disjoint_inner_identities_are_composable(self) -> None:
+        declarations = []
+        entries = []
+        for mod in ("A", "B"):
+            declaration = Reference(
+                "archivexl",
+                "resource.patch",
+                r"base\shared.ent",
+                mod,
+                f"{mod}.xl",
+                details={"source": f"{mod}.ent"},
+            )
+            declarations.append(declaration)
+            parsed, _findings = parse_resource_patch_payload(
+                declaration,
+                {
+                    "Data": {
+                        "RootChunk": {
+                            "$type": "entEntityTemplate",
+                            "components": [{"name": f"component-{mod}"}],
+                        }
+                    }
+                },
+                f"{mod}.archive",
+            )
+            entries.extend(parsed)
+        finding = compare_patch_target_entries(declarations, entries, True)
+        self.assertEqual("AXL-RESOURCE-PATCH-DISJOINT", finding.rule_id)
+
     def test_parses_serialized_factory_rows(self) -> None:
         declaration = Reference(
             "archivexl",

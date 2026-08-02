@@ -6,14 +6,53 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.5.0`
+- Scanner version: `0.6.0`
 - Implemented ecosystems: ArchiveXL and TweakXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 37 passing
+- Automated tests: 40 passing
 - Last complete scan: successful on 2026-08-02
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-02 — ArchiveXL resource patch payload identities
+
+Replaced generic shared-target patch assumptions with selective CR2W payload
+comparison for compatibility-relevant sources.
+
+Changes:
+
+- Selected only resource patch sources participating in cross-mod target
+  overlaps: 23 unique sources covering 43 targets and 86 declarations.
+- Serialized `.mesh`, `.ent`, and `.devices` payloads through the existing safe
+  WolvenKit provider.
+- Extracted stable identities from named CR2W objects, patchable scalar
+  properties, and C2dArray-like rows, with canonical fingerprints that omit
+  serializer bookkeeping such as handle IDs and version metadata.
+- Restricted default inspection to documented patchable resource properties;
+  explicit ArchiveXL `props` declarations still control the selected fields.
+- Added conflict, identical-duplicate, disjoint, and uninspected outcomes with
+  medium confidence and consolidated evidence by participant set.
+- Removed the declaration-only `AXL-RESOURCE-PATCH-COMPOSABLE` findings when
+  payload analysis is enabled, and added a `patches` payload scope option.
+- Bumped the scanner to version 0.6.0 and extended report coverage metrics.
+
+Validation:
+
+- Forty unit tests passed.
+- First patch payload pass completed in 73.9 seconds; cached scans remain about
+  9.5 seconds.
+- All 23 selected sources serialized without failure and produced 8,302
+  target-scoped stable inner-identity references with non-null declaration
+  lines.
+- All 43 shared targets are disjoint at meaningful inner identities: 36 citizen
+  entities patch components versus appearances, six player hair resources use
+  distinct appearance identities, and the shared device database receives
+  different device hashes.
+- No patch target was conflicting, duplicated, or left uninspected. Overall
+  severity totals remain 6 conflicts, 2 warnings, 16 reviews, and 16 infos.
+- Regenerated `reports/current`; frozen staging and game inputs were not
+  modified.
 
 ### 2026-08-02 — ArchiveXL factory payload analysis
 

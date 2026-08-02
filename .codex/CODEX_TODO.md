@@ -49,7 +49,8 @@ frozen-corpus validation pass are complete.
   custom tags and source lines.
 - [x] Compare resource patch targets, copy/link destinations, scope members,
   and fix rewrites across mods.
-- [ ] Inspect identities inside serialized resource patch payloads.
+- [x] Inspect identities inside serialized resource patch payloads when two or
+  more mods patch the same target.
 - [ ] Add `customizations` identity and slot/group collision checks.
 - [ ] Determine whether duplicate streaming node deletions are always unsafe,
   idempotent, or rule-dependent; adjust confidence/severity accordingly.

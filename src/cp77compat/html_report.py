@@ -325,7 +325,11 @@ _HTML_TEMPLATE = r'''<!doctype html>
             serializationHits: payload.serialization_cache_hits,
             verified: payload.verified_targets,
             crossMod: payload.cross_mod_targets,
-            missing: payload.missing_targets
+            missing: payload.missing_targets,
+            disjoint: payload.disjoint_targets,
+            duplicate: payload.duplicate_targets,
+            conflicting: payload.conflicting_targets,
+            uninspected: payload.uninspected_targets
           });
         }
         group.append(coverageTable(payloadRows, [
@@ -335,7 +339,9 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "references", label: "References"}, {key: "extractionHits", label: "Extraction hits"},
           {key: "serializationHits", label: "Serialization hits"},
           {key: "verified", label: "Targets verified"}, {key: "crossMod", label: "Cross-mod targets"},
-          {key: "missing", label: "Missing targets"}
+          {key: "missing", label: "Missing targets"}, {key: "disjoint", label: "Disjoint patches"},
+          {key: "duplicate", label: "Duplicate patches"}, {key: "conflicting", label: "Conflicting patches"},
+          {key: "uninspected", label: "Uninspected patches"}
         ]));
       }
       coverageElement.append(group);

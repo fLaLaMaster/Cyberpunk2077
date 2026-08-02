@@ -164,7 +164,7 @@ def load_config(path: Path) -> ScannerConfig:
         payload_scope=_choice(
             scan.get("payload_scope"),
             "all",
-            {"all", "factories", "localization", "none"},
+            {"all", "factories", "localization", "none", "patches"},
             "scan.payload_scope",
         ),
         hash_mode=_choice(scan.get("hash_mode"), "archives", {"none", "archives", "all"}, "scan.hash_mode"),

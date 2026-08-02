@@ -19,6 +19,8 @@ Implemented analysis includes:
   `secondaryKey`/`primaryKey` collision analysis;
 - ArchiveXL factory CSV serialization, entity-name collision checks, and
   factory target resource validation;
+- ArchiveXL shared-target resource patch serialization and comparison of stable
+  inner identities for the installed `.mesh`, `.ent`, and `.devices` overlaps;
 - TweakXL `.yaml`/`.yml` parsing under `r6/tweaks`;
 - TweakDB record, flat, property, `$base`, `$type`, and `$instances` extraction;
 - semantic comparison of complete assignments and tagged array operations;
@@ -27,8 +29,8 @@ Implemented analysis includes:
 Reports include an analyzer-coverage panel that distinguishes analyzed,
 partially analyzed, and unsupported installed sections. Resource operations are
 compared at declaration-identity level. Localization and factory payload entries
-are inspected; identities inside general resource patch payloads remain a later
-milestone.
+are inspected, and patch sources sharing targets are compared by stable inner
+identities. Unshared patch payload contents remain outside the selective scope.
 
 The TweakXL parser preserves YAML anchors, aliases, repeated template roots,
 and the `!append`, `!append-once`, `!append-from`, `!prepend`,
@@ -97,8 +99,8 @@ Archive modes:
 - `--no-refresh-cache` overrides a YAML `refresh_cache: true` value.
 - `--payload-scope all` inspects every implemented ArchiveXL payload type
   (default).
-- `--payload-scope localization` or `--payload-scope factories` limits payload
-  inspection to that resource type.
+- `--payload-scope localization`, `--payload-scope factories`, or
+  `--payload-scope patches` limits inspection to that payload type.
 - `--payload-scope none` keeps the scan declaration-only and does not
   materialize payloads.
 

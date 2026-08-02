@@ -19,6 +19,7 @@ from .archivexl import (
 from .archivexl_payload_analysis import (
     inspect_factory_payloads,
     inspect_localization_payloads,
+    inspect_resource_patch_payloads,
 )
 from .config import DEFAULT_CONFIG_PATH, ScannerConfig, load_config
 from .deployment import load_deployment
@@ -41,7 +42,8 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--cache", type=Path)
     scan.add_argument("--archive-scope", choices=("none", "xl", "all"))
     scan.add_argument(
-        "--payload-scope", choices=("none", "localization", "factories", "all")
+        "--payload-scope",
+        choices=("none", "localization", "factories", "patches", "all"),
     )
     scan.add_argument("--hash-mode", choices=("none", "archives", "all"))
     scan.add_argument("--workers", type=int)
@@ -200,6 +202,36 @@ def run_scan(args: argparse.Namespace) -> int:
                 print(
                     f"Serialized {payload_stats['serialized']} factory payloads; "
                     f"extracted {payload_stats['entry_references']} entity rows"
+                )
+            if args.payload_scope in {"patches", "all"}:
+                print("Inspecting shared ArchiveXL resource patch payloads")
+                payload_references, payload_findings, payload_stats = (
+                    inspect_resource_patch_payloads(
+                        references,
+                        manifests,
+                        provider,
+                        workers=args.workers,
+                    )
+                )
+                references.extend(payload_references)
+                findings = [
+                    finding
+                    for finding in findings
+                    if finding.rule_id != "AXL-RESOURCE-PATCH-COMPOSABLE"
+                ]
+                findings.extend(payload_findings)
+                payload_coverage["patches"] = payload_stats
+                for section in coverage["archivexl"]["sections"]:
+                    if section["name"] == "resource":
+                        section["note"] = (
+                            "Declarations are analyzed and shared-target patch "
+                            "payloads are compared by stable inner identities; "
+                            "unshared payload contents remain outside scan scope."
+                        )
+                        break
+                print(
+                    f"Serialized {payload_stats['serialized']} shared patch payloads; "
+                    f"compared {payload_stats['shared_targets']} targets"
                 )
             if payload_coverage:
                 coverage["archivexl"]["payloads"] = payload_coverage
