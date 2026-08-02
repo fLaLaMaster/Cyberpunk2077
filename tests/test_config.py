@@ -21,6 +21,7 @@ paths:
   cache: .cache/archives
 scan:
   archive_scope: none
+  payload_scope: none
   hash_mode: none
   workers: 2
   refresh_cache: true
@@ -32,6 +33,7 @@ scan:
             self.assertEqual(root / "reports" / "current", config.output)
             self.assertEqual(root / ".cache" / "archives", config.cache)
             self.assertEqual("none", config.archive_scope)
+            self.assertEqual("none", config.payload_scope)
             self.assertTrue(config.refresh_cache)
             self.assertEqual(45, config.wolvenkit_timeout_seconds)
 
@@ -64,6 +66,7 @@ scan:
                 output=root / "override",
                 cache=None,
                 archive_scope="all",
+                payload_scope="none",
                 hash_mode=None,
                 workers=7,
                 refresh_cache=False,
@@ -73,6 +76,7 @@ scan:
             resolved = resolve_scan_args(args, config)
             self.assertEqual(7, resolved.workers)
             self.assertEqual("all", resolved.archive_scope)
+            self.assertEqual("none", resolved.payload_scope)
             self.assertFalse(resolved.refresh_cache)
             self.assertEqual((root / "override").resolve(), resolved.output)
 

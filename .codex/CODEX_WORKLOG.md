@@ -6,14 +6,93 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.2.1`
+- Scanner version: `0.4.0`
 - Implemented ecosystems: ArchiveXL and TweakXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 23 passing
+- Automated tests: 34 passing
 - Last complete scan: successful on 2026-08-02
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-02 — Selective payload provider and localization analysis
+
+Added safe, cache-backed ArchiveXL payload inspection and used it for on-screen
+localization resources.
+
+Changes:
+
+- Added an archive payload provider interface and WolvenKit implementation.
+- Verified requested resources against indexed archive manifests, mapped them
+  only below `.cache/archives/<sha256>/extracted`, and rejected absolute or
+  traversal paths before tool execution.
+- Used numeric FNV-1a resource hashes for exact extraction after confirming that
+  passing a resource path to WolvenKit `--hash` can extract multiple related
+  members.
+- Captured `convert serialize --print` JSON, cached it separately, and recorded
+  commands, tool/source versions and hashes, timing, output hashes, and failures
+  in per-resource metadata.
+- Added cache validation and automatic recovery from missing, corrupt, stale,
+  or mismatched payload and serialization entries.
+- Added locale-scoped ArchiveXL localization entry references and comparison
+  rules for duplicate/conflicting `secondaryKey` and nonzero `primaryKey`
+  definitions.
+- Added `payload_scope: localization` configuration and CLI override, payload
+  coverage statistics in Markdown/HTML, and scanner version 0.4.0.
+
+Validation:
+
+- Thirty-four unit tests passed.
+- Cold frozen-corpus scan completed in 546 seconds; the immediate warm-cache
+  scan completed in 9.51 seconds.
+- Serialized all 181 archive-owned localization payloads with zero failures and
+  extracted 4,124 entry references. Four declarations without a resource in
+  their own indexed archive remained covered by existing missing/cross-mod
+  resource findings.
+- Every warm run used 181 extraction and 181 serialization cache hits.
+- No duplicate or conflicting cross-mod localization keys were found, so the
+  overall result remained 40 findings: 6 conflicts, 2 warnings, 16 reviews, and
+  16 informational findings.
+- Regenerated `reports/current`; frozen staging and game inputs were not
+  modified. Two scanner-cache-only probe directories were removed after the CLI
+  behavior check.
+
+### 2026-08-02 — ArchiveXL resource declarations and coverage
+
+Added declaration-level semantic analysis for every ArchiveXL `resource`
+operation installed in the frozen corpus.
+
+Changes:
+
+- Preserved ArchiveXL custom tags such as `!include` with source locations.
+- Parsed `resource.patch`, `copy`, `link`, `scope`, and `fix` in their installed
+  list and structured `props`/`targets` forms.
+- Added references for patch targets, copy/link destinations, scope members,
+  and individual fix rewrites.
+- Added conflict rules for competing copy/link targets and contradictory fix
+  rewrites.
+- Added informational rules for composable patch targets, identical redirects,
+  and duplicate scope members, plus review handling for patch/redirect overlap.
+- Added malformed-shape errors and unknown-operation review findings so future
+  syntax cannot be silently ignored.
+- Added ArchiveXL analyzer coverage to JSON, Markdown, and a collapsible HTML
+  table with analyzed, partial, and unsupported states.
+- Bumped scanner version to 0.3.0.
+
+Validation:
+
+- Twenty-seven unit tests passed.
+- Full frozen-corpus scan parsed 21,611 resource references with zero null source
+  lines and no malformed declarations.
+- Observed operations: 19,281 `fix`, 1,267 `scope`, 1,010 `patch`, 39 `link`,
+  and 14 `copy` references.
+- Found no new resource conflict, warning, review, or parser error.
+- Found 43 composable patch-target overlaps across three participant groups and
+  four identical redirect targets across the two Beautiful Eyebrows variants.
+- Overall baseline is now 35,926 ArchiveXL references and 40 findings: 6
+  conflicts, 2 warnings, 16 reviews, and 16 informational findings.
+- Regenerated `reports/current`; HTML remains approximately 0.75 MB.
+- Frozen staging and game inputs were not modified.
 
 ### 2026-08-02 — Structural source-line tracking
 

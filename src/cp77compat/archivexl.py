@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -28,6 +28,54 @@ KNOWN_LOCALES = {
     "hu-hu", "it-it", "jp-jp", "kr-kr", "pl-pl", "pt-br", "ru-ru",
     "th-th", "tr-tr", "ua-ua", "zh-cn", "zh-tw",
 }
+
+RESOURCE_OPERATIONS = {"copy", "fix", "link", "patch", "scope"}
+
+SECTION_COVERAGE = {
+    "customizations": (
+        "unsupported",
+        "Declarations are inventoried but customization identities are not compared yet.",
+    ),
+    "factories": (
+        "partial",
+        "Factory resources are resolved; CSV entity definitions are not inspected yet.",
+    ),
+    "journal": (
+        "unsupported",
+        "Journal declarations are not interpreted yet.",
+    ),
+    "localization": (
+        "partial",
+        "On-screen resources are resolved; localization entries are not inspected yet.",
+    ),
+    "overrides": (
+        "unsupported",
+        "Override identities and operations are not interpreted yet.",
+    ),
+    "player": (
+        "unsupported",
+        "Player declarations are not interpreted yet.",
+    ),
+    "quest": (
+        "unsupported",
+        "Quest phase operations are not interpreted yet.",
+    ),
+    "resource": (
+        "partial",
+        "Resource declarations and overlaps are analyzed; patch payload contents are pending.",
+    ),
+    "streaming": (
+        "partial",
+        "Blocks, sectors, and node deletions are analyzed.",
+    ),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class ArchiveXLTagged:
+    tag: str
+    value: Any
+    line: int | None = None
 
 
 class ArchiveXLLoader(yaml.SafeLoader):
@@ -84,12 +132,22 @@ def _construct_sequence(
     return sequence
 
 
-def _construct_unknown_tag(loader: ArchiveXLLoader, _suffix: str, node: yaml.Node) -> Any:
+def _construct_unknown_tag(
+    loader: ArchiveXLLoader,
+    suffix: str,
+    node: yaml.Node,
+) -> ArchiveXLTagged:
     if isinstance(node, yaml.ScalarNode):
-        return loader.construct_scalar(node)
-    if isinstance(node, yaml.SequenceNode):
-        return _construct_sequence(loader, node, deep=True)
-    return _construct_mapping(loader, node, deep=True)
+        value: Any = loader.construct_scalar(node)
+    elif isinstance(node, yaml.SequenceNode):
+        value = _construct_sequence(loader, node, deep=True)
+    else:
+        value = _construct_mapping(loader, node, deep=True)
+    return ArchiveXLTagged(
+        tag=suffix.lstrip("!").casefold(),
+        value=value,
+        line=node.start_mark.line + 1,
+    )
 
 
 ArchiveXLLoader.add_constructor(
@@ -135,14 +193,17 @@ def _sequence_entries(value: Any) -> list[tuple[Any, int | None]]:
 
 
 def _as_paths(value: Any, fallback_line: int | None = None) -> list[tuple[str, int | None]]:
+    if isinstance(value, ArchiveXLTagged):
+        if isinstance(value.value, str):
+            return [(value.value, value.line or fallback_line)]
+        return _as_paths(value.value, value.line or fallback_line)
     if isinstance(value, str):
         return [(value, fallback_line)]
     if isinstance(value, list):
-        return [
-            (item, line or fallback_line)
-            for item, line in _sequence_entries(value)
-            if isinstance(item, str)
-        ]
+        paths: list[tuple[str, int | None]] = []
+        for item, line in _sequence_entries(value):
+            paths.extend(_as_paths(item, line or fallback_line))
+        return paths
     return []
 
 
@@ -275,9 +336,263 @@ def _reference(
     )
 
 
+def _tagged_paths(
+    value: Any,
+    fallback_line: int | None = None,
+) -> list[tuple[str, int | None, str | None]]:
+    if isinstance(value, ArchiveXLTagged):
+        if isinstance(value.value, str):
+            return [(value.value, value.line or fallback_line, value.tag)]
+        return [
+            (path, line, tag or value.tag)
+            for path, line, tag in _tagged_paths(
+                value.value, value.line or fallback_line
+            )
+        ]
+    if isinstance(value, str):
+        return [(value, fallback_line, None)]
+    if isinstance(value, list):
+        paths: list[tuple[str, int | None, str | None]] = []
+        for item, line in _sequence_entries(value):
+            paths.extend(_tagged_paths(item, line or fallback_line))
+        return paths
+    return []
+
+
+def _resource_shape_finding(
+    document: ArchiveXLDocument,
+    operation: str,
+    explanation: str,
+    line: int | None,
+) -> Finding:
+    return Finding(
+        rule_id="AXL-RESOURCE-SHAPE",
+        severity="error",
+        confidence="high",
+        summary=f"Invalid ArchiveXL resource.{operation} declaration",
+        explanation=explanation,
+        participants=[document.artifact.mod_name],
+        evidence=[{"path": str(document.artifact.absolute_path), "line": line}],
+    )
+
+
+def _resource_reference(
+    document: ArchiveXLDocument,
+    operation: str,
+    identity: str,
+    line: int | None,
+    **details: Any,
+) -> Reference:
+    return _reference(
+        document,
+        f"resource.{operation}",
+        identity,
+        line,
+        resource_operation=operation,
+        **details,
+    )
+
+
+def _extract_resource_references(
+    document: ArchiveXLDocument,
+    resource: dict[Any, Any],
+    findings: list[Finding],
+) -> list[Reference]:
+    refs: list[Reference] = []
+    for raw_operation, declarations in resource.items():
+        operation = str(raw_operation).casefold()
+        operation_line = _mapping_line(resource, raw_operation)
+        if operation not in RESOURCE_OPERATIONS:
+            findings.append(
+                Finding(
+                    rule_id="AXL-RESOURCE-UNKNOWN-OPERATION",
+                    severity="review",
+                    confidence="high",
+                    summary=f"Unknown ArchiveXL resource operation: {raw_operation}",
+                    explanation=(
+                        "The operation is inventoried by coverage reporting but its "
+                        "semantics are not compared."
+                    ),
+                    participants=[document.artifact.mod_name],
+                    evidence=[
+                        {
+                            "path": str(document.artifact.absolute_path),
+                            "line": operation_line,
+                        }
+                    ],
+                )
+            )
+            continue
+        if not isinstance(declarations, dict):
+            findings.append(
+                _resource_shape_finding(
+                    document,
+                    operation,
+                    f"resource.{operation} must be a mapping.",
+                    operation_line,
+                )
+            )
+            continue
+
+        for raw_source, raw_value in declarations.items():
+            if not isinstance(raw_source, str):
+                findings.append(
+                    _resource_shape_finding(
+                        document,
+                        operation,
+                        "Resource source, target, or scope identifiers must be strings.",
+                        _mapping_line(declarations, raw_source, operation_line),
+                    )
+                )
+                continue
+            source_line = _mapping_line(declarations, raw_source, operation_line)
+
+            if operation in {"copy", "link"}:
+                targets = _tagged_paths(raw_value, source_line)
+                if not targets:
+                    findings.append(
+                        _resource_shape_finding(
+                            document,
+                            operation,
+                            f"resource.{operation}.{raw_source} must list target paths.",
+                            source_line,
+                        )
+                    )
+                for target, line, tag in targets:
+                    refs.append(
+                        _resource_reference(
+                            document,
+                            operation,
+                            target,
+                            line,
+                            source=raw_source,
+                            target=target,
+                            target_tag=tag,
+                        )
+                    )
+                continue
+
+            if operation == "scope":
+                members = _tagged_paths(raw_value, source_line)
+                if not members:
+                    findings.append(
+                        _resource_shape_finding(
+                            document,
+                            operation,
+                            f"resource.scope.{raw_source} must list scope members.",
+                            source_line,
+                        )
+                    )
+                for member, line, tag in members:
+                    refs.append(
+                        _resource_reference(
+                            document,
+                            operation,
+                            f"{raw_source}#{member}",
+                            line,
+                            scope=raw_source,
+                            member=member,
+                            member_tag=tag,
+                        )
+                    )
+                continue
+
+            if operation == "patch":
+                properties: list[str] = []
+                target_value = raw_value
+                if isinstance(raw_value, dict):
+                    properties = [
+                        path
+                        for path, _line in _as_paths(
+                            raw_value.get("props"),
+                            _mapping_line(raw_value, "props", source_line),
+                        )
+                    ]
+                    target_value = raw_value.get("targets")
+                targets = _tagged_paths(target_value, source_line)
+                if not targets:
+                    findings.append(
+                        _resource_shape_finding(
+                            document,
+                            operation,
+                            f"resource.patch.{raw_source} must list patch targets.",
+                            source_line,
+                        )
+                    )
+                for target, line, tag in targets:
+                    refs.append(
+                        _resource_reference(
+                            document,
+                            operation,
+                            target,
+                            line,
+                            source=raw_source,
+                            target=target,
+                            properties=properties,
+                            target_tag=tag,
+                        )
+                    )
+                continue
+
+            # resource.fix: target -> category -> original value -> replacement
+            if not isinstance(raw_value, dict):
+                findings.append(
+                    _resource_shape_finding(
+                        document,
+                        operation,
+                        f"resource.fix.{raw_source} must be a mapping.",
+                        source_line,
+                    )
+                )
+                continue
+            for raw_category, replacements in raw_value.items():
+                category = str(raw_category)
+                category_line = _mapping_line(raw_value, raw_category, source_line)
+                if not isinstance(replacements, dict):
+                    findings.append(
+                        _resource_shape_finding(
+                            document,
+                            operation,
+                            f"resource.fix.{raw_source}.{category} must be a mapping.",
+                            category_line,
+                        )
+                    )
+                    continue
+                for original, replacement in replacements.items():
+                    if not isinstance(original, str) or not isinstance(replacement, str):
+                        findings.append(
+                            _resource_shape_finding(
+                                document,
+                                operation,
+                                "Resource fix keys and replacements must be strings.",
+                                _mapping_line(
+                                    replacements, original, category_line
+                                ),
+                            )
+                        )
+                        continue
+                    refs.append(
+                        _resource_reference(
+                            document,
+                            operation,
+                            f"{raw_source}#{category}#{original}",
+                            _mapping_line(replacements, original, category_line),
+                            target=raw_source,
+                            category=category,
+                            original=original,
+                            replacement=replacement,
+                        )
+                    )
+    return refs
+
+
 def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) -> list[Reference]:
     data = document.data
     refs: list[Reference] = []
+
+    resource = data.get("resource")
+    if isinstance(resource, dict):
+        refs.extend(_extract_resource_references(document, resource, findings))
 
     localization = data.get("localization")
     if isinstance(localization, dict):
@@ -467,6 +782,238 @@ def compare_references(references: Iterable[Reference]) -> list[Finding]:
             )
         )
     return findings
+
+
+def compare_resource_references(references: Iterable[Reference]) -> list[Finding]:
+    resource_refs = [
+        reference
+        for reference in references
+        if reference.kind.startswith("resource.")
+    ]
+    by_kind_identity: dict[tuple[str, str], list[Reference]] = defaultdict(list)
+    redirects_by_target: dict[str, list[Reference]] = defaultdict(list)
+    patches_by_target: dict[str, list[Reference]] = defaultdict(list)
+    for reference in resource_refs:
+        by_kind_identity[(reference.kind, reference.normalized_identity)].append(
+            reference
+        )
+        if reference.kind in {"resource.copy", "resource.link"}:
+            redirects_by_target[reference.normalized_identity].append(reference)
+        elif reference.kind == "resource.patch":
+            patches_by_target[reference.normalized_identity].append(reference)
+
+    overlaps: list[
+        tuple[str, str, str, str, list[str], dict[str, Any]]
+    ] = []
+
+    def add_overlap(
+        rule: str,
+        severity: str,
+        confidence: str,
+        explanation: str,
+        group: list[Reference],
+    ) -> None:
+        participants = sorted({ref.mod_name for ref in group}, key=str.casefold)
+        if len(participants) < 2:
+            return
+        overlaps.append(
+            (
+                rule,
+                severity,
+                confidence,
+                explanation,
+                participants,
+                {
+                    "identity": group[0].identity,
+                    "references": [reference.to_dict() for reference in group],
+                },
+            )
+        )
+
+    for group in patches_by_target.values():
+        add_overlap(
+            "AXL-RESOURCE-PATCH-COMPOSABLE",
+            "info",
+            "medium",
+            (
+                "ArchiveXL is designed to compose multiple patch sources on one "
+                "target. Payload-level identities are not inspected yet, so this "
+                "is a confirmed declaration overlap rather than a full payload "
+                "compatibility guarantee."
+            ),
+            group,
+        )
+
+    for group in redirects_by_target.values():
+        participants = {reference.mod_name for reference in group}
+        if len(participants) < 2:
+            continue
+        mappings = {
+            (
+                reference.kind,
+                normalize_game_path(str(reference.details.get("source", ""))),
+            )
+            for reference in group
+        }
+        if len(mappings) > 1:
+            add_overlap(
+                "AXL-RESOURCE-TARGET-CONFLICT",
+                "conflict",
+                "high",
+                (
+                    "Different mods create the same copy/link target from different "
+                    "sources or through different redirect operations."
+                ),
+                group,
+            )
+        else:
+            add_overlap(
+                "AXL-RESOURCE-TARGET-DUPLICATE",
+                "info",
+                "high",
+                "Multiple mods declare the same resource redirect.",
+                group,
+            )
+
+    for (kind, _identity), group in by_kind_identity.items():
+        if kind == "resource.fix":
+            replacements = {
+                str(reference.details.get("replacement")) for reference in group
+            }
+            if len(replacements) > 1:
+                add_overlap(
+                    "AXL-RESOURCE-FIX-CONFLICT",
+                    "conflict",
+                    "high",
+                    (
+                        "Different mods rewrite the same name or path in the same "
+                        "resource to different replacement values."
+                    ),
+                    group,
+                )
+        elif kind == "resource.scope":
+            add_overlap(
+                "AXL-RESOURCE-SCOPE-DUPLICATE",
+                "info",
+                "high",
+                "Multiple mods append the same member to the same resource scope.",
+                group,
+            )
+
+    for target, patches in patches_by_target.items():
+        redirects = redirects_by_target.get(target, [])
+        if redirects:
+            add_overlap(
+                "AXL-RESOURCE-PATCH-REDIRECT",
+                "review",
+                "medium",
+                (
+                    "One mod patches a resource path while another creates that path "
+                    "through copy/link. Runtime ordering and the resulting payload "
+                    "should be reviewed."
+                ),
+                [*patches, *redirects],
+            )
+
+    aggregate: dict[
+        tuple[str, str, str, str, tuple[str, ...]], list[dict[str, Any]]
+    ] = defaultdict(list)
+    for rule, severity, confidence, explanation, participants, evidence in overlaps:
+        aggregate[
+            (rule, severity, confidence, explanation, tuple(participants))
+        ].append(evidence)
+
+    nouns = {
+        "AXL-RESOURCE-FIX-CONFLICT": "conflicting resource fixes",
+        "AXL-RESOURCE-PATCH-COMPOSABLE": "composable resource patch overlaps",
+        "AXL-RESOURCE-PATCH-REDIRECT": "resource patch/redirect overlaps",
+        "AXL-RESOURCE-SCOPE-DUPLICATE": "duplicate resource scope members",
+        "AXL-RESOURCE-TARGET-CONFLICT": "conflicting resource redirect targets",
+        "AXL-RESOURCE-TARGET-DUPLICATE": "duplicate resource redirects",
+    }
+    findings: list[Finding] = []
+    for (rule, severity, confidence, explanation, participants), evidence in sorted(
+        aggregate.items(),
+        key=lambda item: (
+            item[0][0],
+            tuple(participant.casefold() for participant in item[0][4]),
+        ),
+    ):
+        findings.append(
+            Finding(
+                rule_id=rule,
+                severity=severity,
+                confidence=confidence,
+                summary=f"{len(evidence)} {nouns[rule]}",
+                explanation=explanation,
+                participants=list(participants),
+                evidence=evidence,
+            )
+        )
+    return findings
+
+
+def build_archivexl_coverage(
+    documents: Iterable[ArchiveXLDocument],
+    references: Iterable[Reference],
+) -> dict[str, Any]:
+    document_list = list(documents)
+    reference_list = list(references)
+    section_documents: dict[str, set[str]] = defaultdict(set)
+    operation_documents: dict[str, set[str]] = defaultdict(set)
+    operation_blocks: Counter[str] = Counter()
+    for document in document_list:
+        document_id = str(document.artifact.absolute_path)
+        for raw_section, value in document.data.items():
+            section = str(raw_section).casefold()
+            section_documents[section].add(document_id)
+            if section == "resource" and isinstance(value, dict):
+                for raw_operation in value:
+                    operation = str(raw_operation).casefold()
+                    operation_documents[operation].add(document_id)
+                    operation_blocks[operation] += 1
+
+    reference_counts = Counter(
+        str(reference.details.get("resource_operation"))
+        for reference in reference_list
+        if reference.kind.startswith("resource.")
+    )
+    sections = []
+    for section in sorted(section_documents, key=str.casefold):
+        status, note = SECTION_COVERAGE.get(
+            section,
+            ("unsupported", "Unknown top-level section."),
+        )
+        sections.append(
+            {
+                "name": section,
+                "documents": len(section_documents[section]),
+                "status": status,
+                "note": note,
+            }
+        )
+    resource_operations = []
+    for operation in sorted(operation_documents, key=str.casefold):
+        known = operation in RESOURCE_OPERATIONS
+        resource_operations.append(
+            {
+                "name": operation,
+                "documents": len(operation_documents[operation]),
+                "blocks": operation_blocks[operation],
+                "references": reference_counts[operation],
+                "status": "analyzed" if known else "unsupported",
+                "note": (
+                    "Declaration identities and cross-mod overlaps are analyzed."
+                    if known
+                    else "Operation semantics are not implemented."
+                ),
+            }
+        )
+    return {
+        "documents": len(document_list),
+        "sections": sections,
+        "resource_operations": resource_operations,
+    }
 
 
 def resolve_archive_references(

@@ -67,6 +67,7 @@ Useful options:
 .\run-scanner.cmd --archive-scope none --hash-mode none
 .\run-scanner.cmd --archive-scope xl --workers 4
 .\run-scanner.cmd --archive-scope all
+.\run-scanner.cmd --payload-scope none
 .\run-scanner.cmd --refresh-cache
 ```
 
@@ -76,8 +77,8 @@ Defaults point to the workspace paths above. The normal report destination is
 `cp77compat.yaml` is the authoritative default configuration. It stores input,
 tool, output, cache, archive scope, hash mode, worker, refresh, and WolvenKit
 timeout settings. Relative paths are resolved from the config file directory.
-CLI values override YAML. The schema is versioned and rejects duplicate or
-unknown keys.
+CLI values override YAML. The schema includes archive and payload scope and is
+versioned; it rejects duplicate or unknown keys.
 
 Run tests without installing the package:
 
@@ -102,12 +103,20 @@ python -m unittest discover -s tests -v
   reports exact relative-path collisions.
 - `src/cp77compat/archives.py`
   Invokes `WolvenKit.CLI.exe archiveinfo --list`, parses archive member paths,
-  and caches manifests by archive SHA-256. It does not extract payloads yet.
+  and caches manifests by archive SHA-256.
+- `src/cp77compat/archive_payloads.py`
+  Materializes exact archive members into a SHA-256-keyed scanner cache using
+  numeric FNV-1a hashes, rejects unsafe paths, serializes CR2W resources through
+  WolvenKit, validates cached hashes, and records per-resource metadata.
+- `src/cp77compat/archivexl_payload_analysis.py`
+  Extracts locale-scoped localization entry identities from serialized payloads
+  and compares cross-mod `secondaryKey` and nonzero `primaryKey` definitions.
 - `src/cp77compat/archivexl.py`
   Parses YAML and JSON `.xl` files, rejects duplicate YAML keys, tolerates the
   tab variants present in the frozen corpus, extracts ArchiveXL references,
-  retains mapping/sequence source locations, compares streaming operations, and
-  resolves resources against indexed archives or loose mod files.
+  retains mapping/sequence source locations, compares streaming and resource
+  operations, and resolves resources against indexed archives or loose mod
+  files.
 - `src/cp77compat/tweakxl.py`
   Parses deployed `.yaml` and `.yml` files under `r6/tweaks`, preserves YAML
   anchors, aliases, duplicate template roots, and TweakXL tags, expands
@@ -119,7 +128,8 @@ python -m unittest discover -s tests -v
   combined findings JSON, Markdown, and HTML reports.
 - `src/cp77compat/html_report.py`
   Generates a self-contained offline HTML report with search, severity/rule/mod
-  and ecosystem filters, pagination, and lazily expanded evidence.
+  and ecosystem filters, analyzer-coverage tables, pagination, and lazily
+  expanded evidence.
 - `src/cp77compat/cli.py`
   Orchestrates the scan and exposes CLI options.
 - `tests/`
@@ -155,7 +165,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.2.1 scan on 2026-08-02 reported:
+The successful v0.4.0 scan on 2026-08-02 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -163,21 +173,28 @@ The successful v0.2.1 scan on 2026-08-02 reported:
   framework bundle placeholder.
 - 78 ArchiveXL-related archives indexed.
 - 5,458 indexed archive members.
-- 14,315 extracted ArchiveXL references.
+- 40,050 extracted ArchiveXL references: 35,926 declaration/streaming/resource
+  references plus 4,124 serialized localization entry references.
 - 216 deployed TweakXL YAML files: 214 non-empty configs parsed and two empty
   configs reported informationally.
 - 57,455 concrete TweakXL references after `$instances` expansion.
-- 36 consolidated findings overall:
+- 181 archive-owned localization payloads serialized with zero failures; four
+  declarations without an own indexed archive payload were skipped and remain
+  covered by resource-resolution findings.
+- 40 consolidated findings overall:
   - 6 conflict candidates.
   - 2 warnings.
   - 16 review groups.
-  - 12 informational findings.
+  - 16 informational findings.
 - Zero WolvenKit indexing failures.
-- Twenty-three automated tests passing.
-- Cached normal scan time with both analyzers was approximately 43 seconds.
-- All 71,770 ArchiveXL and TweakXL references have one-based source lines in the
-  generated reports. For minified one-line JSON-shaped `.xl` files, line 1 is
-  correctly shared by every operation in that physical source line.
+- Thirty-four automated tests passing.
+- First payload-populating scan time was 546 seconds; the immediate fully cached
+  normal scan completed in 9.51 seconds.
+- All 97,505 ArchiveXL and TweakXL references have one-based declaration/source
+  lines in the generated reports. Serialized localization entries additionally
+  carry their zero-based payload `entry_index`. For minified one-line
+  JSON-shaped `.xl` files, line 1 is correctly shared by every declaration on
+  that physical source line.
 
 Important current findings:
 
@@ -195,6 +212,21 @@ Important current findings:
 6. TweakXL found 251 concrete TweakDB array identities shared across four mod
    participant groups. All use composable tagged operations in the frozen
    collection; no TweakXL conflict, warning, review, or parser error was found.
+7. ArchiveXL resource declarations add 43 composable cross-mod patch targets,
+   consolidated into three participant groups. No contradictory fix or
+   copy/link target was found.
+8. Two Beautiful Eyebrows variants provide four identical copy targets. This is
+   recorded as one informational duplicate-redirect group.
+9. All 181 available localization payloads were inspected; no cross-mod
+   duplicate or conflicting locale/key identities were found.
+
+Analyzer coverage is embedded in all primary reports. It currently records 45
+ArchiveXL documents with `resource` sections and marks all five installed
+resource operations (`copy`, `fix`, `link`, `patch`, and `scope`) as analyzed at
+declaration level. The `resource` section remains partial until payload contents
+are selectively extracted and compared. Localization is now marked analyzed for
+archive-owned on-screen resources and its extraction/serialization cache counts
+are embedded in report coverage.
 
 ## Generated reports
 

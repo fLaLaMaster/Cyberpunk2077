@@ -18,26 +18,26 @@ frozen-corpus validation pass are complete.
 
 ## Next milestone: selective ArchiveXL payload inspection
 
-- [ ] Add an archive-provider interface separating member indexing from payload
+- [x] Add an archive-provider interface separating member indexing from payload
   materialization.
-- [ ] Add exact, selective extraction into
+- [x] Add exact, selective extraction into
   `.cache/archives/<archive-sha256>/extracted` using WolvenKit filters.
-- [ ] Verify every resolved extraction path remains inside the scanner-owned
+- [x] Verify every resolved extraction path remains inside the scanner-owned
   cache.
-- [ ] Add WolvenKit CR2W serialization to JSON, preferably capturing
+- [x] Add WolvenKit CR2W serialization to JSON, preferably capturing
   `convert serialize --print` output without writing a second permanent copy.
-- [ ] Record WolvenKit command, version, source archive hash, resource path,
+- [x] Record WolvenKit command, version, source archive hash, resource path,
   timeout, and conversion result in cache metadata.
-- [ ] Add cache invalidation and failure findings for partial or corrupt cached
+- [x] Add cache invalidation and failure findings for partial or corrupt cached
   payloads.
-- [ ] Add small synthetic archive/extraction fixtures where practical; never
+- [x] Add small synthetic archive/extraction fixtures where practical; never
   write into the frozen staging or game directories.
 
 ## ArchiveXL semantic coverage
 
-- [ ] Inspect serialized localization resources and detect duplicate
+- [x] Inspect serialized localization resources and detect duplicate
   `secondaryKey` definitions across mods.
-- [ ] Detect competing edits to the same localization `primaryKey`.
+- [x] Detect competing edits to the same localization `primaryKey`.
 - [ ] Inspect serialized factory CSV resources and compare factory entity names
   and target `.ent`/`.app` paths.
 - [ ] Verify factory target resources exist in the declaring mod or document an
@@ -45,8 +45,11 @@ frozen-corpus validation pass are complete.
 - [ ] Parse and analyze `quest.phases` operations and parent targets.
 - [ ] Parse and analyze `journal` resources.
 - [ ] Parse and analyze `overrides` operations.
-- [ ] Add deeper `resource.fix`, `resource.scope`, and related identity-level
-  checks.
+- [x] Parse `resource.patch`, `copy`, `link`, `scope`, and `fix`, preserving
+  custom tags and source lines.
+- [x] Compare resource patch targets, copy/link destinations, scope members,
+  and fix rewrites across mods.
+- [ ] Inspect identities inside serialized resource patch payloads.
 - [ ] Add `customizations` identity and slot/group collision checks.
 - [ ] Determine whether duplicate streaming node deletions are always unsafe,
   idempotent, or rule-dependent; adjust confidence/severity accordingly.
@@ -102,6 +105,8 @@ frozen-corpus validation pass are complete.
 
 ## Reporting and performance
 
+- [x] Add analyzer-coverage tables for installed ArchiveXL sections and
+  resource operations, including analyzed/partial/unsupported status.
 - [x] Attach structural source lines to all current ArchiveXL and TweakXL
   references instead of relying on synthesized-identity text searches.
 - [ ] Add URL/hash-backed HTML filter state so a filtered finding view can be

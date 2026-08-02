@@ -23,6 +23,7 @@ def write_reports(
     tweakxl_references: list[Reference],
     findings: list[Finding],
     metadata: dict[str, Any],
+    coverage: dict[str, Any] | None = None,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     ordered_findings = sorted(findings, key=lambda item: item.sort_key())
@@ -34,6 +35,7 @@ def write_reports(
         "archivexl_references": len(archivexl_references),
         "tweakxl_references": len(tweakxl_references),
         "findings": dict(sorted(Counter(item.severity for item in ordered_findings).items())),
+        "coverage": coverage or {},
     }
     _write_json(
         output_dir / "inventory.json",
@@ -100,9 +102,32 @@ def write_reports(
         f"- TweakXL references: {summary['tweakxl_references']}",
         "- Findings: " + ", ".join(f"{key}={value}" for key, value in summary["findings"].items()),
         "",
-        "## Findings",
-        "",
     ]
+    if summary["coverage"]:
+        lines.extend(["## Analyzer coverage", ""])
+        for ecosystem, analyzer in summary["coverage"].items():
+            lines.extend([f"### {ecosystem}", "", "#### Sections", ""])
+            for section in analyzer.get("sections", []):
+                lines.append(
+                    f"- `{section['name']}`: {section['status']}; "
+                    f"documents={section['documents']} — {section['note']}"
+                )
+            operations = analyzer.get("resource_operations", [])
+            if operations:
+                lines.extend(["", "#### Resource operations", ""])
+                for operation in operations:
+                    lines.append(
+                        f"- `{operation['name']}`: {operation['status']}; "
+                        f"documents={operation['documents']}; "
+                        f"references={operation['references']} — {operation['note']}"
+                    )
+            payloads = analyzer.get("payloads")
+            if payloads:
+                lines.extend(["", "#### Payload inspection", ""])
+                for key, value in payloads.items():
+                    lines.append(f"- `{key}`: {value}")
+            lines.append("")
+    lines.extend(["## Findings", ""])
     if not ordered_findings:
         lines.append("No findings.")
     for finding in ordered_findings:

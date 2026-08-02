@@ -32,6 +32,30 @@ class HtmlReportTests(unittest.TestCase):
                     "archive_members": 0,
                     "archivexl_references": 1,
                     "tweakxl_references": 2,
+                    "coverage": {
+                        "archivexl": {
+                            "documents": 1,
+                            "sections": [
+                                {
+                                    "name": "resource",
+                                    "documents": 1,
+                                    "status": "partial",
+                                    "note": "Example coverage",
+                                }
+                            ],
+                            "resource_operations": [],
+                            "payloads": {
+                                "declarations": 1,
+                                "unique_archive_payloads": 1,
+                                "serialized": 1,
+                                "skipped_without_own_archive": 0,
+                                "failed": 0,
+                                "entry_references": 2,
+                                "extraction_cache_hits": 1,
+                                "serialization_cache_hits": 1,
+                            },
+                        }
+                    },
                 },
                 [finding],
                 {
@@ -44,6 +68,8 @@ class HtmlReportTests(unittest.TestCase):
             self.assertIn('id="search"', html)
             self.assertIn('id="severity"', html)
             self.assertIn('id="ecosystem"', html)
+            self.assertIn('id="coverage"', html)
+            self.assertIn("Payload inspection", html)
             self.assertNotIn("</script><script>alert(1)</script>", html)
             match = re.search(
                 r'<script id="report-data" type="application/json">(.*?)</script>',

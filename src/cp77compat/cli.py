@@ -7,12 +7,16 @@ from pathlib import Path
 
 from . import __version__
 from .archives import WolvenKitArchiveIndexer
+from .archive_payloads import WolvenKitArchivePayloadProvider
 from .archivexl import (
+    build_archivexl_coverage,
     compare_references,
+    compare_resource_references,
     internal_archive_collisions,
     parse_documents,
     resolve_archive_references,
 )
+from .archivexl_payload_analysis import inspect_localization_payloads
 from .config import DEFAULT_CONFIG_PATH, ScannerConfig, load_config
 from .deployment import load_deployment
 from .inventory import build_inventory, discover_mods, exact_path_findings
@@ -33,6 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--output", type=Path)
     scan.add_argument("--cache", type=Path)
     scan.add_argument("--archive-scope", choices=("none", "xl", "all"))
+    scan.add_argument("--payload-scope", choices=("none", "localization"))
     scan.add_argument("--hash-mode", choices=("none", "archives", "all"))
     scan.add_argument("--workers", type=int)
     scan.add_argument(
@@ -52,6 +57,8 @@ def resolve_scan_args(args: argparse.Namespace, config: ScannerConfig) -> argpar
             setattr(args, name, getattr(args, name).expanduser().resolve(strict=False))
     if args.archive_scope is None:
         args.archive_scope = config.archive_scope
+    if args.payload_scope is None:
+        args.payload_scope = config.payload_scope
     if args.hash_mode is None:
         args.hash_mode = config.hash_mode
     if args.workers is None:
@@ -84,6 +91,8 @@ def run_scan(args: argparse.Namespace) -> int:
     documents, references, archive_xl_findings = parse_documents(artifacts)
     findings.extend(archive_xl_findings)
     findings.extend(compare_references(references))
+    findings.extend(compare_resource_references(references))
+    coverage = {"archivexl": build_archivexl_coverage(documents, references)}
     tweak_documents, tweak_references, tweak_findings = parse_tweak_documents(artifacts)
     findings.extend(tweak_findings)
     findings.extend(compare_tweak_references(tweak_references))
@@ -127,6 +136,38 @@ def run_scan(args: argparse.Namespace) -> int:
             findings.extend(index_findings)
             findings.extend(resolve_archive_references(references, manifests, artifacts))
             findings.extend(internal_archive_collisions(manifests))
+            if args.payload_scope == "localization":
+                print("Inspecting ArchiveXL localization payloads")
+                provider = WolvenKitArchivePayloadProvider(
+                    args.wolvenkit,
+                    args.cache,
+                    wolvenkit_version,
+                    refresh_cache=args.refresh_cache,
+                    timeout_seconds=args.wolvenkit_timeout,
+                )
+                payload_references, payload_findings, payload_stats = (
+                    inspect_localization_payloads(
+                        references,
+                        manifests,
+                        provider,
+                        workers=args.workers,
+                    )
+                )
+                references.extend(payload_references)
+                findings.extend(payload_findings)
+                coverage["archivexl"]["payloads"] = payload_stats
+                for section in coverage["archivexl"]["sections"]:
+                    if section["name"] == "localization":
+                        section["status"] = "analyzed"
+                        section["note"] = (
+                            "On-screen resources are resolved and archive-owned "
+                            "payload entry identities are compared."
+                        )
+                        break
+                print(
+                    f"Serialized {payload_stats['serialized']} localization payloads; "
+                    f"extracted {payload_stats['entry_references']} entry references"
+                )
 
     metadata = {
         "scanner_version": __version__,
@@ -136,6 +177,7 @@ def run_scan(args: argparse.Namespace) -> int:
         "staging_root": str(args.staging),
         "game_root": str(args.game),
         "archive_scope": args.archive_scope,
+        "payload_scope": args.payload_scope,
         "hash_mode": args.hash_mode,
         "workers": args.workers,
         "wolvenkit": str(args.wolvenkit),
@@ -152,6 +194,7 @@ def run_scan(args: argparse.Namespace) -> int:
         tweak_references,
         findings,
         metadata,
+        coverage,
     )
     print(f"Wrote reports to {args.output}")
     return 0

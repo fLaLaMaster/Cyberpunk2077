@@ -74,6 +74,21 @@ _HTML_TEMPLATE = r'''<!doctype html>
     .stat { padding: 15px 17px; background: rgba(20, 23, 28, .92); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); }
     .stat-value { display: block; font-size: 24px; font-weight: 750; }
     .stat-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .coverage-shell { margin-bottom: 18px; }
+    .coverage-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); }
+    .coverage-panel > summary { cursor: pointer; padding: 13px 16px; color: var(--accent); font-weight: 750; }
+    .coverage-content { display: grid; gap: 18px; padding: 0 16px 16px; }
+    .coverage-group h2 { margin: 4px 0 10px; font-size: 17px; }
+    .coverage-group h3 { margin: 14px 0 7px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .coverage-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; }
+    .coverage-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .coverage-table th, .coverage-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .coverage-table tr:last-child td { border-bottom: 0; }
+    .coverage-table th { color: var(--muted); background: var(--panel-2); text-transform: uppercase; letter-spacing: .06em; font-size: 10px; }
+    .coverage-status { display: inline-block; padding: 2px 6px; border: 1px solid var(--border); border-radius: 999px; font: 700 10px/1.4 Consolas, monospace; text-transform: uppercase; }
+    .coverage-status[data-status="analyzed"] { color: #59d185; border-color: #326b48; }
+    .coverage-status[data-status="partial"] { color: var(--warning); border-color: #79612f; }
+    .coverage-status[data-status="unsupported"] { color: var(--muted); }
     .toolbar-wrap { position: sticky; top: 0; z-index: 10; padding: 10px 0; background: rgba(11, 13, 16, .93); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(48, 54, 65, .75); }
     .toolbar { display: grid; grid-template-columns: minmax(260px, 2fr) repeat(4, minmax(135px, 1fr)) auto; gap: 9px; align-items: end; }
     label { display: block; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
@@ -136,6 +151,13 @@ _HTML_TEMPLATE = r'''<!doctype html>
     <div class="generated" id="generated"></div>
     <div class="stats" id="stats"></div>
   </header>
+
+  <section class="shell coverage-shell" id="coverage-shell" hidden>
+    <details class="coverage-panel">
+      <summary>Analyzer coverage</summary>
+      <div class="coverage-content" id="coverage"></div>
+    </details>
+  </section>
 
   <div class="toolbar-wrap">
     <div class="shell toolbar">
@@ -238,6 +260,75 @@ _HTML_TEMPLATE = r'''<!doctype html>
     addOptions(controls.mod, [...modCounts.keys()].sort((a, b) => a.localeCompare(b)), modCounts);
 
     const summary = report.summary;
+    const coverage = summary.coverage || {};
+    const coverageShell = document.getElementById("coverage-shell");
+    const coverageElement = document.getElementById("coverage");
+
+    function coverageTable(rows, columns) {
+      const wrap = document.createElement("div"); wrap.className = "coverage-table-wrap";
+      const table = document.createElement("table"); table.className = "coverage-table";
+      const head = document.createElement("thead"), headRow = document.createElement("tr");
+      for (const column of columns) {
+        const th = document.createElement("th"); th.textContent = column.label; headRow.append(th);
+      }
+      head.append(headRow); table.append(head);
+      const body = document.createElement("tbody");
+      for (const row of rows) {
+        const tr = document.createElement("tr");
+        for (const column of columns) {
+          const td = document.createElement("td");
+          if (column.key === "status") {
+            const status = document.createElement("span"); status.className = "coverage-status";
+            status.dataset.status = row.status; status.textContent = row.status; td.append(status);
+          } else {
+            td.textContent = row[column.key] == null ? "" : String(row[column.key]);
+          }
+          tr.append(td);
+        }
+        body.append(tr);
+      }
+      table.append(body); wrap.append(table); return wrap;
+    }
+
+    for (const [ecosystem, analyzer] of Object.entries(coverage)) {
+      coverageShell.hidden = false;
+      const group = document.createElement("section"); group.className = "coverage-group";
+      const heading = document.createElement("h2");
+      heading.textContent = `${ecosystem} · ${Number(analyzer.documents || 0).toLocaleString()} documents`;
+      group.append(heading);
+      if ((analyzer.sections || []).length) {
+        const label = document.createElement("h3"); label.textContent = "Top-level sections"; group.append(label);
+        group.append(coverageTable(analyzer.sections, [
+          {key: "name", label: "Section"}, {key: "documents", label: "Documents"},
+          {key: "status", label: "Status"}, {key: "note", label: "Coverage note"}
+        ]));
+      }
+      if ((analyzer.resource_operations || []).length) {
+        const label = document.createElement("h3"); label.textContent = "Resource operations"; group.append(label);
+        group.append(coverageTable(analyzer.resource_operations, [
+          {key: "name", label: "Operation"}, {key: "documents", label: "Documents"},
+          {key: "references", label: "References"}, {key: "status", label: "Status"},
+          {key: "note", label: "Coverage note"}
+        ]));
+      }
+      if (analyzer.payloads) {
+        const label = document.createElement("h3"); label.textContent = "Payload inspection"; group.append(label);
+        const payload = analyzer.payloads;
+        group.append(coverageTable([
+          {metric: "Declarations", value: payload.declarations},
+          {metric: "Unique archive payloads", value: payload.unique_archive_payloads},
+          {metric: "Serialized", value: payload.serialized},
+          {metric: "Skipped without own archive", value: payload.skipped_without_own_archive},
+          {metric: "Failures", value: payload.failed},
+          {metric: "Entry references", value: payload.entry_references},
+          {metric: "Extraction cache hits", value: payload.extraction_cache_hits},
+          {metric: "Serialization cache hits", value: payload.serialization_cache_hits}
+        ], [
+          {key: "metric", label: "Metric"}, {key: "value", label: "Count"}
+        ]));
+      }
+      coverageElement.append(group);
+    }
     const stats = [
       [summary.mods, "Mods"], [summary.artifacts, "Files"],
       [summary.archive_manifests, "Archives"], [summary.archive_members, "Archive members"],

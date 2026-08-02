@@ -10,12 +10,23 @@ Implemented analysis includes:
 - per-mod file inventory and Vortex deployment attribution;
 - exact relative-path collision reporting;
 - ArchiveXL YAML/JSON parsing;
-- WolvenKit CLI archive member indexing without extraction;
+- WolvenKit CLI archive member indexing plus exact, cache-backed selective
+  payload extraction;
 - ArchiveXL reference resolution and streaming overlap checks;
+- ArchiveXL `resource.patch`, `copy`, `link`, `scope`, and `fix` declaration
+  analysis;
+- ArchiveXL on-screen localization payload serialization and locale-scoped
+  `secondaryKey`/`primaryKey` collision analysis;
 - TweakXL `.yaml`/`.yml` parsing under `r6/tweaks`;
 - TweakDB record, flat, property, `$base`, `$type`, and `$instances` extraction;
 - semantic comparison of complete assignments and tagged array operations;
 - deterministic JSON and Markdown reports.
+
+Reports include an analyzer-coverage panel that distinguishes analyzed,
+partially analyzed, and unsupported installed sections. Resource operations are
+compared at declaration-identity level. Localization payload entries are
+inspected; identities inside general resource patch payloads remain a later
+milestone.
 
 The TweakXL parser preserves YAML anchors, aliases, repeated template roots,
 and the `!append`, `!append-once`, `!append-from`, `!prepend`,
@@ -61,6 +72,7 @@ paths:
 
 scan:
   archive_scope: xl
+  payload_scope: localization
   hash_mode: archives
   workers: 4
   refresh_cache: false
@@ -81,9 +93,16 @@ Archive modes:
 - `--archive-scope all` indexes every mod archive.
 - `--archive-scope none` skips WolvenKit execution.
 - `--no-refresh-cache` overrides a YAML `refresh_cache: true` value.
+- `--payload-scope localization` selectively extracts and serializes declared
+  ArchiveXL on-screen resources (default).
+- `--payload-scope none` keeps the scan declaration-only and does not
+  materialize payloads.
 
-Use `--refresh-cache` to rebuild WolvenKit archive manifests. Archive payloads
-are not extracted in this milestone.
+Use `--refresh-cache` to rebuild WolvenKit archive manifests and payload caches.
+Every payload is written only beneath
+`.cache/archives/<archive-sha256>/extracted`; metadata records the exact command,
+tool version, source hash, resource hash, result, timing, size, and payload hash.
+CR2W JSON serialization is cached separately for fast repeat scans.
 
 ## Reports
 

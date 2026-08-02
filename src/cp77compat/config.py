@@ -58,6 +58,7 @@ class ScannerConfig:
     output: Path
     cache: Path
     archive_scope: str
+    payload_scope: str
     hash_mode: str
     workers: int
     refresh_cache: bool
@@ -137,6 +138,7 @@ def load_config(path: Path) -> ScannerConfig:
         scan,
         {
             "archive_scope",
+            "payload_scope",
             "hash_mode",
             "workers",
             "refresh_cache",
@@ -159,6 +161,12 @@ def load_config(path: Path) -> ScannerConfig:
         output=_path_value(paths.get("output"), PROJECT_ROOT / "reports" / "current", base, "paths.output"),
         cache=_path_value(paths.get("cache"), PROJECT_ROOT / ".cache" / "archives", base, "paths.cache"),
         archive_scope=_choice(scan.get("archive_scope"), "xl", {"none", "xl", "all"}, "scan.archive_scope"),
+        payload_scope=_choice(
+            scan.get("payload_scope"),
+            "localization",
+            {"none", "localization"},
+            "scan.payload_scope",
+        ),
         hash_mode=_choice(scan.get("hash_mode"), "archives", {"none", "archives", "all"}, "scan.hash_mode"),
         workers=_positive_int(scan.get("workers"), 4, "scan.workers"),
         refresh_cache=refresh_cache,
@@ -168,4 +176,3 @@ def load_config(path: Path) -> ScannerConfig:
             "scan.wolvenkit_timeout_seconds",
         ),
     )
-

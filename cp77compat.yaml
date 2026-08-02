@@ -17,10 +17,13 @@ scan:
   # all: every mod archive.
   archive_scope: xl
 
+  # none: declarations only; localization: selectively extract and inspect
+  # ArchiveXL on-screen localization payloads.
+  payload_scope: localization
+
   # none: no inventory hashes; archives: hash .archive files; all: hash all files.
   hash_mode: archives
 
   workers: 4
   refresh_cache: false
   wolvenkit_timeout_seconds: 120
-
