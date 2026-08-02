@@ -6,14 +6,85 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.1.0`
-- Implemented ecosystem: ArchiveXL
+- Scanner version: `0.2.1`
+- Implemented ecosystems: ArchiveXL and TweakXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 12 passing
+- Automated tests: 23 passing
 - Last complete scan: successful on 2026-08-02
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-02 — Structural source-line tracking
+
+Replaced best-effort identity text searches with parser-owned source locations.
+
+Changes:
+
+- TweakXL mappings now retain key/value lines and tagged values retain their
+  operation line.
+- `$instances` substitutions and YAML aliases preserve the originating source
+  location on every expanded reference.
+- ArchiveXL mappings and sequences now retain YAML node lines for localization,
+  factories, streaming blocks, sectors, and node deletions.
+- JSON-shaped `.xl` files use the same located safe loader; valid tab whitespace
+  is normalized only for parsing and does not create a spurious warning.
+- Text lookup remains only as a fallback for values without structural marks.
+- Bumped the scanner patch version to 0.2.1.
+- Added exact-line regression tests for nested TweakXL tags, duplicate template
+  expansion, anchored aliases, ArchiveXL sectors, and deletion indices.
+
+Validation:
+
+- Twenty-three unit tests passed.
+- Full frozen-corpus scan completed successfully with unchanged compatibility
+  results and zero WolvenKit failures.
+- All 57,455 TweakXL references and all 14,315 ArchiveXL references now have a
+  non-null one-based source line.
+- The reported Double RAM and Lower Quickhack Cost operations both resolve to
+  line 3. The vending-machine deletion resolves to line 13,992. NCEE resolves
+  to line 1 because its entire `.xl` JSON document is physically one line.
+- Regenerated `reports/current` and confirmed the corrected lines are embedded
+  in the HTML report.
+- Frozen staging and game inputs were not modified.
+
+### 2026-08-02 — TweakXL YAML compatibility analyzer
+
+Added semantic support for deployed TweakXL `.yaml` and `.yml` files.
+
+Changes:
+
+- Added `src/cp77compat/tweakxl.py` with safe custom-tag parsing and source-order
+  duplicate-key preservation.
+- Preserved anchors and aliases, and expanded repeated `$instances` templates
+  into concrete TweakDB identities without silently dropping duplicate template
+  roots.
+- Extracted record `$base`/`$type`, full flat/property assignments, and
+  `!append`, `!append-once`, `!append-from`, `!prepend`, `!prepend-once`,
+  `!prepend-from`, and `!remove` operations.
+- Added conflict rules for incompatible assignments and record definitions,
+  assignment/mutation load-order risk, add/remove opposition, and duplicate
+  non-unique additions.
+- Added a consolidated informational rule for safe cross-mod array operations.
+- Added `tweakxl-findings.json` and `compatibility-findings.json`, a TweakXL
+  reference statistic, and an ecosystem filter to the offline HTML report.
+- Kept high-volume informational evidence compact in HTML while retaining the
+  complete reference inventory in the ecosystem JSON report.
+- Bumped the scanner version to 0.2.0 and documented the analyzer.
+
+Validation:
+
+- Twenty-one unit tests passed.
+- Parsed all 216 deployed TweakXL YAML files: 214 non-empty and two empty, with
+  no parser errors.
+- Extracted 57,455 concrete references after template expansion.
+- Found 251 shared TweakDB array identities consolidated into four compatible
+  participant groups, with no TweakXL conflict or warning in the frozen corpus.
+- Full cached scan completed in approximately 43 seconds with 78 archives and
+  zero WolvenKit failures.
+- Final HTML report is approximately 0.69 MB; complete TweakXL JSON is
+  approximately 39.83 MB.
+- Frozen staging and game inputs were not modified.
 
 ### 2026-08-02 — Versioned YAML scanner configuration
 

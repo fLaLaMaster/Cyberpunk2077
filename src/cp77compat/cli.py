@@ -18,6 +18,8 @@ from .deployment import load_deployment
 from .inventory import build_inventory, discover_mods, exact_path_findings
 from .models import Finding
 from .reporting import write_reports
+from .tweakxl import compare_tweak_references, parse_tweak_documents
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cp77compat")
@@ -82,7 +84,14 @@ def run_scan(args: argparse.Namespace) -> int:
     documents, references, archive_xl_findings = parse_documents(artifacts)
     findings.extend(archive_xl_findings)
     findings.extend(compare_references(references))
-    print(f"Found {len(mods)} mods, {len(artifacts)} files, and {len(documents)} non-empty ArchiveXL configs")
+    tweak_documents, tweak_references, tweak_findings = parse_tweak_documents(artifacts)
+    findings.extend(tweak_findings)
+    findings.extend(compare_tweak_references(tweak_references))
+    print(
+        f"Found {len(mods)} mods, {len(artifacts)} files, "
+        f"{len(documents)} non-empty ArchiveXL configs, and "
+        f"{len(tweak_documents)} non-empty TweakXL configs"
+    )
 
     manifests = []
     wolvenkit_version = None
@@ -140,6 +149,7 @@ def run_scan(args: argparse.Namespace) -> int:
         deployment.to_dict() if deployment else None,
         manifests,
         references,
+        tweak_references,
         findings,
         metadata,
     )

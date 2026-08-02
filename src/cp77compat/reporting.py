@@ -19,7 +19,8 @@ def write_reports(
     artifacts: list[Artifact],
     deployment: dict[str, Any] | None,
     manifests: list[ArchiveManifest],
-    references: list[Reference],
+    archivexl_references: list[Reference],
+    tweakxl_references: list[Reference],
     findings: list[Finding],
     metadata: dict[str, Any],
 ) -> None:
@@ -30,7 +31,8 @@ def write_reports(
         "artifacts": len(artifacts),
         "archive_manifests": len(manifests),
         "archive_members": sum(len(item.members) for item in manifests),
-        "archivexl_references": len(references),
+        "archivexl_references": len(archivexl_references),
+        "tweakxl_references": len(tweakxl_references),
         "findings": dict(sorted(Counter(item.severity for item in ordered_findings).items())),
     }
     _write_json(
@@ -55,7 +57,32 @@ def write_reports(
         {
             "metadata": metadata,
             "summary": summary,
-            "references": [reference.to_dict() for reference in references],
+            "references": [reference.to_dict() for reference in archivexl_references],
+            "findings": [
+                finding.to_dict()
+                for finding in ordered_findings
+                if finding.rule_id.startswith("AXL-")
+            ],
+        },
+    )
+    _write_json(
+        output_dir / "tweakxl-findings.json",
+        {
+            "metadata": metadata,
+            "summary": summary,
+            "references": [reference.to_dict() for reference in tweakxl_references],
+            "findings": [
+                finding.to_dict()
+                for finding in ordered_findings
+                if finding.rule_id.startswith("TXL-")
+            ],
+        },
+    )
+    _write_json(
+        output_dir / "compatibility-findings.json",
+        {
+            "metadata": metadata,
+            "summary": summary,
             "findings": [finding.to_dict() for finding in ordered_findings],
         },
     )
@@ -70,6 +97,7 @@ def write_reports(
         f"- Indexed archives: {summary['archive_manifests']}",
         f"- Indexed archive members: {summary['archive_members']}",
         f"- ArchiveXL references: {summary['archivexl_references']}",
+        f"- TweakXL references: {summary['tweakxl_references']}",
         "- Findings: " + ", ".join(f"{key}={value}" for key, value in summary["findings"].items()),
         "",
         "## Findings",
@@ -107,7 +135,8 @@ def write_reports(
                             + (f" (line {nested_line})" if nested_line else "")
                         )
         if len(finding.evidence) > len(displayed_evidence):
-            lines.append(f"- ...and {len(finding.evidence) - len(displayed_evidence)} more targets in the JSON report.")
+            remaining = len(finding.evidence) - len(displayed_evidence)
+            lines.append(f"- ...and {remaining} more targets in the JSON report.")
         if finding.evidence:
             lines.append("")
     (output_dir / "compatibility-report.md").write_text("\n".join(lines), encoding="utf-8")

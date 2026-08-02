@@ -31,6 +31,7 @@ class HtmlReportTests(unittest.TestCase):
                     "archive_manifests": 0,
                     "archive_members": 0,
                     "archivexl_references": 1,
+                    "tweakxl_references": 2,
                 },
                 [finding],
                 {
@@ -42,6 +43,7 @@ class HtmlReportTests(unittest.TestCase):
             html = path.read_text(encoding="utf-8")
             self.assertIn('id="search"', html)
             self.assertIn('id="severity"', html)
+            self.assertIn('id="ecosystem"', html)
             self.assertNotIn("</script><script>alert(1)</script>", html)
             match = re.search(
                 r'<script id="report-data" type="application/json">(.*?)</script>',

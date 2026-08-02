@@ -55,12 +55,18 @@ frozen-corpus validation pass are complete.
 
 ## TweakXL analyzer
 
-- [ ] Reuse the YAML loader while preserving TweakXL-specific tags and
+- [x] Reuse the YAML loader while preserving TweakXL-specific tags and
   operations such as append/prepend/remove.
-- [ ] Extract record and flat identities.
-- [ ] Distinguish additive operations from destructive assignments.
-- [ ] Detect multiple mods assigning incompatible values to the same record
+- [x] Preserve anchors, aliases, repeated template roots, and expand
+  `$instances` before comparison.
+- [x] Preserve structural source lines through aliases and `$instances`
+  expansion.
+- [x] Extract record and flat identities.
+- [x] Distinguish additive operations from destructive assignments.
+- [x] Detect multiple mods assigning incompatible values to the same record
   property.
+- [x] Detect assignment/mutation load-order risks, opposing add/remove
+  operations, and non-unique duplicate array additions.
 - [ ] Detect missing bases, clones, or referenced records where feasible.
 - [ ] Parse and correlate TweakXL runtime logs.
 
@@ -96,6 +102,8 @@ frozen-corpus validation pass are complete.
 
 ## Reporting and performance
 
+- [x] Attach structural source lines to all current ArchiveXL and TweakXL
+  references instead of relying on synthesized-identity text searches.
 - [ ] Add URL/hash-backed HTML filter state so a filtered finding view can be
   bookmarked or shared.
 - [ ] Add export of the currently filtered HTML findings to JSON/CSV.

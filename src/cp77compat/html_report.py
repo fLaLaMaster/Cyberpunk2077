@@ -75,7 +75,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
     .stat-value { display: block; font-size: 24px; font-weight: 750; }
     .stat-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
     .toolbar-wrap { position: sticky; top: 0; z-index: 10; padding: 10px 0; background: rgba(11, 13, 16, .93); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(48, 54, 65, .75); }
-    .toolbar { display: grid; grid-template-columns: minmax(260px, 2fr) repeat(3, minmax(145px, 1fr)) auto; gap: 9px; align-items: end; }
+    .toolbar { display: grid; grid-template-columns: minmax(260px, 2fr) repeat(4, minmax(135px, 1fr)) auto; gap: 9px; align-items: end; }
     label { display: block; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
     input, select, button {
       width: 100%; min-height: 40px; margin-top: 5px; padding: 8px 10px;
@@ -145,6 +145,9 @@ _HTML_TEMPLATE = r'''<!doctype html>
       <label>Severity
         <select id="severity"><option value="">All severities</option></select>
       </label>
+      <label>Ecosystem
+        <select id="ecosystem"><option value="">All ecosystems</option></select>
+      </label>
       <label>Rule
         <select id="rule"><option value="">All rules</option></select>
       </label>
@@ -180,6 +183,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
     const severityOrder = ["error", "conflict", "warning", "review", "info"];
     const controls = {
       search: document.getElementById("search"), severity: document.getElementById("severity"),
+      ecosystem: document.getElementById("ecosystem"),
       rule: document.getElementById("rule"), mod: document.getElementById("mod"),
       pageSize: document.getElementById("page-size")
     };
@@ -194,11 +198,19 @@ _HTML_TEMPLATE = r'''<!doctype html>
         for (const ref of item.references || []) {
           values.push(String(ref.source_path || ""), String(ref.mod_name || ""));
         }
+        for (const source of item.sources || []) {
+          values.push(String(source.source_path || ""), String(source.mod_name || ""));
+        }
+        for (const operation of item.operation_counts || []) {
+          values.push(String(operation.mod_name || ""), String(operation.operation || ""));
+        }
       }
       return values.join(" ");
     }
 
     for (const finding of findings) {
+      const prefix = String(finding.rule_id || "").split("-", 1)[0];
+      finding._ecosystem = ({AXL: "ArchiveXL", TXL: "TweakXL", CORE: "Core", WOLVENKIT: "WolvenKit"})[prefix] || "Other";
       finding._search = [finding.rule_id, finding.severity, finding.confidence, finding.summary,
         finding.explanation, ...(finding.participants || []), evidenceText(finding.evidence)]
         .join(" ").toLocaleLowerCase();
@@ -213,13 +225,15 @@ _HTML_TEMPLATE = r'''<!doctype html>
       }
     }
 
-    const severityCounts = new Map(), ruleCounts = new Map(), modCounts = new Map();
+    const severityCounts = new Map(), ecosystemCounts = new Map(), ruleCounts = new Map(), modCounts = new Map();
     for (const finding of findings) {
       severityCounts.set(finding.severity, (severityCounts.get(finding.severity) || 0) + 1);
+      ecosystemCounts.set(finding._ecosystem, (ecosystemCounts.get(finding._ecosystem) || 0) + 1);
       ruleCounts.set(finding.rule_id, (ruleCounts.get(finding.rule_id) || 0) + 1);
       for (const mod of finding.participants || []) modCounts.set(mod, (modCounts.get(mod) || 0) + 1);
     }
     addOptions(controls.severity, severityOrder.filter(value => severityCounts.has(value)), severityCounts);
+    addOptions(controls.ecosystem, [...ecosystemCounts.keys()].sort(), ecosystemCounts);
     addOptions(controls.rule, [...ruleCounts.keys()].sort(), ruleCounts);
     addOptions(controls.mod, [...modCounts.keys()].sort((a, b) => a.localeCompare(b)), modCounts);
 
@@ -227,7 +241,8 @@ _HTML_TEMPLATE = r'''<!doctype html>
     const stats = [
       [summary.mods, "Mods"], [summary.artifacts, "Files"],
       [summary.archive_manifests, "Archives"], [summary.archive_members, "Archive members"],
-      [summary.archivexl_references, "ArchiveXL references"], [findings.length, "Findings"]
+      [summary.archivexl_references, "ArchiveXL references"],
+      [summary.tweakxl_references, "TweakXL references"], [findings.length, "Findings"]
     ];
     const statsElement = document.getElementById("stats");
     for (const [value, label] of stats) {
@@ -245,6 +260,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
       return findings.filter(finding =>
         (!query || finding._search.includes(query)) &&
         (!controls.severity.value || finding.severity === controls.severity.value) &&
+        (!controls.ecosystem.value || finding._ecosystem === controls.ecosystem.value) &&
         (!controls.rule.value || finding.rule_id === controls.rule.value) &&
         (!controls.mod.value || (finding.participants || []).includes(controls.mod.value))
       );

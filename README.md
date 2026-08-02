@@ -5,14 +5,26 @@ collection. The scanner reads the Vortex staging directory, deployed game
 directory, and `vortex.deployment.json`. It writes only to its report and cache
 directories.
 
-The first milestone includes:
+Implemented analysis includes:
 
 - per-mod file inventory and Vortex deployment attribution;
 - exact relative-path collision reporting;
 - ArchiveXL YAML/JSON parsing;
 - WolvenKit CLI archive member indexing without extraction;
 - ArchiveXL reference resolution and streaming overlap checks;
+- TweakXL `.yaml`/`.yml` parsing under `r6/tweaks`;
+- TweakDB record, flat, property, `$base`, `$type`, and `$instances` extraction;
+- semantic comparison of complete assignments and tagged array operations;
 - deterministic JSON and Markdown reports.
+
+The TweakXL parser preserves YAML anchors, aliases, repeated template roots,
+and the `!append`, `!append-once`, `!append-from`, `!prepend`,
+`!prepend-once`, `!prepend-from`, and `!remove` operations. It expands
+`$instances` before comparing concrete TweakDB identities. Findings distinguish
+incompatible complete assignments, assignment-versus-mutation load-order risks,
+add/remove opposition, non-unique duplicate additions, and safely composable
+cross-mod array operations. Parser node locations are retained through aliases
+and template expansion so report evidence points to the originating source line.
 
 ## Run
 
@@ -78,6 +90,8 @@ are not extracted in this milestone.
 - `reports/current/inventory.json`: mods, files, hashes, and deployment state.
 - `reports/current/archive-manifests.json`: WolvenKit archive member indexes.
 - `reports/current/archivexl-findings.json`: complete references and evidence.
+- `reports/current/tweakxl-findings.json`: TweakXL references and findings.
+- `reports/current/compatibility-findings.json`: combined machine-readable findings.
 - `reports/current/compatibility-report.html`: searchable, filterable offline report.
 - `reports/current/compatibility-report.md`: concise human-readable report.
 

@@ -67,6 +67,27 @@ class ArchiveXLTests(unittest.TestCase):
         self.assertEqual("AXL-SECTOR-EXPECTED-NODES", findings[0].rule_id)
         self.assertEqual("conflict", findings[0].severity)
 
+    def test_sector_and_node_deletion_use_structural_source_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "deletions.xl"
+            path.write_text(
+                """streaming:
+  sectors:
+    - path: base\\worlds\\example.streamingsector
+      nodeDeletions:
+        - index: 179
+          type: worldEntityNode
+""",
+                encoding="utf-8",
+            )
+            _documents, references, findings = parse_documents(
+                [artifact(path, "Example")]
+            )
+            lines = {item.kind: item.line for item in references}
+            self.assertEqual(3, lines["streaming.sector"])
+            self.assertEqual(5, lines["streaming.node_deletion"])
+            self.assertFalse([item for item in findings if item.severity == "error"])
+
     def test_sector_reviews_are_aggregated_by_mod_set(self) -> None:
         refs = [
             Reference("archivexl", "streaming.sector", "sector_a", "A", "a.xl"),

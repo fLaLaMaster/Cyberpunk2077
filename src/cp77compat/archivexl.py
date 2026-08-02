@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,10 +34,31 @@ class ArchiveXLLoader(yaml.SafeLoader):
     """Safe YAML loader that rejects duplicate mapping keys."""
 
 
-def _construct_mapping(loader: ArchiveXLLoader, node: yaml.MappingNode, deep: bool = False) -> dict[Any, Any]:
-    mapping: dict[Any, Any] = {}
+class ArchiveXLMapping(dict[Any, Any]):
+    """ArchiveXL mapping with one-based source lines for keys and values."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.key_lines: dict[Any, int] = {}
+        self.value_lines: dict[Any, int] = {}
+
+
+class ArchiveXLSequence(list[Any]):
+    """ArchiveXL sequence with one-based source lines for each item."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.item_lines: list[int] = []
+
+
+def _construct_mapping(
+    loader: ArchiveXLLoader,
+    node: yaml.MappingNode,
+    deep: bool = False,
+) -> ArchiveXLMapping:
+    mapping = ArchiveXLMapping()
     for key_node, value_node in node.value:
-        key = loader.construct_object(key_node, deep=deep)
+        key = loader.construct_object(key_node, deep=True)
         if key in mapping:
             raise ConstructorError(
                 "while constructing a mapping",
@@ -46,20 +66,37 @@ def _construct_mapping(loader: ArchiveXLLoader, node: yaml.MappingNode, deep: bo
                 f"found duplicate key {key!r}",
                 key_node.start_mark,
             )
-        mapping[key] = loader.construct_object(value_node, deep=deep)
+        mapping[key] = loader.construct_object(value_node, deep=True)
+        mapping.key_lines[key] = key_node.start_mark.line + 1
+        mapping.value_lines[key] = value_node.start_mark.line + 1
     return mapping
+
+
+def _construct_sequence(
+    loader: ArchiveXLLoader,
+    node: yaml.SequenceNode,
+    deep: bool = False,
+) -> ArchiveXLSequence:
+    sequence = ArchiveXLSequence()
+    for item_node in node.value:
+        sequence.append(loader.construct_object(item_node, deep=True))
+        sequence.item_lines.append(item_node.start_mark.line + 1)
+    return sequence
 
 
 def _construct_unknown_tag(loader: ArchiveXLLoader, _suffix: str, node: yaml.Node) -> Any:
     if isinstance(node, yaml.ScalarNode):
         return loader.construct_scalar(node)
     if isinstance(node, yaml.SequenceNode):
-        return loader.construct_sequence(node)
-    return loader.construct_mapping(node)
+        return _construct_sequence(loader, node, deep=True)
+    return _construct_mapping(loader, node, deep=True)
 
 
 ArchiveXLLoader.add_constructor(
     yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping
+)
+ArchiveXLLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_SEQUENCE_TAG, _construct_sequence
 )
 ArchiveXLLoader.add_multi_constructor("!", _construct_unknown_tag)
 
@@ -79,11 +116,33 @@ def _line_for(text: str, value: str) -> int | None:
     return None
 
 
-def _as_paths(value: Any) -> list[str]:
-    if isinstance(value, str):
-        return [value]
+def _mapping_line(
+    mapping: Any,
+    key: Any,
+    fallback: int | None = None,
+) -> int | None:
+    if isinstance(mapping, ArchiveXLMapping):
+        return mapping.key_lines.get(key) or mapping.value_lines.get(key) or fallback
+    return fallback
+
+
+def _sequence_entries(value: Any) -> list[tuple[Any, int | None]]:
+    if isinstance(value, ArchiveXLSequence):
+        return list(zip(value, value.item_lines, strict=True))
     if isinstance(value, list):
-        return [item for item in value if isinstance(item, str)]
+        return [(item, None) for item in value]
+    return []
+
+
+def _as_paths(value: Any, fallback_line: int | None = None) -> list[tuple[str, int | None]]:
+    if isinstance(value, str):
+        return [(value, fallback_line)]
+    if isinstance(value, list):
+        return [
+            (item, line or fallback_line)
+            for item, line in _sequence_entries(value)
+            if isinstance(item, str)
+        ]
     return []
 
 
@@ -115,17 +174,15 @@ def parse_documents(artifacts: Iterable[Artifact]) -> tuple[list[ArchiveXLDocume
             )
             continue
         used_tab_fallback = False
+        json_shaped = text.lstrip().startswith(("{", "["))
         try:
-            if text.lstrip().startswith(("{", "[")):
-                loaded = json.loads(text)
-            else:
-                try:
-                    loaded = yaml.load(text, Loader=ArchiveXLLoader)
-                except yaml.scanner.ScannerError as exc:
-                    if "character '\\t'" not in str(exc):
-                        raise
-                    loaded = yaml.load(text.replace("\t", "  "), Loader=ArchiveXLLoader)
-                    used_tab_fallback = True
+            try:
+                loaded = yaml.load(text, Loader=ArchiveXLLoader)
+            except yaml.scanner.ScannerError as exc:
+                if "character '\\t'" not in str(exc):
+                    raise
+                loaded = yaml.load(text.replace("\t", "  "), Loader=ArchiveXLLoader)
+                used_tab_fallback = True
         except yaml.YAMLError as exc:
             mark = getattr(exc, "problem_mark", None)
             findings.append(
@@ -145,19 +202,6 @@ def parse_documents(artifacts: Iterable[Artifact]) -> tuple[list[ArchiveXLDocume
                 )
             )
             continue
-        except json.JSONDecodeError as exc:
-            findings.append(
-                Finding(
-                    rule_id="AXL-PARSE",
-                    severity="error",
-                    confidence="high",
-                    summary=f"Cannot parse {artifact.relative_path}",
-                    explanation=str(exc),
-                    participants=[artifact.mod_name],
-                    evidence=[{"path": str(artifact.absolute_path), "line": exc.lineno}],
-                )
-            )
-            continue
         if not isinstance(loaded, dict):
             findings.append(
                 Finding(
@@ -174,14 +218,17 @@ def parse_documents(artifacts: Iterable[Artifact]) -> tuple[list[ArchiveXLDocume
 
         document = ArchiveXLDocument(artifact=artifact, data=loaded, text=text)
         documents.append(document)
-        if used_tab_fallback:
+        if used_tab_fallback and not json_shaped:
             findings.append(
                 Finding(
                     rule_id="AXL-NONSTANDARD-TABS",
                     severity="info",
                     confidence="high",
-                    summary=f"ArchiveXL YAML contains tab characters: {artifact.relative_path}",
-                    explanation="The scanner normalized tabs for parsing; the original file was not modified.",
+                    summary=f"ArchiveXL config contains tab characters: {artifact.relative_path}",
+                    explanation=(
+                        "The scanner normalized tab whitespace for parsing; the "
+                        "original file was not modified."
+                    ),
                     participants=[artifact.mod_name],
                     evidence=[{"path": str(artifact.absolute_path)}],
                 )
@@ -197,7 +244,10 @@ def parse_documents(artifacts: Iterable[Artifact]) -> tuple[list[ArchiveXLDocume
                     severity="review",
                     confidence="medium",
                     summary=f"Unknown ArchiveXL section(s) in {artifact.relative_path}",
-                    explanation="The scanner does not yet understand these sections; they are not necessarily invalid.",
+                    explanation=(
+                        "The scanner does not yet understand these sections; they "
+                        "are not necessarily invalid."
+                    ),
                     participants=[artifact.mod_name],
                     evidence=[{"path": str(artifact.absolute_path), "sections": unknown}],
                 )
@@ -207,14 +257,20 @@ def parse_documents(artifacts: Iterable[Artifact]) -> tuple[list[ArchiveXLDocume
     return documents, references, findings
 
 
-def _reference(document: ArchiveXLDocument, kind: str, identity: str, **details: Any) -> Reference:
+def _reference(
+    document: ArchiveXLDocument,
+    kind: str,
+    identity: str,
+    line: int | None = None,
+    **details: Any,
+) -> Reference:
     return Reference(
         ecosystem="archivexl",
         kind=kind,
         identity=identity,
         mod_name=document.artifact.mod_name,
         source_path=str(document.artifact.absolute_path),
-        line=_line_for(document.text, identity),
+        line=line or _line_for(document.text, identity),
         details=details,
     )
 
@@ -228,6 +284,7 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
         onscreens = localization.get("onscreens")
         if isinstance(onscreens, dict):
             for locale, path in onscreens.items():
+                locale_line = _mapping_line(onscreens, locale)
                 if isinstance(locale, str) and locale.casefold() not in KNOWN_LOCALES:
                     findings.append(
                         Finding(
@@ -235,44 +292,70 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                             severity="warning",
                             confidence="high",
                             summary=f"Unknown localization code {locale}",
-                            explanation="The localization key is not one of the documented Cyberpunk 2077 language codes.",
+                            explanation=(
+                                "The localization key is not one of the documented "
+                                "Cyberpunk 2077 language codes."
+                            ),
                             participants=[document.artifact.mod_name],
-                            evidence=[{"path": str(document.artifact.absolute_path), "line": _line_for(document.text, str(locale))}],
+                            evidence=[
+                                {
+                                    "path": str(document.artifact.absolute_path),
+                                    "line": locale_line,
+                                }
+                            ],
                         )
                     )
-                for item in _as_paths(path):
-                    refs.append(_reference(document, "localization.onscreens", item, locale=str(locale)))
+                for item, line in _as_paths(path, locale_line):
+                    refs.append(
+                        _reference(
+                            document,
+                            "localization.onscreens",
+                            item,
+                            line,
+                            locale=str(locale),
+                        )
+                    )
 
-    for item in _as_paths(data.get("factories")):
-        refs.append(_reference(document, "factory", item))
+    for item, line in _as_paths(
+        data.get("factories"), _mapping_line(data, "factories")
+    ):
+        refs.append(_reference(document, "factory", item, line))
 
     streaming = data.get("streaming")
     if isinstance(streaming, dict):
-        for item in _as_paths(streaming.get("blocks")):
-            refs.append(_reference(document, "streaming.block", item))
+        for item, line in _as_paths(
+            streaming.get("blocks"), _mapping_line(streaming, "blocks")
+        ):
+            refs.append(_reference(document, "streaming.block", item, line))
         sectors = streaming.get("sectors")
         if isinstance(sectors, list):
-            for sector in sectors:
+            for sector, sector_line in _sequence_entries(sectors):
                 if not isinstance(sector, dict) or not isinstance(sector.get("path"), str):
                     continue
                 path = sector["path"]
+                path_line = _mapping_line(sector, "path", sector_line)
                 refs.append(
                     _reference(
                         document,
                         "streaming.sector",
                         path,
+                        path_line,
                         expected_nodes=sector.get("expectedNodes"),
                     )
                 )
                 deletions = sector.get("nodeDeletions")
                 if isinstance(deletions, list):
-                    for deletion in deletions:
+                    for deletion, deletion_line in _sequence_entries(deletions):
                         if isinstance(deletion, dict) and deletion.get("index") is not None:
+                            index_line = _mapping_line(
+                                deletion, "index", deletion_line or path_line
+                            )
                             refs.append(
                                 _reference(
                                     document,
                                     "streaming.node_deletion",
                                     f"{path}#{deletion['index']}",
+                                    index_line,
                                     sector=path,
                                     index=deletion["index"],
                                     node_type=deletion.get("type"),
@@ -300,7 +383,11 @@ def compare_references(references: Iterable[Reference]) -> list[Finding]:
                 "Multiple mods register the same streaming block resource path.",
             )
         elif kind == "streaming.sector":
-            expected = {ref.details.get("expected_nodes") for ref in group if ref.details.get("expected_nodes") is not None}
+            expected = {
+                ref.details.get("expected_nodes")
+                for ref in group
+                if ref.details.get("expected_nodes") is not None
+            }
             if len(expected) > 1:
                 severity, rule, explanation = (
                     "conflict",
@@ -343,11 +430,17 @@ def compare_references(references: Iterable[Reference]) -> list[Finding]:
         if rule == "AXL-SECTOR-MULTI-PATCH":
             severity = "review"
             noun = "streaming sector" if count == 1 else "streaming sectors"
-            explanation = "These mods patch the same sectors. Different node operations may be compatible, so manual review is required."
+            explanation = (
+                "These mods patch the same sectors. Different node operations may "
+                "be compatible, so manual review is required."
+            )
         else:
             severity = "conflict"
             noun = "streaming node deletion" if count == 1 else "streaming node deletions"
-            explanation = "These mods delete the same node indices from the same sectors, indicating duplicated or overlapping world patches."
+            explanation = (
+                "These mods delete the same node indices from the same sectors, "
+                "indicating duplicated or overlapping world patches."
+            )
         findings.append(
             Finding(
                 rule_id=rule,
@@ -419,7 +512,11 @@ def resolve_archive_references(
                     severity="warning",
                     confidence="high",
                     summary=f"ArchiveXL resource comes from another mod: {ref.identity}",
-                    explanation="The declaring mod does not contain this resource, but another installed mod does. This creates an implicit dependency.",
+                    explanation=(
+                        "The declaring mod does not contain this resource, but "
+                        "another installed mod does. This creates an implicit "
+                        "dependency."
+                    ),
                     participants=[ref.mod_name, *providers],
                     evidence=[ref.to_dict(), {"providers": providers}],
                 )
@@ -431,7 +528,11 @@ def resolve_archive_references(
                     severity="warning",
                     confidence="medium",
                     summary=f"ArchiveXL resource was not found: {ref.identity}",
-                    explanation="The referenced resource was not present as a loose mod file or in any indexed archive. This can also mean that the relevant archive was outside the selected archive scope.",
+                    explanation=(
+                        "The referenced resource was not present as a loose mod file "
+                        "or in any indexed archive. This can also mean that the "
+                        "relevant archive was outside the selected archive scope."
+                    ),
                     participants=[ref.mod_name],
                     evidence=[ref.to_dict()],
                 )
@@ -459,7 +560,11 @@ def internal_archive_collisions(manifests: Iterable[ArchiveManifest]) -> list[Fi
                 severity="info",
                 confidence="high",
                 summary=f"Multiple archives contain {display_path[normalized]}",
-                explanation="Archive load order determines the winning resource. This scanner records the overlap but does not override the existing archive conflict rules.",
+                explanation=(
+                    "Archive load order determines the winning resource. This "
+                    "scanner records the overlap but does not override the existing "
+                    "archive conflict rules."
+                ),
                 participants=mods,
                 evidence=[{"mod": mod, "archive": archive} for mod, archive in sorted(providers)],
             )

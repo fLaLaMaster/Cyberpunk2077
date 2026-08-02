@@ -10,9 +10,9 @@ mod packages, attributes deployed files through Vortex metadata, indexes
 resources inside `.archive` files with WolvenKit CLI, and performs
 ecosystem-specific semantic compatibility checks.
 
-The scanner is being developed incrementally. ArchiveXL is the first supported
-ecosystem. Planned ecosystems include TweakXL, REDscript, CET Lua, input/config
-files, RED4ext native plugins, and runtime logs.
+The scanner is being developed incrementally. ArchiveXL and TweakXL are the
+currently supported ecosystems. Planned ecosystems include REDscript, CET Lua,
+input/config files, RED4ext native plugins, and runtime logs.
 
 ## Workspace paths
 
@@ -106,18 +106,25 @@ python -m unittest discover -s tests -v
 - `src/cp77compat/archivexl.py`
   Parses YAML and JSON `.xl` files, rejects duplicate YAML keys, tolerates the
   tab variants present in the frozen corpus, extracts ArchiveXL references,
-  compares streaming operations, and resolves resources against indexed
-  archives or loose mod files.
+  retains mapping/sequence source locations, compares streaming operations, and
+  resolves resources against indexed archives or loose mod files.
+- `src/cp77compat/tweakxl.py`
+  Parses deployed `.yaml` and `.yml` files under `r6/tweaks`, preserves YAML
+  anchors, aliases, duplicate template roots, and TweakXL tags, expands
+  `$instances`, extracts concrete record/flat/property operations, and compares
+  destructive assignments with additive array mutations. Source lines survive
+  aliases and template expansion.
 - `src/cp77compat/reporting.py`
-  Writes inventory, archive manifest, findings JSON, Markdown, and HTML reports.
+  Writes inventory, archive manifest, per-ecosystem reference/finding JSON,
+  combined findings JSON, Markdown, and HTML reports.
 - `src/cp77compat/html_report.py`
   Generates a self-contained offline HTML report with search, severity/rule/mod
-  filters, pagination, and lazily expanded evidence.
+  and ecosystem filters, pagination, and lazily expanded evidence.
 - `src/cp77compat/cli.py`
   Orchestrates the scan and exposes CLI options.
 - `tests/`
-  Unit tests for ArchiveXL parsing/comparison, archive output parsing, loose
-  resource resolution, and safe HTML data embedding.
+  Unit tests for ArchiveXL and TweakXL parsing/comparison, archive output
+  parsing, loose resource resolution, configuration, and safe HTML embedding.
 
 ## Data model and report semantics
 
@@ -139,12 +146,16 @@ Severity meanings:
 
 Do not treat a shared ArchiveXL top-level key such as `streaming` or
 `localization` as a conflict. Compare identities and operations below it.
+For TweakXL, compare concrete identities after `$instances` expansion and keep
+full assignments distinct from tagged array mutations. Cross-mod tagged array
+operations are compatible when they neither add/remove the same value nor add
+the same value through a non-unique operation.
 Consolidate repeated findings by participant set when possible so reports remain
 usable at large scale.
 
 ## Current verified baseline
 
-The successful scan on 2026-08-02 reported:
+The successful v0.2.1 scan on 2026-08-02 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -153,14 +164,20 @@ The successful scan on 2026-08-02 reported:
 - 78 ArchiveXL-related archives indexed.
 - 5,458 indexed archive members.
 - 14,315 extracted ArchiveXL references.
-- 30 consolidated findings:
+- 216 deployed TweakXL YAML files: 214 non-empty configs parsed and two empty
+  configs reported informationally.
+- 57,455 concrete TweakXL references after `$instances` expansion.
+- 36 consolidated findings overall:
   - 6 conflict candidates.
   - 2 warnings.
   - 16 review groups.
-  - 6 informational findings.
+  - 12 informational findings.
 - Zero WolvenKit indexing failures.
-- Twelve automated tests passing.
-- Cached normal scan time was approximately 33 seconds.
+- Twenty-three automated tests passing.
+- Cached normal scan time with both analyzers was approximately 43 seconds.
+- All 71,770 ArchiveXL and TweakXL references have one-based source lines in the
+  generated reports. For minified one-line JSON-shaped `.xl` files, line 1 is
+  correctly shared by every operation in that physical source line.
 
 Important current findings:
 
@@ -175,6 +192,9 @@ Important current findings:
    absent.
 5. Sixteen consolidated mod groups patch some of the same streaming sectors;
    these are review candidates, not automatically confirmed incompatibilities.
+6. TweakXL found 251 concrete TweakDB array identities shared across four mod
+   participant groups. All use composable tagged operations in the frozen
+   collection; no TweakXL conflict, warning, review, or parser error was found.
 
 ## Generated reports
 
@@ -185,6 +205,11 @@ Important current findings:
   Concise text report suitable for diffs and quick reading.
 - `reports/current/archivexl-findings.json`
   Full ArchiveXL references and evidence.
+- `reports/current/tweakxl-findings.json`
+  Full TweakXL references and ecosystem findings. This is intentionally large
+  because it retains all 57,455 expanded references.
+- `reports/current/compatibility-findings.json`
+  Combined machine-readable findings without the full reference inventories.
 - `reports/current/archive-manifests.json`
   Indexed WolvenKit archive contents.
 - `reports/current/inventory.json`
