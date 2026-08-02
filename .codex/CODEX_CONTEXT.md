@@ -1,0 +1,195 @@
+# Codex Project Context
+
+Last updated: 2026-08-02
+
+## Purpose
+
+This repository contains `cp77compat`, a read-only compatibility scanner for a
+large Vortex-managed Cyberpunk 2077 mod collection. It inventories individual
+mod packages, attributes deployed files through Vortex metadata, indexes
+resources inside `.archive` files with WolvenKit CLI, and performs
+ecosystem-specific semantic compatibility checks.
+
+The scanner is being developed incrementally. ArchiveXL is the first supported
+ecosystem. Planned ecosystems include TweakXL, REDscript, CET Lua, input/config
+files, RED4ext native plugins, and runtime logs.
+
+## Workspace paths
+
+- Scanner repository: `C:\Games\Programs\Mods\cyberpunk2077`
+- Frozen Vortex staging collection:
+  `C:\Games\Programs\Vortex Mods\cyberpunk2077`
+- Deployed game:
+  `C:\Games\Steam\steamapps\common\Cyberpunk 2077`
+- WolvenKit CLI:
+  `C:\Games\Programs\WolvenKit-Console\WolvenKit.CLI.exe`
+- Vortex deployment manifest:
+  `C:\Games\Steam\steamapps\common\Cyberpunk 2077\vortex.deployment.json`
+
+## Safety and ownership rules
+
+1. The Vortex staging collection and game directory are frozen reference
+   inputs. Do not edit, rename, delete, redeploy, or extract files into them.
+2. Scanner source, tests, reports, and caches belong only under the scanner
+   repository.
+3. WolvenKit inspection must remain read-only with respect to source archives.
+   Temporary/selective extraction must use a scanner-owned cache directory.
+4. Generated `reports/` and `.cache/` contents are ignored by Git.
+5. Existing Vortex conflict decisions are authoritative unless the user asks to
+   change them. The known winners are:
+   - Damage Scaling and Balance - Extended over Damage Scaling.
+   - Classic Drinks over the standalone No Paper Bags copy.
+
+## Runtime and dependencies
+
+- Python: 3.12.10 during initial implementation.
+- YAML parser: PyYAML 6.0.3.
+- WolvenKit CLI: 8.19.0.
+- The scanner otherwise prefers the Python standard library and offline assets.
+- `git.exe` was not available on the active PowerShell `PATH` on 2026-08-02,
+  even though `.git` exists. Do not infer branch/commit/dirty state without
+  locating a usable Git executable first.
+
+## How to run
+
+From the repository root:
+
+```powershell
+.\run-scanner.cmd
+```
+
+Useful options:
+
+```powershell
+.\run-scanner.cmd --archive-scope none --hash-mode none
+.\run-scanner.cmd --archive-scope xl --workers 4
+.\run-scanner.cmd --archive-scope all
+.\run-scanner.cmd --refresh-cache
+```
+
+Defaults point to the workspace paths above. The normal report destination is
+`reports\current`.
+
+Run tests without installing the package:
+
+```powershell
+$env:PYTHONPATH = "C:\Games\Programs\Mods\cyberpunk2077\src"
+python -m unittest discover -s tests -v
+```
+
+## Current architecture
+
+- `src/cp77compat/models.py`
+  Shared artifacts, references, findings, archive manifests, path normalization,
+  and severity ordering.
+- `src/cp77compat/deployment.py`
+  Reads `vortex.deployment.json` and maps deployed relative paths to winning
+  staging mods.
+- `src/cp77compat/inventory.py`
+  Discovers mod directories, inventories files, hashes selected artifacts, and
+  reports exact relative-path collisions.
+- `src/cp77compat/archives.py`
+  Invokes `WolvenKit.CLI.exe archiveinfo --list`, parses archive member paths,
+  and caches manifests by archive SHA-256. It does not extract payloads yet.
+- `src/cp77compat/archivexl.py`
+  Parses YAML and JSON `.xl` files, rejects duplicate YAML keys, tolerates the
+  tab variants present in the frozen corpus, extracts ArchiveXL references,
+  compares streaming operations, and resolves resources against indexed
+  archives or loose mod files.
+- `src/cp77compat/reporting.py`
+  Writes inventory, archive manifest, findings JSON, Markdown, and HTML reports.
+- `src/cp77compat/html_report.py`
+  Generates a self-contained offline HTML report with search, severity/rule/mod
+  filters, pagination, and lazily expanded evidence.
+- `src/cp77compat/cli.py`
+  Orchestrates the scan and exposes CLI options.
+- `tests/`
+  Unit tests for ArchiveXL parsing/comparison, archive output parsing, loose
+  resource resolution, and safe HTML data embedding.
+
+## Data model and report semantics
+
+Every analyzer should emit the same shared types:
+
+- `Artifact`: a physical file owned by one staging mod.
+- `Reference`: a semantic resource, method, record, key, or operation extracted
+  from an ecosystem file.
+- `Finding`: rule ID, severity, confidence, summary, explanation, participants,
+  and evidence.
+
+Severity meanings:
+
+- `error`: definite parsing/loading/tool failure.
+- `conflict`: strong evidence that operations overlap incompatibly.
+- `warning`: likely problem or missing dependency/resource.
+- `review`: overlap that may still be additive and needs manual inspection.
+- `info`: expected state, deliberate override, or contextual observation.
+
+Do not treat a shared ArchiveXL top-level key such as `streaming` or
+`localization` as a conflict. Compare identities and operations below it.
+Consolidate repeated findings by participant set when possible so reports remain
+usable at large scale.
+
+## Current verified baseline
+
+The successful scan on 2026-08-02 reported:
+
+- 266 Vortex mod directories.
+- 3,476 files.
+- 104 `.xl` files: 103 non-empty configs parsed and one expected empty ArchiveXL
+  framework bundle placeholder.
+- 78 ArchiveXL-related archives indexed.
+- 5,458 indexed archive members.
+- 14,315 extracted ArchiveXL references.
+- 30 consolidated findings:
+  - 6 conflict candidates.
+  - 2 warnings.
+  - 16 review groups.
+  - 6 informational findings.
+- Zero WolvenKit indexing failures.
+- Nine automated tests passing.
+- Cached normal scan time was approximately 33 seconds.
+
+Important current findings:
+
+1. Immersive Night City Fixes and TheNullifier patch the same streaming sector
+   with different `expectedNodes` values: 1237 versus 1263.
+2. Five participant groups delete identical streaming node indices. The largest
+   is 29 overlaps between Immersive Night City Fixes and Road Fix V2.
+3. Better Armor Tooltip declares
+   `better_armor_tooltip\localization\es-mx.json`, but that resource is absent.
+4. NCEE NPC declares
+   `localization\it-it\onscreens\ncee_onscreens.json`, but that resource is
+   absent.
+5. Sixteen consolidated mod groups patch some of the same streaming sectors;
+   these are review candidates, not automatically confirmed incompatibilities.
+
+## Generated reports
+
+- `reports/current/compatibility-report.html`
+  Primary human interface. Self-contained, searchable, filterable, paginated,
+  and safe to open locally.
+- `reports/current/compatibility-report.md`
+  Concise text report suitable for diffs and quick reading.
+- `reports/current/archivexl-findings.json`
+  Full ArchiveXL references and evidence.
+- `reports/current/archive-manifests.json`
+  Indexed WolvenKit archive contents.
+- `reports/current/inventory.json`
+  Complete mod/file/deployment inventory.
+
+## Continuity procedure
+
+At the start of a restored Codex session, read these files in order:
+
+1. `.codex/CODEX_CONTEXT.md`
+2. `.codex/CODEX_WORKLOG.md`
+3. `.codex/CODEX_TODO.md`
+
+After material project work:
+
+- Update `CODEX_WORKLOG.md` with what changed and how it was validated.
+- Update checkbox/status information in `CODEX_TODO.md`.
+- Update this context file only when stable architecture, paths, constraints,
+  commands, dependencies, or baseline facts change.
+
