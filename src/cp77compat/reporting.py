@@ -124,8 +124,10 @@ def write_reports(
             payloads = analyzer.get("payloads")
             if payloads:
                 lines.extend(["", "#### Payload inspection", ""])
-                for key, value in payloads.items():
-                    lines.append(f"- `{key}`: {value}")
+                for payload_name, payload_stats in payloads.items():
+                    lines.append(f"- **{payload_name}**")
+                    for key, value in payload_stats.items():
+                        lines.append(f"  - `{key}`: {value}")
             lines.append("")
     lines.extend(["## Findings", ""])
     if not ordered_findings:

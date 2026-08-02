@@ -38,9 +38,9 @@ frozen-corpus validation pass are complete.
 - [x] Inspect serialized localization resources and detect duplicate
   `secondaryKey` definitions across mods.
 - [x] Detect competing edits to the same localization `primaryKey`.
-- [ ] Inspect serialized factory CSV resources and compare factory entity names
+- [x] Inspect serialized factory CSV resources and compare factory entity names
   and target `.ent`/`.app` paths.
-- [ ] Verify factory target resources exist in the declaring mod or document an
+- [x] Verify factory target resources exist in the declaring mod or document an
   implicit cross-mod dependency.
 - [ ] Parse and analyze `quest.phases` operations and parent targets.
 - [ ] Parse and analyze `journal` resources.

@@ -163,8 +163,8 @@ def load_config(path: Path) -> ScannerConfig:
         archive_scope=_choice(scan.get("archive_scope"), "xl", {"none", "xl", "all"}, "scan.archive_scope"),
         payload_scope=_choice(
             scan.get("payload_scope"),
-            "localization",
-            {"none", "localization"},
+            "all",
+            {"all", "factories", "localization", "none"},
             "scan.payload_scope",
         ),
         hash_mode=_choice(scan.get("hash_mode"), "archives", {"none", "archives", "all"}, "scan.hash_mode"),

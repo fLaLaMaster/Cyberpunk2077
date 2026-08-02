@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cp77compat"
-version = "0.4.0"
+version = "0.5.0"
 description = "Read-only compatibility scanner for a Vortex-managed Cyberpunk 2077 mod collection"
 requires-python = ">=3.11"
 dependencies = ["PyYAML>=6.0"]

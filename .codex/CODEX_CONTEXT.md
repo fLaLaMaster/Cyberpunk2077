@@ -110,7 +110,9 @@ python -m unittest discover -s tests -v
   WolvenKit, validates cached hashes, and records per-resource metadata.
 - `src/cp77compat/archivexl_payload_analysis.py`
   Extracts locale-scoped localization entry identities from serialized payloads
-  and compares cross-mod `secondaryKey` and nonzero `primaryKey` definitions.
+  and compares cross-mod `secondaryKey` and nonzero `primaryKey` definitions. It
+  also parses factory C2dArray rows, compares entity names and targets, and
+  validates target resources against indexed archives and loose files.
 - `src/cp77compat/archivexl.py`
   Parses YAML and JSON `.xl` files, rejects duplicate YAML keys, tolerates the
   tab variants present in the frozen corpus, extracts ArchiveXL references,
@@ -165,7 +167,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.4.0 scan on 2026-08-02 reported:
+The successful v0.5.0 scan on 2026-08-02 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -173,26 +175,31 @@ The successful v0.4.0 scan on 2026-08-02 reported:
   framework bundle placeholder.
 - 78 ArchiveXL-related archives indexed.
 - 5,458 indexed archive members.
-- 40,050 extracted ArchiveXL references: 35,926 declaration/streaming/resource
-  references plus 4,124 serialized localization entry references.
+- 40,064 extracted ArchiveXL references: 35,926 declaration/streaming/resource
+  references, 4,124 serialized localization entries, and 14 factory entity
+  rows.
 - 216 deployed TweakXL YAML files: 214 non-empty configs parsed and two empty
   configs reported informationally.
 - 57,455 concrete TweakXL references after `$instances` expansion.
 - 181 archive-owned localization payloads serialized with zero failures; four
   declarations without an own indexed archive payload were skipped and remain
   covered by resource-resolution findings.
+- Six factory payloads serialized into 14 entity rows. All 14 target resources
+  resolve inside their declaring mods, with no name collisions, missing targets,
+  or cross-mod dependencies.
 - 40 consolidated findings overall:
   - 6 conflict candidates.
   - 2 warnings.
   - 16 review groups.
   - 16 informational findings.
 - Zero WolvenKit indexing failures.
-- Thirty-four automated tests passing.
+- Thirty-seven automated tests passing.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
-  normal scan completed in 9.51 seconds.
-- All 97,505 ArchiveXL and TweakXL references have one-based declaration/source
-  lines in the generated reports. Serialized localization entries additionally
-  carry their zero-based payload `entry_index`. For minified one-line
+  normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
+  completed in 8.97 seconds.
+- All 97,519 ArchiveXL and TweakXL references have one-based declaration/source
+  lines in the generated reports. Serialized localization and factory entries
+  additionally carry their zero-based payload `entry_index` or `row_index`. For minified one-line
   JSON-shaped `.xl` files, line 1 is correctly shared by every declaration on
   that physical source line.
 
@@ -219,6 +226,8 @@ Important current findings:
    recorded as one informational duplicate-redirect group.
 9. All 181 available localization payloads were inspected; no cross-mod
    duplicate or conflicting locale/key identities were found.
+10. All six factory payloads were inspected; 14 entity names are unique and all
+    target resources resolve within their declaring mods.
 
 Analyzer coverage is embedded in all primary reports. It currently records 45
 ArchiveXL documents with `resource` sections and marks all five installed
@@ -226,7 +235,8 @@ resource operations (`copy`, `fix`, `link`, `patch`, and `scope`) as analyzed at
 declaration level. The `resource` section remains partial until payload contents
 are selectively extracted and compared. Localization is now marked analyzed for
 archive-owned on-screen resources and its extraction/serialization cache counts
-are embedded in report coverage.
+are embedded in report coverage. Factory declarations are also marked analyzed,
+with row counts, cache counts, and target-resolution results in the same panel.
 
 ## Generated reports
 

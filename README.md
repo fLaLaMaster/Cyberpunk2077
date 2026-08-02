@@ -17,6 +17,8 @@ Implemented analysis includes:
   analysis;
 - ArchiveXL on-screen localization payload serialization and locale-scoped
   `secondaryKey`/`primaryKey` collision analysis;
+- ArchiveXL factory CSV serialization, entity-name collision checks, and
+  factory target resource validation;
 - TweakXL `.yaml`/`.yml` parsing under `r6/tweaks`;
 - TweakDB record, flat, property, `$base`, `$type`, and `$instances` extraction;
 - semantic comparison of complete assignments and tagged array operations;
@@ -24,8 +26,8 @@ Implemented analysis includes:
 
 Reports include an analyzer-coverage panel that distinguishes analyzed,
 partially analyzed, and unsupported installed sections. Resource operations are
-compared at declaration-identity level. Localization payload entries are
-inspected; identities inside general resource patch payloads remain a later
+compared at declaration-identity level. Localization and factory payload entries
+are inspected; identities inside general resource patch payloads remain a later
 milestone.
 
 The TweakXL parser preserves YAML anchors, aliases, repeated template roots,
@@ -72,7 +74,7 @@ paths:
 
 scan:
   archive_scope: xl
-  payload_scope: localization
+  payload_scope: all
   hash_mode: archives
   workers: 4
   refresh_cache: false
@@ -93,8 +95,10 @@ Archive modes:
 - `--archive-scope all` indexes every mod archive.
 - `--archive-scope none` skips WolvenKit execution.
 - `--no-refresh-cache` overrides a YAML `refresh_cache: true` value.
-- `--payload-scope localization` selectively extracts and serializes declared
-  ArchiveXL on-screen resources (default).
+- `--payload-scope all` inspects every implemented ArchiveXL payload type
+  (default).
+- `--payload-scope localization` or `--payload-scope factories` limits payload
+  inspection to that resource type.
 - `--payload-scope none` keeps the scan declaration-only and does not
   materialize payloads.
 

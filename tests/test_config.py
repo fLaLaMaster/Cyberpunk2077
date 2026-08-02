@@ -59,6 +59,7 @@ scan:
                 encoding="utf-8",
             )
             config = load_config(path)
+            self.assertEqual("all", config.payload_scope)
             args = argparse.Namespace(
                 staging=None,
                 game=None,

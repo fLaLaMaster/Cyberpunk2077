@@ -16,7 +16,10 @@ from .archivexl import (
     parse_documents,
     resolve_archive_references,
 )
-from .archivexl_payload_analysis import inspect_localization_payloads
+from .archivexl_payload_analysis import (
+    inspect_factory_payloads,
+    inspect_localization_payloads,
+)
 from .config import DEFAULT_CONFIG_PATH, ScannerConfig, load_config
 from .deployment import load_deployment
 from .inventory import build_inventory, discover_mods, exact_path_findings
@@ -37,7 +40,9 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--output", type=Path)
     scan.add_argument("--cache", type=Path)
     scan.add_argument("--archive-scope", choices=("none", "xl", "all"))
-    scan.add_argument("--payload-scope", choices=("none", "localization"))
+    scan.add_argument(
+        "--payload-scope", choices=("none", "localization", "factories", "all")
+    )
     scan.add_argument("--hash-mode", choices=("none", "archives", "all"))
     scan.add_argument("--workers", type=int)
     scan.add_argument(
@@ -136,8 +141,8 @@ def run_scan(args: argparse.Namespace) -> int:
             findings.extend(index_findings)
             findings.extend(resolve_archive_references(references, manifests, artifacts))
             findings.extend(internal_archive_collisions(manifests))
-            if args.payload_scope == "localization":
-                print("Inspecting ArchiveXL localization payloads")
+            payload_coverage = {}
+            if args.payload_scope != "none":
                 provider = WolvenKitArchivePayloadProvider(
                     args.wolvenkit,
                     args.cache,
@@ -145,6 +150,8 @@ def run_scan(args: argparse.Namespace) -> int:
                     refresh_cache=args.refresh_cache,
                     timeout_seconds=args.wolvenkit_timeout,
                 )
+            if args.payload_scope in {"localization", "all"}:
+                print("Inspecting ArchiveXL localization payloads")
                 payload_references, payload_findings, payload_stats = (
                     inspect_localization_payloads(
                         references,
@@ -155,7 +162,7 @@ def run_scan(args: argparse.Namespace) -> int:
                 )
                 references.extend(payload_references)
                 findings.extend(payload_findings)
-                coverage["archivexl"]["payloads"] = payload_stats
+                payload_coverage["localization"] = payload_stats
                 for section in coverage["archivexl"]["sections"]:
                     if section["name"] == "localization":
                         section["status"] = "analyzed"
@@ -168,6 +175,34 @@ def run_scan(args: argparse.Namespace) -> int:
                     f"Serialized {payload_stats['serialized']} localization payloads; "
                     f"extracted {payload_stats['entry_references']} entry references"
                 )
+            if args.payload_scope in {"factories", "all"}:
+                print("Inspecting ArchiveXL factory payloads")
+                payload_references, payload_findings, payload_stats = (
+                    inspect_factory_payloads(
+                        references,
+                        manifests,
+                        artifacts,
+                        provider,
+                        workers=args.workers,
+                    )
+                )
+                references.extend(payload_references)
+                findings.extend(payload_findings)
+                payload_coverage["factories"] = payload_stats
+                for section in coverage["archivexl"]["sections"]:
+                    if section["name"] == "factories":
+                        section["status"] = "analyzed"
+                        section["note"] = (
+                            "Factory CSV entity names and target resource paths are "
+                            "extracted, compared, and resolved."
+                        )
+                        break
+                print(
+                    f"Serialized {payload_stats['serialized']} factory payloads; "
+                    f"extracted {payload_stats['entry_references']} entity rows"
+                )
+            if payload_coverage:
+                coverage["archivexl"]["payloads"] = payload_coverage
 
     metadata = {
         "scanner_version": __version__,

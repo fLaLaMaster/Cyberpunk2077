@@ -13,10 +13,13 @@ from cp77compat.archivexl import (
     resolve_archive_references,
 )
 from cp77compat.archivexl_payload_analysis import (
+    compare_factory_entries,
     compare_localization_entries,
+    parse_factory_payload,
     parse_localization_payload,
+    validate_factory_targets,
 )
-from cp77compat.models import Artifact, Reference
+from cp77compat.models import ArchiveManifest, ArchiveMember, Artifact, Reference
 
 
 def artifact(path: Path, mod: str) -> Artifact:
@@ -32,6 +35,103 @@ def artifact(path: Path, mod: str) -> Artifact:
 
 
 class ArchiveXLTests(unittest.TestCase):
+    def test_parses_serialized_factory_rows(self) -> None:
+        declaration = Reference(
+            "archivexl",
+            "factory",
+            r"mod\factory.csv",
+            "Example",
+            "example.xl",
+            line=2,
+        )
+        serialized = {
+            "Data": {
+                "RootChunk": {
+                    "$type": "C2dArray",
+                    "compiledHeaders": ["name", "path", "preload"],
+                    "compiledData": [
+                        ["example_entity", r"mod\example.ent", "true"]
+                    ],
+                }
+            }
+        }
+        references, findings = parse_factory_payload(
+            declaration, serialized, "example.archive"
+        )
+        self.assertEqual([], findings)
+        self.assertEqual(1, len(references))
+        self.assertEqual("example_entity", references[0].identity)
+        self.assertEqual(r"mod\example.ent", references[0].details["target_path"])
+        self.assertEqual(0, references[0].details["row_index"])
+        self.assertEqual(2, references[0].line)
+
+    def test_competing_factory_name_is_a_conflict(self) -> None:
+        references = [
+            Reference(
+                "archivexl",
+                "factory.entry",
+                "shared_entity",
+                "A",
+                "a.xl",
+                details={"target_path": r"a\root.ent"},
+            ),
+            Reference(
+                "archivexl",
+                "factory.entry",
+                "shared_entity",
+                "B",
+                "b.xl",
+                details={"target_path": r"b\root.ent"},
+            ),
+        ]
+        findings = compare_factory_entries(references)
+        self.assertEqual(1, len(findings))
+        self.assertEqual("AXL-FACTORY-NAME-CONFLICT", findings[0].rule_id)
+
+    def test_factory_target_validation_distinguishes_provider_states(self) -> None:
+        references = [
+            Reference(
+                "archivexl",
+                "factory.entry",
+                "owned",
+                "A",
+                "a.xl",
+                details={"target_path": r"a\owned.ent"},
+            ),
+            Reference(
+                "archivexl",
+                "factory.entry",
+                "foreign",
+                "A",
+                "a.xl",
+                details={"target_path": r"b\foreign.ent"},
+            ),
+            Reference(
+                "archivexl",
+                "factory.entry",
+                "missing",
+                "A",
+                "a.xl",
+                details={"target_path": r"missing.ent"},
+            ),
+        ]
+        manifests = [
+            ArchiveManifest(
+                "A", "a.archive", "a" * 64, 1, "test", [ArchiveMember(r"a\owned.ent")]
+            ),
+            ArchiveManifest(
+                "B", "b.archive", "b" * 64, 1, "test", [ArchiveMember(r"b\foreign.ent")]
+            ),
+        ]
+        findings, stats = validate_factory_targets(references, manifests)
+        self.assertEqual(1, stats["verified_targets"])
+        self.assertEqual(1, stats["cross_mod_targets"])
+        self.assertEqual(1, stats["missing_targets"])
+        self.assertEqual(
+            {"AXL-FACTORY-CROSS-MOD-TARGET", "AXL-FACTORY-TARGET-NOT-FOUND"},
+            {item.rule_id for item in findings},
+        )
+
     def test_parses_serialized_localization_entries(self) -> None:
         declaration = Reference(
             "archivexl",

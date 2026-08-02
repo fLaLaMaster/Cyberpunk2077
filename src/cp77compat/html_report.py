@@ -226,6 +226,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
         for (const operation of item.operation_counts || []) {
           values.push(String(operation.mod_name || ""), String(operation.operation || ""));
         }
+        if (item.details) values.push(JSON.stringify(item.details));
       }
       return values.join(" ");
     }
@@ -313,18 +314,28 @@ _HTML_TEMPLATE = r'''<!doctype html>
       }
       if (analyzer.payloads) {
         const label = document.createElement("h3"); label.textContent = "Payload inspection"; group.append(label);
-        const payload = analyzer.payloads;
-        group.append(coverageTable([
-          {metric: "Declarations", value: payload.declarations},
-          {metric: "Unique archive payloads", value: payload.unique_archive_payloads},
-          {metric: "Serialized", value: payload.serialized},
-          {metric: "Skipped without own archive", value: payload.skipped_without_own_archive},
-          {metric: "Failures", value: payload.failed},
-          {metric: "Entry references", value: payload.entry_references},
-          {metric: "Extraction cache hits", value: payload.extraction_cache_hits},
-          {metric: "Serialization cache hits", value: payload.serialization_cache_hits}
-        ], [
-          {key: "metric", label: "Metric"}, {key: "value", label: "Count"}
+        const payloadRows = [];
+        for (const [name, payload] of Object.entries(analyzer.payloads)) {
+          payloadRows.push({
+            name, declarations: payload.declarations,
+            unique: payload.unique_archive_payloads, serialized: payload.serialized,
+            skipped: payload.skipped_without_own_archive, failed: payload.failed,
+            references: payload.entry_references,
+            extractionHits: payload.extraction_cache_hits,
+            serializationHits: payload.serialization_cache_hits,
+            verified: payload.verified_targets,
+            crossMod: payload.cross_mod_targets,
+            missing: payload.missing_targets
+          });
+        }
+        group.append(coverageTable(payloadRows, [
+          {key: "name", label: "Analyzer"}, {key: "declarations", label: "Declarations"},
+          {key: "unique", label: "Unique payloads"}, {key: "serialized", label: "Serialized"},
+          {key: "skipped", label: "Skipped"}, {key: "failed", label: "Failures"},
+          {key: "references", label: "References"}, {key: "extractionHits", label: "Extraction hits"},
+          {key: "serializationHits", label: "Serialization hits"},
+          {key: "verified", label: "Targets verified"}, {key: "crossMod", label: "Cross-mod targets"},
+          {key: "missing", label: "Missing targets"}
         ]));
       }
       coverageElement.append(group);

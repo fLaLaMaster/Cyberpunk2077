@@ -45,14 +45,16 @@ class HtmlReportTests(unittest.TestCase):
                             ],
                             "resource_operations": [],
                             "payloads": {
-                                "declarations": 1,
-                                "unique_archive_payloads": 1,
-                                "serialized": 1,
-                                "skipped_without_own_archive": 0,
-                                "failed": 0,
-                                "entry_references": 2,
-                                "extraction_cache_hits": 1,
-                                "serialization_cache_hits": 1,
+                                "localization": {
+                                    "declarations": 1,
+                                    "unique_archive_payloads": 1,
+                                    "serialized": 1,
+                                    "skipped_without_own_archive": 0,
+                                    "failed": 0,
+                                    "entry_references": 2,
+                                    "extraction_cache_hits": 1,
+                                    "serialization_cache_hits": 1,
+                                }
                             },
                         }
                     },

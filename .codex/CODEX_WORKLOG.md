@@ -6,14 +6,48 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.4.0`
+- Scanner version: `0.5.0`
 - Implemented ecosystems: ArchiveXL and TweakXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 34 passing
+- Automated tests: 37 passing
 - Last complete scan: successful on 2026-08-02
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-02 — ArchiveXL factory payload analysis
+
+Extended selective payload inspection to ArchiveXL factory CSV resources.
+
+Changes:
+
+- Parsed serialized `C2dArray` factory payloads using their `name`, `path`, and
+  optional `preload` columns while retaining declaration lines and payload row
+  indices.
+- Added conflict/informational rules for factory entity names registered by
+  multiple mods with different/identical targets.
+- Validated every factory target against resources owned by the declaring mod,
+  then distinguished cross-mod providers from entirely missing resources.
+- Expanded payload scope to `none`, `localization`, `factories`, or `all`, with
+  `all` as the tracked configuration default.
+- Updated nested payload coverage tables in JSON, Markdown, and HTML, and bumped
+  the scanner to version 0.5.0.
+
+Validation:
+
+- Thirty-seven unit tests passed.
+- Serialized all six installed factory payloads with zero failures and extracted
+  14 factory entity rows.
+- All 14 target resources resolve inside their declaring mods. No duplicate or
+  competing entity names, cross-mod targets, missing targets, or malformed rows
+  were found.
+- The first factory-enabled run completed in 29.9 seconds and populated six new
+  extraction/serialization cache entries; the fully cached run completed in
+  8.97 seconds.
+- The overall result remains 40 findings, and all 40,064 ArchiveXL references
+  have non-null source lines.
+- Regenerated `reports/current`; frozen staging and game inputs were not
+  modified. The scanner-cache-only factory probe directory was removed.
 
 ### 2026-08-02 — Selective payload provider and localization analysis
 

@@ -17,9 +17,9 @@ scan:
   # all: every mod archive.
   archive_scope: xl
 
-  # none: declarations only; localization: selectively extract and inspect
-  # ArchiveXL on-screen localization payloads.
-  payload_scope: localization
+  # none: declarations only; localization/factories: inspect that payload type;
+  # all: inspect every implemented ArchiveXL payload type.
+  payload_scope: all
 
   # none: no inventory hashes; archives: hash .archive files; all: hash all files.
   hash_mode: archives
