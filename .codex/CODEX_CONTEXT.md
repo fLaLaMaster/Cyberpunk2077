@@ -169,7 +169,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.6.0 scan on 2026-08-02 reported:
+The successful v0.7.0 scan on 2026-08-02 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -192,17 +192,29 @@ The successful v0.6.0 scan on 2026-08-02 reported:
 - Twenty-three compatibility-relevant patch sources serialized for all 43
   targets shared across mods. Every shared target uses disjoint stable inner
   identities; none remained uninspected or produced a conflict.
-- 40 consolidated findings overall:
+- TweakXL dependency analysis indexed 74,829 named records from 2,684 official
+  REDmod `.tweak` files and verified generated `_inlineN` IDs against both
+  local TweakDB binaries.
+- All 1,284 `$base` targets were classified: 1,110 vanilla/generated-inline,
+  75 same-mod, 98 cross-mod, and one capitalization mismatch; no truly missing
+  target and no base cycle was found.
+- 27,374 implicit values exactly match installed custom record providers;
+  18,660 of those references form three compact cross-mod dependency
+  relationships. No explicit `t"..."`/`TweakDBID("...")` foreign keys occur in
+  the frozen TweakXL corpus.
+- 42 consolidated findings overall:
   - 6 conflict candidates.
+  - 1 error.
   - 2 warnings.
   - 16 review groups.
-  - 16 informational findings.
+  - 17 informational findings.
 - Zero WolvenKit indexing failures.
-- Forty automated tests passing.
+- Forty-five automated tests passing.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
-  seconds and fully cached scans remain approximately 9.5 seconds.
+  seconds. The v0.7 dependency-enabled fully cached scan completes in about
+  17.8 seconds, including indexing the local official TweakDB sources.
 - All 105,821 ArchiveXL and TweakXL references have one-based declaration/source
   lines in the generated reports. Serialized localization and factory entries
   additionally carry their zero-based payload `entry_index` or `row_index`. For minified one-line
@@ -224,7 +236,7 @@ Important current findings:
    these are review candidates, not automatically confirmed incompatibilities.
 6. TweakXL found 251 concrete TweakDB array identities shared across four mod
    participant groups. All use composable tagged operations in the frozen
-   collection; no TweakXL conflict, warning, review, or parser error was found.
+   collection; no assignment or tagged-array incompatibility was found.
 7. ArchiveXL resource declarations add 43 composable cross-mod patch targets,
    consolidated into three participant groups. No contradictory fix or
    copy/link target was found.
@@ -238,6 +250,14 @@ Important current findings:
     36 citizen entity targets patch components versus appearances, six player
     hair targets use distinct appearance identities, and one device database
     target adds distinct device hashes.
+12. `Attachments Crafting System.yaml` line 94 clones
+    `Items.w_att_scope_sniper_02_legendary`, but the installed vanilla record is
+    `Items.w_att_scope_sniper_02_Legendary`. This is the only high-confidence
+    TweakXL dependency error.
+13. Three valid custom-record dependency relationships were identified:
+    Attachments Unrestricted consumes records from Attachments Crafting System
+    and 6 More Weapon Mod Slots, while More Mods More Fun Compatible Patch also
+    consumes records from 6 More Weapon Mod Slots.
 
 Analyzer coverage is embedded in all primary reports. It currently records 45
 ArchiveXL documents with `resource` sections and marks all five installed
@@ -249,6 +269,10 @@ are embedded in report coverage. Factory declarations are also marked analyzed,
 with row counts, cache counts, and target-resolution results in the same panel.
 Shared-target resource patch payload counts and disjoint/duplicate/conflict/
 uninspected outcomes are recorded there as well.
+TweakXL coverage now includes record-provider indexing, `$base` resolution and
+cycle counts, explicit foreign-key results, and conservative implicit
+custom-provider matches. Arbitrary implicit scalar values remain partial rather
+than being guessed without property type metadata.
 
 ## Generated reports
 

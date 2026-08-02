@@ -24,6 +24,10 @@ Implemented analysis includes:
 - TweakXL `.yaml`/`.yml` parsing under `r6/tweaks`;
 - TweakDB record, flat, property, `$base`, `$type`, and `$instances` extraction;
 - semantic comparison of complete assignments and tagged array operations;
+- `$base` validation against installed definitions, official REDmod `.tweak`
+  sources, and generated inline record IDs in the local TweakDB binaries;
+- TweakXL base-chain cycle, case-mismatch, missing-record, and compact
+  cross-mod custom-record dependency analysis;
 - deterministic JSON and Markdown reports.
 
 Reports include an analyzer-coverage panel that distinguishes analyzed,
@@ -40,6 +44,10 @@ incompatible complete assignments, assignment-versus-mutation load-order risks,
 add/remove opposition, non-unique duplicate additions, and safely composable
 cross-mod array operations. Parser node locations are retained through aliases
 and template expansion so report evidence points to the originating source line.
+Dependency checks resolve explicit `t"..."`/`TweakDBID("...")` foreign keys and
+implicit values that exactly match an installed custom record provider. Other
+implicit scalar values are intentionally left unclassified until property type
+metadata is available.
 
 ## Run
 

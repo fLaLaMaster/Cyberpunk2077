@@ -312,6 +312,17 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "note", label: "Coverage note"}
         ]));
       }
+      if ((analyzer.dependencies || []).length) {
+        const label = document.createElement("h3"); label.textContent = "Dependency analysis"; group.append(label);
+        group.append(coverageTable(analyzer.dependencies, [
+          {key: "name", label: "Analyzer"}, {key: "references", label: "References"},
+          {key: "vanilla", label: "Vanilla"}, {key: "same_mod", label: "Same mod"},
+          {key: "cross_mod", label: "Cross-mod"}, {key: "case_mismatch", label: "Case mismatch"},
+          {key: "missing", label: "Missing"},
+          {key: "cycles", label: "Cycles"}, {key: "status", label: "Status"},
+          {key: "note", label: "Coverage note"}
+        ]));
+      }
       if (analyzer.payloads) {
         const label = document.createElement("h3"); label.textContent = "Payload inspection"; group.append(label);
         const payloadRows = [];

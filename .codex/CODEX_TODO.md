@@ -71,7 +71,9 @@ frozen-corpus validation pass are complete.
   property.
 - [x] Detect assignment/mutation load-order risks, opposing add/remove
   operations, and non-unique duplicate array additions.
-- [ ] Detect missing bases, clones, or referenced records where feasible.
+- [x] Detect missing/case-mismatched `$base` clone sources, base cycles,
+  explicit foreign keys, and exact installed custom-record dependencies using
+  local official REDmod/TweakDB data.
 - [ ] Parse and correlate TweakXL runtime logs.
 
 ## REDscript analyzer

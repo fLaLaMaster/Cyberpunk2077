@@ -121,6 +121,20 @@ def write_reports(
                         f"documents={operation['documents']}; "
                         f"references={operation['references']} — {operation['note']}"
                     )
+            dependencies = analyzer.get("dependencies", [])
+            if dependencies:
+                lines.extend(["", "#### Dependency analysis", ""])
+                for dependency in dependencies:
+                    lines.append(
+                        f"- `{dependency['name']}`: {dependency['status']}; "
+                        f"references={dependency['references']}; "
+                        f"vanilla={dependency['vanilla']}; "
+                        f"same-mod={dependency['same_mod']}; "
+                        f"cross-mod={dependency['cross_mod']}; "
+                        f"case-mismatch={dependency['case_mismatch']}; "
+                        f"missing={dependency['missing']}; "
+                        f"cycles={dependency['cycles']} — {dependency['note']}"
+                    )
             payloads = analyzer.get("payloads")
             if payloads:
                 lines.extend(["", "#### Payload inspection", ""])

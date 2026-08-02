@@ -6,6 +6,7 @@ from pathlib import Path
 
 from cp77compat.models import Artifact, Reference
 from cp77compat.tweakxl import compare_tweak_references, parse_tweak_documents
+from cp77compat.tweakxl_dependencies import analyze_tweak_dependencies
 
 
 def artifact(path: Path, mod: str, relative_path: str | None = None) -> Artifact:
@@ -179,6 +180,146 @@ Items.Second: *shared
         self.assertEqual("info", findings[0].severity)
         self.assertEqual(2, findings[0].evidence[0]["reference_count"])
         self.assertNotIn("references", findings[0].evidence[0])
+
+    def test_dependency_analysis_resolves_vanilla_and_reports_missing_base(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            game = Path(temp)
+            tweak = game / "tools" / "redmod" / "tweaks" / "base" / "items.tweak"
+            tweak.parent.mkdir(parents=True)
+            tweak.write_text(
+                "package Items\n\nVanillaBase : Item\n{\n}\n",
+                encoding="utf-8",
+            )
+            references = [
+                Reference(
+                    "tweakxl",
+                    "record.base",
+                    "Items.ValidClone",
+                    "Valid",
+                    "valid.yaml",
+                    line=2,
+                    details={"value": "Items.VanillaBase"},
+                ),
+                Reference(
+                    "tweakxl",
+                    "record.base",
+                    "Items.BrokenClone",
+                    "Broken",
+                    "broken.yaml",
+                    line=3,
+                    details={"value": "Items.DoesNotExist"},
+                ),
+            ]
+
+            findings, coverage = analyze_tweak_dependencies(references, game)
+
+            missing = [item for item in findings if item.rule_id == "TXL-MISSING-BASE"]
+            self.assertEqual(1, len(missing))
+            self.assertEqual("Items.DoesNotExist", missing[0].evidence[0]["target"])
+            base_stats = coverage["dependencies"][0]
+            self.assertEqual(1, base_stats["vanilla"])
+            self.assertEqual(1, base_stats["missing"])
+
+    def test_dependency_analysis_detects_cycles_and_cross_mod_records(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            game = Path(temp)
+            references = [
+                Reference(
+                    "tweakxl",
+                    "record.base",
+                    "Custom.A",
+                    "Provider",
+                    "provider.yaml",
+                    line=1,
+                    details={"value": "Custom.B"},
+                ),
+                Reference(
+                    "tweakxl",
+                    "record.base",
+                    "Custom.B",
+                    "Provider",
+                    "provider.yaml",
+                    line=3,
+                    details={"value": "Custom.A"},
+                ),
+                Reference(
+                    "tweakxl",
+                    "assignment",
+                    "Consumer.Record.foreignKey",
+                    "Consumer",
+                    "consumer.yaml",
+                    line=5,
+                    details={"value": "Custom.A", "operation": "assign"},
+                ),
+            ]
+
+            findings, _coverage = analyze_tweak_dependencies(references, game)
+            rules = {item.rule_id for item in findings}
+
+            self.assertIn("TXL-BASE-CYCLE", rules)
+            self.assertIn("TXL-CROSS-MOD-DEPENDENCY", rules)
+            dependency = next(
+                item for item in findings if item.rule_id == "TXL-CROSS-MOD-DEPENDENCY"
+            )
+            self.assertEqual(1, dependency.evidence[0]["record_references"])
+
+    def test_dependency_analysis_reports_base_case_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            game = Path(temp)
+            tweak = game / "tools" / "redmod" / "tweaks" / "base" / "items.tweak"
+            tweak.parent.mkdir(parents=True)
+            tweak.write_text(
+                "package Items\n\nLegendaryBase : Item\n{\n}\n",
+                encoding="utf-8",
+            )
+            references = [
+                Reference(
+                    "tweakxl",
+                    "record.base",
+                    "Items.Clone",
+                    "Example",
+                    "example.yaml",
+                    line=2,
+                    details={"value": "Items.legendaryBase"},
+                )
+            ]
+
+            findings, coverage = analyze_tweak_dependencies(references, game)
+
+            self.assertEqual(
+                ["TXL-BASE-CASE-MISMATCH"],
+                [item.rule_id for item in findings],
+            )
+            self.assertEqual(
+                ["Items.LegendaryBase"],
+                findings[0].evidence[0]["case_matches"],
+            )
+            self.assertEqual(1, coverage["dependencies"][0]["case_mismatch"])
+
+    def test_dependency_analysis_reports_missing_explicit_foreign_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            references = [
+                Reference(
+                    "tweakxl",
+                    "assignment",
+                    "Items.Example.link",
+                    "Example",
+                    "example.yaml",
+                    line=8,
+                    details={
+                        "value": 'TweakDBID("Custom.Missing")',
+                        "operation": "assign",
+                    },
+                )
+            ]
+
+            findings, coverage = analyze_tweak_dependencies(references, Path(temp))
+
+            self.assertEqual(
+                ["TXL-MISSING-RECORD-REFERENCE"],
+                [item.rule_id for item in findings],
+            )
+            self.assertEqual(1, coverage["dependencies"][1]["missing"])
 
 
 if __name__ == "__main__":

@@ -6,14 +6,51 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.6.0`
+- Scanner version: `0.7.0`
 - Implemented ecosystems: ArchiveXL and TweakXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 40 passing
+- Automated tests: 45 passing
 - Last complete scan: successful on 2026-08-02
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-02 — TweakXL record dependency analysis
+
+Finished the planned static `$base`, clone, and foreign-record dependency pass.
+
+Changes:
+
+- Indexed 74,829 named vanilla/expansion records from 2,684 local official
+  REDmod `.tweak` sources without modifying the game directory.
+- Added exact generated `_inlineN` record verification using CRC32/length
+  TweakDBIDs in `tweakdb.bin` and `tweakdb_ep1.bin`.
+- Resolved installed `$base` targets against official records and concrete
+  `$base`/`$type` providers, and added missing-base, capitalization-mismatch,
+  and base-cycle rules.
+- Added explicit `t"..."`/`TweakDBID("...")` foreign-key resolution plus a
+  conservative implicit pass limited to values exactly matching installed
+  custom record providers.
+- Compactly aggregated cross-mod dependencies by consumer/provider pair so
+  expanded `$instances` references do not overwhelm the HTML report.
+- Added TweakXL dependency coverage tables to JSON, Markdown, and HTML reports,
+  and bumped the scanner to version 0.7.0.
+
+Validation:
+
+- All 45 unit tests pass.
+- A complete frozen-corpus scan finished in 17.83 seconds with cached archive
+  payloads; staging and game inputs were not modified.
+- All 1,284 `$base` targets resolve except one exact capitalization error, and
+  no base cycle or otherwise missing base was found.
+- The error is `Items.w_att_scope_sniper_02_legendary` at line 94 of
+  Attachments Crafting System; the official record is capitalized
+  `Items.w_att_scope_sniper_02_Legendary`.
+- Three valid cross-mod custom-record relationships compact 18,758 base and
+  foreign-key references. No explicit foreign-key syntax occurs in the frozen
+  corpus.
+- Reports now contain 42 findings: 6 conflicts, 1 error, 2 warnings, 16
+  reviews, and 17 infos. All 57,455 TweakXL references still have source lines.
 
 ### 2026-08-02 — ArchiveXL resource patch payload identities
 
