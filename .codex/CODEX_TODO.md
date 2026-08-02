@@ -102,11 +102,10 @@ frozen-corpus validation pass are complete.
 
 ## Packaging and repository maintenance
 
-- [ ] Locate or configure a usable Git executable for status/diff checks in the
-  execution environment.
+- [x] Locate or configure a usable Git executable for status/diff checks in the
+  execution environment. It resolves from `C:\Program Files\Git\cmd\git.exe`.
 - [ ] Add a license if the user chooses one.
 - [ ] Add contributor/development documentation when the analyzer API stabilizes.
 - [ ] Add CI for Python tests after GitHub Actions requirements are decided.
 - [ ] Decide whether generated example reports should remain ignored or whether
   a small sanitized sample report belongs in the repository.
-

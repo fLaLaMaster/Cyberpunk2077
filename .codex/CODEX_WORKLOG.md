@@ -15,6 +15,20 @@ do not use it as a raw command transcript.
 
 ## History
 
+### 2026-08-02 — Git availability rechecked
+
+Rechecked Git after it was previously unavailable to the shell.
+
+Validation:
+
+- `git.exe` resolves to `C:\Program Files\Git\cmd\git.exe`.
+- Version: 2.55.0.windows.3.
+- Repository root resolves correctly.
+- Active branch: `main`.
+- `main` matched `origin/main` at commit `a16f39e` before this documentation
+  correction.
+- Worktree was clean before editing these continuity files.
+
 ### 2026-08-02 — Searchable HTML report
 
 Implemented a self-contained offline HTML compatibility report.
@@ -118,4 +132,3 @@ Validation:
 Follow-up:
 
 - Remaining work moved to `CODEX_TODO.md`.
-

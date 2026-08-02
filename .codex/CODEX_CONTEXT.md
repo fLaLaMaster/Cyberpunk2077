@@ -46,9 +46,10 @@ files, RED4ext native plugins, and runtime logs.
 - YAML parser: PyYAML 6.0.3.
 - WolvenKit CLI: 8.19.0.
 - The scanner otherwise prefers the Python standard library and offline assets.
-- `git.exe` was not available on the active PowerShell `PATH` on 2026-08-02,
-  even though `.git` exists. Do not infer branch/commit/dirty state without
-  locating a usable Git executable first.
+- Git: 2.55.0.windows.3 at `C:\Program Files\Git\cmd\git.exe`; its directory is
+  available on the active PowerShell `PATH`.
+- Repository branch: `main`. At the 2026-08-02 verification, `main` matched
+  `origin/main` and the worktree was clean.
 
 ## How to run
 
@@ -192,4 +193,3 @@ After material project work:
 - Update checkbox/status information in `CODEX_TODO.md`.
 - Update this context file only when stable architecture, paths, constraints,
   commands, dependencies, or baseline facts change.
-
