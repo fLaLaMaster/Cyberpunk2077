@@ -1,0 +1,26 @@
+# CP77 Compatibility Scanner configuration
+#
+# Relative paths are resolved from this file's directory. Command-line options
+# override values declared here.
+
+version: 1
+
+paths:
+  staging: 'C:\Games\Programs\Vortex Mods\cyberpunk2077'
+  game: 'C:\Games\Steam\steamapps\common\Cyberpunk 2077'
+  wolvenkit: 'C:\Games\Programs\WolvenKit-Console\WolvenKit.CLI.exe'
+  output: 'reports\current'
+  cache: '.cache\archives'
+
+scan:
+  # none: no archive indexing; xl: archives owned by mods with .xl files;
+  # all: every mod archive.
+  archive_scope: xl
+
+  # none: no inventory hashes; archives: hash .archive files; all: hash all files.
+  hash_mode: archives
+
+  workers: 4
+  refresh_cache: false
+  wolvenkit_timeout_seconds: 120
+

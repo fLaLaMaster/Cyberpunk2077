@@ -32,12 +32,43 @@ started with just:
 .\run-scanner.cmd
 ```
 
+## Configuration
+
+The tracked `cp77compat.yaml` file stores workspace paths and normal scan
+settings:
+
+```yaml
+version: 1
+
+paths:
+  staging: 'C:\Games\Programs\Vortex Mods\cyberpunk2077'
+  game: 'C:\Games\Steam\steamapps\common\Cyberpunk 2077'
+  wolvenkit: 'C:\Games\Programs\WolvenKit-Console\WolvenKit.CLI.exe'
+  output: 'reports\current'
+  cache: '.cache\archives'
+
+scan:
+  archive_scope: xl
+  hash_mode: archives
+  workers: 4
+  refresh_cache: false
+  wolvenkit_timeout_seconds: 120
+```
+
+Relative paths are resolved from the YAML file's directory. Command-line
+options override YAML values, so temporary changes do not require editing the
+configuration. A different file can be selected with `--config <path>`.
+
+The loader rejects duplicate keys, unknown settings, unsupported schema
+versions, invalid choices, and non-positive worker/timeout values.
+
 Archive modes:
 
 - `--archive-scope xl` indexes archives belonging to mods with `.xl` files
   (default).
 - `--archive-scope all` indexes every mod archive.
 - `--archive-scope none` skips WolvenKit execution.
+- `--no-refresh-cache` overrides a YAML `refresh_cache: true` value.
 
 Use `--refresh-cache` to rebuild WolvenKit archive manifests. Archive payloads
 are not extracted in this milestone.

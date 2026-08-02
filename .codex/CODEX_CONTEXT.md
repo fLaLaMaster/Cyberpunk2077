@@ -23,6 +23,8 @@ files, RED4ext native plugins, and runtime logs.
   `C:\Games\Steam\steamapps\common\Cyberpunk 2077`
 - WolvenKit CLI:
   `C:\Games\Programs\WolvenKit-Console\WolvenKit.CLI.exe`
+- Scanner configuration:
+  `C:\Games\Programs\Mods\cyberpunk2077\cp77compat.yaml`
 - Vortex deployment manifest:
   `C:\Games\Steam\steamapps\common\Cyberpunk 2077\vortex.deployment.json`
 
@@ -71,6 +73,12 @@ Useful options:
 Defaults point to the workspace paths above. The normal report destination is
 `reports\current`.
 
+`cp77compat.yaml` is the authoritative default configuration. It stores input,
+tool, output, cache, archive scope, hash mode, worker, refresh, and WolvenKit
+timeout settings. Relative paths are resolved from the config file directory.
+CLI values override YAML. The schema is versioned and rejects duplicate or
+unknown keys.
+
 Run tests without installing the package:
 
 ```powershell
@@ -86,6 +94,9 @@ python -m unittest discover -s tests -v
 - `src/cp77compat/deployment.py`
   Reads `vortex.deployment.json` and maps deployed relative paths to winning
   staging mods.
+- `src/cp77compat/config.py`
+  Strictly loads the versioned `cp77compat.yaml` schema, resolves paths, applies
+  defaults, and validates choices, booleans, workers, and timeouts.
 - `src/cp77compat/inventory.py`
   Discovers mod directories, inventories files, hashes selected artifacts, and
   reports exact relative-path collisions.
@@ -148,7 +159,7 @@ The successful scan on 2026-08-02 reported:
   - 16 review groups.
   - 6 informational findings.
 - Zero WolvenKit indexing failures.
-- Nine automated tests passing.
+- Twelve automated tests passing.
 - Cached normal scan time was approximately 33 seconds.
 
 Important current findings:

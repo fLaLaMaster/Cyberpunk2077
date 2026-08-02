@@ -9,11 +9,38 @@ do not use it as a raw command transcript.
 - Scanner version: `0.1.0`
 - Implemented ecosystem: ArchiveXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 9 passing
+- Automated tests: 12 passing
 - Last complete scan: successful on 2026-08-02
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-02 — Versioned YAML scanner configuration
+
+Moved workspace paths and normal scan settings into tracked configuration.
+
+Changes:
+
+- Added `cp77compat.yaml` schema version 1.
+- Added `src/cp77compat/config.py` with safe YAML parsing, duplicate-key
+  rejection, unknown-key rejection, schema-version validation, relative path
+  resolution, environment/user expansion, and typed option validation.
+- Changed CLI values to override YAML values instead of duplicating defaults.
+- Added `--config`, `--no-refresh-cache`, and `--wolvenkit-timeout` support.
+- Updated `run-scanner.cmd` to pass the repository config by absolute launcher
+  location, allowing it to be invoked from another working directory.
+- Added configuration documentation and three configuration tests.
+
+Validation:
+
+- Twelve total unit tests passed.
+- A normal no-argument launcher run completed successfully from the YAML config.
+- The launcher also found the repository config when invoked from the external
+  Cyberpunk 2077 game directory.
+- Full baseline remained 266 mods, 3,476 files, 78 indexed archives, and zero
+  WolvenKit indexing failures.
+- Report metadata records the config path, schema version, effective paths, scan
+  modes, workers, and WolvenKit timeout.
 
 ### 2026-08-02 — Git availability rechecked
 

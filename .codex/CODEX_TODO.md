@@ -6,6 +6,16 @@ This list describes planned scanner work. Reorder it when user priorities
 change. Check an item only after implementation, relevant tests, and a real
 frozen-corpus validation pass are complete.
 
+## Configuration foundation
+
+- [x] Add tracked, versioned YAML configuration for paths and scan settings.
+- [x] Resolve relative YAML paths from the configuration directory.
+- [x] Make explicit CLI options override YAML values.
+- [x] Reject duplicate keys, unknown settings, invalid schema versions, and
+  invalid typed values.
+- [ ] Consider optional per-user override configuration if the repository is
+  later used on multiple machines with different external paths.
+
 ## Next milestone: selective ArchiveXL payload inspection
 
 - [ ] Add an archive-provider interface separating member indexing from payload
