@@ -10,9 +10,9 @@ mod packages, attributes deployed files through Vortex metadata, indexes
 resources inside `.archive` files with WolvenKit CLI, and performs
 ecosystem-specific semantic compatibility checks.
 
-The scanner is being developed incrementally. ArchiveXL and TweakXL are the
-currently supported ecosystems. ArchiveXL and TweakXL runtime logs are
-supported. Planned ecosystems include REDscript, CET Lua, input/config files,
+The scanner is being developed incrementally. ArchiveXL, TweakXL, and
+REDscript are the currently supported ecosystems, including their relevant
+runtime/compiler logs. Planned ecosystems include CET Lua, input/config files,
 RED4ext native plugins, and runtime correlation for the remaining frameworks.
 
 ## Workspace paths
@@ -154,6 +154,16 @@ python -m unittest discover -s tests -v
   warnings, attributes file-scoped events through `Reading` context, resolves
   late validation events through TweakDB identities, and correlates compatible
   static findings.
+- `src/cp77compat/redscript.py`
+  Lexically parses REDscript annotations with exact source lines, target class,
+  parameter/return signature, field type, normalized body fingerprint, wrapper
+  calls, installed `ModuleExists` condition state, and Vortex deployment state.
+  It compares replacements, added symbols, and wrapper chains using official
+  compiler semantics.
+- `src/cp77compat/redscript_runtime.py`
+  Parses `redscript_rCURRENT.log`, records compilation/output success, maps
+  deployed diagnostic paths and lines back to staging artifacts and exact
+  annotation signatures, and correlates static REDscript findings.
 - `src/cp77compat/reporting.py`
   Writes inventory, archive manifest, per-ecosystem reference/finding JSON,
   combined findings JSON, Markdown, and HTML reports.
@@ -164,9 +174,9 @@ python -m unittest discover -s tests -v
 - `src/cp77compat/cli.py`
   Orchestrates the scan and exposes CLI options.
 - `tests/`
-  Unit tests for ArchiveXL and TweakXL parsing/comparison, archive output
-  parsing, loose resource resolution, TweakXL runtime correlation,
-  configuration, and safe HTML embedding.
+  Unit tests for ArchiveXL, TweakXL, and REDscript parsing/comparison; archive
+  output parsing; loose resource resolution; runtime/compiler-log correlation;
+  configuration; and safe HTML embedding.
 
 ## Data model and report semantics
 
@@ -197,7 +207,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.16.0 scan on 2026-08-03 reported:
+The successful v0.17.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -217,6 +227,10 @@ The successful v0.16.0 scan on 2026-08-03 reported:
 - 216 deployed TweakXL YAML files: 214 non-empty configs parsed and two empty
   configs reported informationally.
 - 57,455 concrete TweakXL references after `$instances` expansion.
+- 1,235 REDscript artifacts and 16,775 parsed annotation references with exact
+  source lines and zero parser failures. The effective installed set contains
+  700 wrappers, 139 replacements, 14,024 added methods, and 1,885 added fields;
+  27 conditional or Vortex-overridden annotations are inactive.
 - 181 archive-owned localization payloads serialized with zero failures; four
   declarations without an own indexed archive payload were skipped and remain
   covered by resource-resolution findings.
@@ -249,14 +263,17 @@ The successful v0.16.0 scan on 2026-08-03 reported:
   bytes, and 472,639 lines. Its two errors and six warnings were fully
   attributed and consolidated into four findings; all four quest events have
   exact static missing-target confirmations.
-- 60 consolidated findings overall:
-  - 1 conflict candidate.
+- The 1,277-line current REDscript compiler log successfully compiled 1,234
+  deployed files and saved the modded output. Its zero errors and eight
+  warnings were all source-attributed and statically confirmed.
+- 130 consolidated findings overall:
+  - 2 conflict candidates.
   - 9 errors.
-  - 11 warnings.
-  - 0 review groups.
-  - 39 informational findings.
+  - 15 warnings.
+  - 12 review groups.
+  - 92 informational findings.
 - Zero WolvenKit indexing failures.
-- Seventy-nine automated tests passing.
+- Eighty-three automated tests passing.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
@@ -264,8 +281,9 @@ The successful v0.16.0 scan on 2026-08-03 reported:
   17.8 seconds, including indexing the local official TweakDB sources. The first
   customization payload pass completed in 110.9 seconds; the fully cached
   v0.13 normal scan completed in 19.7 seconds; the fully cached v0.15 and v0.16
-  scans complete in about 20 seconds.
-- All 117,798 ArchiveXL and TweakXL references have one-based declaration/source
+  scans complete in about 20 seconds, and the REDscript-enabled v0.17 scan
+  completed in about 26 seconds.
+- All 134,573 ArchiveXL, TweakXL, and REDscript references have one-based declaration/source
   lines in the generated reports. Serialized localization, factory, and journal
   entries additionally carry their zero-based payload `entry_index` or
   `row_index`. For minified one-line
@@ -342,6 +360,21 @@ Important current findings:
     unknown fields. These are consolidated into two warnings with exact source
     lines; the unknown fields include seven `nodeRefHash` uses plus the
     `sscale` and `rientation` spellings.
+24. Cyberware-EX and VanillaPlus Parkour both replace
+    `DoubleJumpDecisions.EnterCondition(ref<StateContext>,
+    ref<StateGameScriptInterface>)->Bool` with different bodies. Only the later
+    replacement is active, and the current compiler log confirms the overwrite.
+25. 6 More Weapon Mod Slots and Slots Slots Slots - Cyberdeck 2x Quickhack
+    Slots duplicate seven exact method replacements. Their normalized bodies
+    are identical, so the compiler warnings represent redundant rather than
+    behaviorally conflicting replacements.
+26. Better Leveling Addon - Skill Progression and Upgrade Weapons Unlocked both
+    wrap `CraftingSystem.UpgradeItem(wref<GameObject>, ItemID)->Void`; at least
+    one wrapper omits `wrappedMethod`, terminating the shared chain.
+27. Sixty-nine other exact method signatures form compatible cross-mod wrapper
+    chains in which every installed wrapper invokes `wrappedMethod`. Twenty-six
+    active wrappers across 12 mods omit that call and remain explicit review
+    findings even when no other installed mod wraps the same signature.
 
 Analyzer coverage is embedded in all primary reports. It currently records 45
 ArchiveXL documents with `resource` sections and marks all five installed
@@ -394,6 +427,12 @@ resized on later patches. The frozen corpus has 10,812 deletion references:
 10,635 declared full and 177 declared partial, resolving to 10,672 effective
 full and 140 effective partial operations. All 40 cross-mod overlaps are safe
 full-node repetitions.
+REDscript coverage analyzes all four installed compatibility annotations using
+exact class and method signatures. It normalizes array shorthand, legacy
+callback return fallback, and expression-bodied methods; evaluates all observed
+installed-module conditions; and excludes the one Vortex-overridden script from
+effective comparisons while retaining it in the reference inventory. The
+current compiler log confirms all eight active replacement-overwrite warnings.
 
 ## Generated reports
 
@@ -407,6 +446,9 @@ full-node repetitions.
 - `reports/current/tweakxl-findings.json`
   Full TweakXL references and ecosystem findings. This is intentionally large
   because it retains all 57,455 expanded references.
+- `reports/current/redscript-findings.json`
+  All REDscript annotation references, condition/deployment state, static
+  compatibility findings, and correlated compiler diagnostics.
 - `reports/current/compatibility-findings.json`
   Combined machine-readable findings without the full reference inventories.
 - `reports/current/archive-manifests.json`

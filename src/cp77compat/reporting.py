@@ -21,6 +21,7 @@ def write_reports(
     manifests: list[ArchiveManifest],
     archivexl_references: list[Reference],
     tweakxl_references: list[Reference],
+    redscript_references: list[Reference],
     findings: list[Finding],
     metadata: dict[str, Any],
     coverage: dict[str, Any] | None = None,
@@ -34,6 +35,7 @@ def write_reports(
         "archive_members": sum(len(item.members) for item in manifests),
         "archivexl_references": len(archivexl_references),
         "tweakxl_references": len(tweakxl_references),
+        "redscript_references": len(redscript_references),
         "findings": dict(sorted(Counter(item.severity for item in ordered_findings).items())),
         "coverage": coverage or {},
     }
@@ -81,6 +83,19 @@ def write_reports(
         },
     )
     _write_json(
+        output_dir / "redscript-findings.json",
+        {
+            "metadata": metadata,
+            "summary": summary,
+            "references": [reference.to_dict() for reference in redscript_references],
+            "findings": [
+                finding.to_dict()
+                for finding in ordered_findings
+                if finding.rule_id.startswith("RS-")
+            ],
+        },
+    )
+    _write_json(
         output_dir / "compatibility-findings.json",
         {
             "metadata": metadata,
@@ -100,6 +115,7 @@ def write_reports(
         f"- Indexed archive members: {summary['archive_members']}",
         f"- ArchiveXL references: {summary['archivexl_references']}",
         f"- TweakXL references: {summary['tweakxl_references']}",
+        f"- REDscript references: {summary['redscript_references']}",
         "- Findings: " + ", ".join(f"{key}={value}" for key, value in summary["findings"].items()),
         "",
     ]
@@ -163,6 +179,25 @@ def write_reports(
                         f"{operation['node_property_writes']}/"
                         f"{operation['element_property_writes']}; "
                         f"shared mutation nodes={operation['shared_mutation_nodes']} - "
+                        f"{operation['note']}"
+                    )
+            annotation_operations = analyzer.get("annotation_operations", [])
+            if annotation_operations:
+                lines.extend(["", "#### REDscript annotation operations", ""])
+                for operation in annotation_operations:
+                    lines.append(
+                        f"- `{operation['name']}`: {operation['status']}; "
+                        f"documents={operation['documents']}; "
+                        f"wrap/replace/add-method/add-field="
+                        f"{operation['wrap_methods']}/{operation['replace_methods']}/"
+                        f"{operation['add_methods']}/{operation['add_fields']}; "
+                        f"inactive conditions={operation['inactive_annotations']}; "
+                        f"shared wrapper/replacement signatures="
+                        f"{operation['shared_wrapper_signatures']}/"
+                        f"{operation['shared_replacement_signatures']} - "
+                        f"compatible/terminated wrapper chains="
+                        f"{operation['compatible_wrapper_chains']}/"
+                        f"{operation['terminated_wrapper_chains']} - "
                         f"{operation['note']}"
                     )
             quest_operations = analyzer.get("quest_operations", [])

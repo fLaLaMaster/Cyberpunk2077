@@ -233,7 +233,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
 
     for (const finding of findings) {
       const prefix = String(finding.rule_id || "").split("-", 1)[0];
-      finding._ecosystem = ({AXL: "ArchiveXL", TXL: "TweakXL", CORE: "Core", WOLVENKIT: "WolvenKit"})[prefix] || "Other";
+      finding._ecosystem = ({AXL: "ArchiveXL", TXL: "TweakXL", RS: "REDscript", CORE: "Core", WOLVENKIT: "WolvenKit"})[prefix] || "Other";
       finding._search = [finding.rule_id, finding.severity, finding.confidence, finding.summary,
         finding.explanation, ...(finding.participants || []), evidenceText(finding.evidence)]
         .join(" ").toLocaleLowerCase();
@@ -347,6 +347,21 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "note", label: "Notes"}
         ]));
       }
+      if ((analyzer.annotation_operations || []).length) {
+        const label = document.createElement("h3"); label.textContent = "REDscript annotation operations"; group.append(label);
+        group.append(coverageTable(analyzer.annotation_operations, [
+          {key: "name", label: "Analyzer"}, {key: "status", label: "Status"},
+          {key: "documents", label: "Documents"}, {key: "wrap_methods", label: "Wrappers"},
+          {key: "replace_methods", label: "Replacements"}, {key: "add_methods", label: "Added methods"},
+          {key: "add_fields", label: "Added fields"},
+          {key: "inactive_annotations", label: "Inactive conditions"},
+          {key: "shared_wrapper_signatures", label: "Shared wrappers"},
+          {key: "shared_replacement_signatures", label: "Shared replacements"},
+          {key: "compatible_wrapper_chains", label: "Compatible chains"},
+          {key: "terminated_wrapper_chains", label: "Terminated chains"},
+          {key: "note", label: "Notes"}
+        ]));
+      }
       if ((analyzer.quest_operations || []).length) {
         const label = document.createElement("h3"); label.textContent = "Quest operations"; group.append(label);
         group.append(coverageTable(analyzer.quest_operations, [
@@ -375,6 +390,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
         group.append(coverageTable(analyzer.runtime_logs, [
           {key: "name", label: "Log analyzer"}, {key: "status", label: "Status"},
           {key: "session", label: "Session"}, {key: "files", label: "Files"},
+          {key: "compiled_files", label: "Compiled files"},
           {key: "bytes", label: "Bytes"},
           {key: "lines", label: "Lines"}, {key: "errors", label: "Errors"},
           {key: "warnings", label: "Warnings"}, {key: "events", label: "Events"},
@@ -428,7 +444,8 @@ _HTML_TEMPLATE = r'''<!doctype html>
       [summary.mods, "Mods"], [summary.artifacts, "Files"],
       [summary.archive_manifests, "Archives"], [summary.archive_members, "Archive members"],
       [summary.archivexl_references, "ArchiveXL references"],
-      [summary.tweakxl_references, "TweakXL references"], [findings.length, "Findings"]
+      [summary.tweakxl_references, "TweakXL references"],
+      [summary.redscript_references, "REDscript references"], [findings.length, "Findings"]
     ];
     const statsElement = document.getElementById("stats");
     for (const [value, label] of stats) {

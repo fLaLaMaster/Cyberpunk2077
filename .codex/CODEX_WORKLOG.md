@@ -6,14 +6,71 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.16.0`
-- Implemented ecosystems: ArchiveXL and TweakXL
+- Scanner version: `0.17.0`
+- Implemented ecosystems: ArchiveXL, TweakXL, and REDscript
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 79 passing
+- Automated tests: 83 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — REDscript annotation and compiler-log analysis
+
+Implemented the first complete REDscript compatibility analyzer using the
+installed corpus, current compiler log, and official redscript compiler source
+at commit `3ca666c8ec14cfc803ef3888aab6ebc7a1c2bb86`.
+
+Changes:
+
+- Added source-preserving lexical parsing for `@wrapMethod`, `@replaceMethod`,
+  `@addMethod`, and `@addField`, including multiline declarations, nested
+  generic/array types, callback return fallback, and expression-bodied methods.
+- Identified methods by exact target class, name, parameter types, and return
+  type; parameter names and visibility are intentionally excluded to match the
+  compiler's annotation resolution.
+- Indexed installed module declarations and evaluated every observed
+  `@if(ModuleExists(...))` / negated branch. Vortex-overridden scripts remain in
+  the reference inventory but are excluded from effective comparisons.
+- Classified competing versus normalized-identical method replacements,
+  duplicate added methods/fields, annotations targeting added methods,
+  compatible wrapper chains, terminating shared wrapper chains, and wrappers
+  that never invoke `wrappedMethod`.
+- Added `redscript_rCURRENT.log` parsing with source-path/line attribution,
+  exact static-signature correlation, compilation status, and compact
+  diagnostic findings.
+- Added `redscript-findings.json`, REDscript summary/coverage panels in
+  Markdown and HTML, a REDscript HTML ecosystem filter, and scanner version
+  0.17.0.
+
+Validation:
+
+- All 83 automated tests pass with warnings promoted to errors.
+- The frozen corpus contains 1,235 REDscript artifacts. The current compiler
+  compiled 1,234 deployed files; the remaining staging file is the expected
+  Vortex-overridden standalone Damage Scaling script.
+- Parsed 16,775 real annotations with exact source lines and zero parser
+  failures. Effective active operations are 700 wrappers, 139 replacements,
+  14,024 added methods, and 1,885 added fields; 27 conditional/overridden
+  annotations are inactive in the installed setup.
+- Found 70 exact signatures wrapped across mods. Sixty-nine chains preserve
+  all lower behavior; one `CraftingSystem.UpgradeItem` chain combines Better
+  Leveling Skill Progression with Upgrade Weapons Unlocked and contains a
+  wrapper that does not call `wrappedMethod`.
+- Found one genuine competing replacement:
+  `DoubleJumpDecisions.EnterCondition` from Cyberware-EX and VanillaPlus
+  Parkour. The compiler log confirms the later replacement overwrite.
+- Found seven normalized-identical replacement duplicates between 6 More
+  Weapon Mod Slots and the Cyberdeck 2x Quickhack Slots package. The compiler
+  confirms all seven overwrites, but the final replacement bodies are
+  equivalent.
+- The 1,277-line current compiler log reports zero errors, eight warnings,
+  successful compilation, and a saved modded output. All eight diagnostics are
+  attributed and statically confirmed in two compact runtime findings.
+- The full cached scan completed successfully in about 26 seconds. The combined
+  report now contains 130 findings: 2 conflicts, 9 errors, 15 warnings, 12
+  reviews, and 92 informational findings.
+- Frozen Vortex and game inputs were not modified.
 
 ### 2026-08-03 — ArchiveXL streaming node-mutation semantics
 

@@ -50,6 +50,12 @@ Implemented analysis includes:
   cross-mod custom-record dependency analysis;
 - newest-log TweakXL runtime error/warning parsing, source-file attribution,
   static-finding confirmation, and compact event consolidation;
+- REDscript `@wrapMethod`, `@replaceMethod`, `@addMethod`, and `@addField`
+  parsing with exact class plus parameter/return-type signatures;
+- REDscript replacement, added-symbol, and wrapper-chain compatibility checks,
+  including installed `@if(ModuleExists(...))` evaluation;
+- `redscript_rCURRENT.log` compiler diagnostic attribution and correlation with
+  exact static annotation overlaps;
 - deterministic JSON and Markdown reports.
 
 Reports include an analyzer-coverage panel that distinguishes analyzed,
@@ -126,6 +132,23 @@ ArchiveXL logs are session-aware: the scanner selects the newest timestamp and
 reads its numbered rotation chunks before the continuing unnumbered log. Paired
 messages such as a node-count error followed by “no patches applied” remain one
 actionable finding while both physical log lines are preserved as evidence.
+
+REDscript analysis uses source-preserving lexical parsing rather than matching
+method names alone. Parameter names and visibility do not affect annotation
+target resolution, while parameter types and return type do. Legacy callback
+annotations declared as returning `Void` are normalized to the compiler's
+`Bool` fallback. Array shorthand and expression-bodied functions are also
+normalized before comparison. Installed module declarations are used to exclude
+inactive `@if(ModuleExists(...))` branches, and Vortex-overridden scripts remain
+in the reference inventory but are excluded from effective collision checks.
+
+Multiple wrappers of one signature are compatible when each calls
+`wrappedMethod`; a wrapper that skips it is a review finding because it
+terminates the chain. Different replacements of one exact signature are a
+conflict because only the last remains active. Identical replacements are a
+compiler-confirmed warning with equivalent final behavior. Duplicate added
+methods and fields are checked independently, and the current compiler log is
+used to confirm which static overlaps are active in the deployed game.
 
 ## Run
 
@@ -210,6 +233,7 @@ different payloads are load-order conflicts.
 - `reports/current/archive-manifests.json`: WolvenKit archive member indexes.
 - `reports/current/archivexl-findings.json`: complete references and evidence.
 - `reports/current/tweakxl-findings.json`: TweakXL references and findings.
+- `reports/current/redscript-findings.json`: REDscript annotations and findings.
 - `reports/current/compatibility-findings.json`: combined machine-readable findings.
 - `reports/current/compatibility-report.html`: searchable, filterable offline report.
 - `reports/current/compatibility-report.md`: concise human-readable report.

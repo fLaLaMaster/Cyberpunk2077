@@ -34,6 +34,12 @@ from .deployment import load_deployment
 from .inventory import build_inventory, discover_mods, exact_path_findings
 from .models import Finding
 from .reporting import write_reports
+from .redscript import (
+    build_redscript_coverage,
+    compare_redscript_references,
+    parse_redscript_documents,
+)
+from .redscript_runtime import analyze_redscript_runtime_log
 from .tweakxl import compare_tweak_references, parse_tweak_documents
 from .tweakxl_dependencies import analyze_tweak_dependencies
 from .tweakxl_runtime import analyze_tweakxl_runtime_logs
@@ -158,6 +164,47 @@ def run_scan(args: argparse.Namespace) -> int:
             f"Parsed latest TweakXL runtime log: {runtime_coverage['errors']} errors, "
             f"{runtime_coverage['warnings']} warnings, "
             f"{runtime_coverage['findings']} consolidated findings"
+        )
+    redscript_documents, redscript_references, redscript_findings = (
+        parse_redscript_documents(artifacts)
+    )
+    findings.extend(redscript_findings)
+    redscript_static_findings = compare_redscript_references(redscript_references)
+    findings.extend(redscript_static_findings)
+    redscript_coverage = build_redscript_coverage(
+        redscript_documents, redscript_references
+    )
+    redscript_runtime_findings, redscript_runtime_coverage = (
+        analyze_redscript_runtime_log(
+            args.game,
+            artifacts,
+            redscript_references,
+            redscript_static_findings,
+        )
+    )
+    findings.extend(redscript_runtime_findings)
+    redscript_coverage["runtime_logs"] = [redscript_runtime_coverage]
+    redscript_coverage["sections"].append(
+        {
+            "name": "compiler log correlation",
+            "documents": 1 if redscript_runtime_coverage["status"] == "analyzed" else 0,
+            "status": redscript_runtime_coverage["status"],
+            "note": (
+                f"Current REDscript log: {redscript_runtime_coverage['errors']} errors, "
+                f"{redscript_runtime_coverage['warnings']} warnings, "
+                f"{redscript_runtime_coverage['correlated_events']} source-attributed diagnostics."
+                if redscript_runtime_coverage["status"] == "analyzed"
+                else redscript_runtime_coverage["note"]
+            ),
+        }
+    )
+    coverage["redscript"] = redscript_coverage
+    if redscript_runtime_coverage["status"] == "analyzed":
+        print(
+            f"Parsed current REDscript compiler log: "
+            f"{redscript_runtime_coverage['errors']} errors, "
+            f"{redscript_runtime_coverage['warnings']} warnings, "
+            f"{redscript_runtime_coverage['findings']} consolidated findings"
         )
     print(
         f"Found {len(mods)} mods, {len(artifacts)} files, "
@@ -419,6 +466,7 @@ def run_scan(args: argparse.Namespace) -> int:
         manifests,
         references,
         tweak_references,
+        redscript_references,
         findings,
         metadata,
         coverage,

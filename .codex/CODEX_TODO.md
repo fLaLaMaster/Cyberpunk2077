@@ -85,14 +85,14 @@ frozen-corpus validation pass are complete.
 
 ## REDscript analyzer
 
-- [ ] Implement class-and-method-aware extraction for `@wrapMethod`,
+- [x] Implement class-and-method-aware extraction for `@wrapMethod`,
   `@replaceMethod`, `@addMethod`, and `@addField`.
-- [ ] Pair annotations with full method signatures rather than only class names.
-- [ ] Flag multiple replacements of the same method.
-- [ ] Detect duplicate added symbols and fields.
-- [ ] Review wrappers that do not invoke `wrappedMethod` where invocation is
+- [x] Pair annotations with full method signatures rather than only class names.
+- [x] Flag multiple replacements of the same method.
+- [x] Detect duplicate added symbols and fields.
+- [x] Review wrappers that do not invoke `wrappedMethod` where invocation is
   expected.
-- [ ] Correlate findings with `redscript_rCURRENT.log` compiler errors.
+- [x] Correlate findings with `redscript_rCURRENT.log` compiler diagnostics.
 
 ## CET Lua and shared configuration
 

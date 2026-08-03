@@ -32,6 +32,7 @@ class HtmlReportTests(unittest.TestCase):
                     "archive_members": 0,
                     "archivexl_references": 1,
                     "tweakxl_references": 2,
+                    "redscript_references": 3,
                     "coverage": {
                         "archivexl": {
                             "documents": 1,
@@ -97,7 +98,28 @@ class HtmlReportTests(unittest.TestCase):
                                     "serialization_cache_hits": 1,
                                 }
                             },
-                        }
+                        },
+                        "redscript": {
+                            "documents": 2,
+                            "sections": [],
+                            "annotation_operations": [
+                                {
+                                    "name": "REDscript annotations",
+                                    "status": "analyzed",
+                                    "documents": 2,
+                                    "wrap_methods": 2,
+                                    "replace_methods": 1,
+                                    "add_methods": 3,
+                                    "add_fields": 4,
+                                    "shared_wrapper_signatures": 1,
+                                    "shared_replacement_signatures": 1,
+                                    "compatible_wrapper_chains": 1,
+                                    "terminated_wrapper_chains": 0,
+                                    "inactive_annotations": 0,
+                                    "note": "Example REDscript coverage",
+                                }
+                            ],
+                        },
                     },
                 },
                 [finding],
@@ -115,6 +137,7 @@ class HtmlReportTests(unittest.TestCase):
             self.assertIn("Payload inspection", html)
             self.assertIn("Player body types", html)
             self.assertIn("World streaming operations", html)
+            self.assertIn("REDscript annotation operations", html)
             self.assertIn("Runtime log correlation", html)
             self.assertNotIn("</script><script>alert(1)</script>", html)
             match = re.search(
