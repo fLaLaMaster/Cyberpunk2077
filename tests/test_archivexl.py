@@ -12,6 +12,7 @@ from cp77compat.archivexl import (
     compare_quest_references,
     compare_references,
     compare_resource_references,
+    compare_streaming_mutations,
     parse_documents,
     resolve_archive_references,
     resolve_quest_references,
@@ -1125,7 +1126,7 @@ class ArchiveXLTests(unittest.TestCase):
             )
             self.assertFalse([item for item in findings if item.severity == "error"])
 
-    def test_sector_reviews_are_aggregated_by_mod_set(self) -> None:
+    def test_node_disjoint_sectors_are_aggregated_by_mod_set(self) -> None:
         refs = [
             Reference("archivexl", "streaming.sector", "sector_a", "A", "a.xl"),
             Reference("archivexl", "streaming.sector", "sector_a", "B", "b.xl"),
@@ -1134,7 +1135,144 @@ class ArchiveXLTests(unittest.TestCase):
         ]
         findings = compare_references(refs)
         self.assertEqual(1, len(findings))
-        self.assertEqual("2 overlapping streaming sectors", findings[0].summary)
+        self.assertEqual("AXL-SECTOR-NODE-DISJOINT", findings[0].rule_id)
+        self.assertEqual("info", findings[0].severity)
+        self.assertEqual("2 node-disjoint shared streaming sectors", findings[0].summary)
+
+    def test_extracts_effective_node_and_element_mutation_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "mutations.xl"
+            path.write_text(
+                r"""streaming:
+  sectors:
+    - path: base\worlds\example.streamingsector
+      expectedNodes: 10
+      nodeMutations:
+        - index: 7
+          type: worldInstancedMeshNode
+          position: [1, 2, 3, 99]
+          resource: first.mesh
+          mesh: final.mesh
+          appearance: first
+          meshAppearance: final
+          expectedInstances: 3
+          instanceMutations:
+            - index: 1
+              position: [4, 5, 6, 77]
+              scale: [2, 2, 2]
+""",
+                encoding="utf-8",
+            )
+            _documents, references, findings = parse_documents(
+                [artifact(path, "Example")]
+            )
+            self.assertEqual([], findings)
+            node = next(
+                item for item in references if item.kind == "streaming.node_mutation"
+            )
+            element = next(
+                item
+                for item in references
+                if item.kind == "streaming.node_element_mutation"
+            )
+            self.assertEqual(6, node.line)
+            self.assertEqual([1.0, 2.0, 3.0, 0.0], node.details["writes"]["position"])
+            self.assertEqual("final.mesh", node.details["writes"]["resource"])
+            self.assertEqual("final", node.details["writes"]["appearance"])
+            self.assertEqual(15, element.line)
+            self.assertEqual(3, element.details["expected_elements"])
+            self.assertEqual(
+                {"position": [4.0, 5.0, 6.0, 0.0], "scale": [2.0, 2.0, 2.0]},
+                element.details["writes"],
+            )
+
+    def test_node_mutations_distinguish_disjoint_idempotent_and_conflicting_writes(self) -> None:
+        def mutation(mod: str, writes: dict[str, object]) -> Reference:
+            return Reference(
+                "archivexl", "streaming.node_mutation", r"base\sector#7",
+                mod, f"{mod}.xl", details={
+                    "sector": r"base\sector",
+                    "index": 7,
+                    "node_type": "worldEntityNode",
+                    "writes": writes,
+                    "element_mutations": [],
+                },
+            )
+
+        findings = compare_streaming_mutations(
+            [mutation("A", {"position": [1, 2, 3, 0]}), mutation("B", {"appearance": "x"})]
+        )
+        self.assertEqual("AXL-NODE-MUTATION-COMPOSABLE", findings[0].rule_id)
+
+        findings = compare_streaming_mutations(
+            [mutation("A", {"appearance": "x"}), mutation("B", {"appearance": "x"})]
+        )
+        self.assertEqual("AXL-NODE-MUTATION-IDEMPOTENT", findings[0].rule_id)
+
+        findings = compare_streaming_mutations(
+            [mutation("A", {"appearance": "x"}), mutation("B", {"appearance": "y"})]
+        )
+        self.assertEqual("AXL-NODE-MUTATION-WRITE-CONFLICT", findings[0].rule_id)
+        self.assertEqual("conflict", findings[0].severity)
+
+    def test_destructible_instance_mutations_reset_unspecified_transform_fields(self) -> None:
+        references = [
+            Reference(
+                "archivexl", "streaming.node_mutation", r"base\sector#7",
+                mod, f"{mod}.xl", details={
+                    "sector": r"base\sector",
+                    "index": 7,
+                    "node_type": "worldInstancedDestructibleMeshNode",
+                    "writes": {},
+                    "expected_elements": 4,
+                    "element_mutations": [
+                        {"element_index": 1, "writes": {property_name: value}}
+                    ],
+                },
+            )
+            for mod, property_name, value in (
+                ("A", "position", [1, 2, 3, 0]),
+                ("B", "orientation", [0, 0, 0, 1]),
+            )
+        ]
+        findings = compare_streaming_mutations(references)
+        self.assertEqual(
+            "AXL-NODE-MUTATION-DESTRUCTIBLE-CONFLICT", findings[0].rule_id
+        )
+
+    def test_full_deletion_dominates_entity_mutation_but_static_scale_is_ordered(self) -> None:
+        def operations(node_type: str, writes: dict[str, object]) -> list[Reference]:
+            return [
+                Reference(
+                    "archivexl", "streaming.node_mutation", r"base\sector#7",
+                    "A", "a.xl", details={
+                        "sector": r"base\sector", "index": 7,
+                        "node_type": node_type, "writes": writes,
+                        "element_mutations": [],
+                    },
+                ),
+                Reference(
+                    "archivexl", "streaming.node_deletion", r"base\sector#7",
+                    "B", "b.xl", details={
+                        "sector": r"base\sector", "index": 7,
+                        "node_type": node_type, "deletion_scope": "full",
+                        "element_deletions": [],
+                    },
+                ),
+            ]
+
+        findings = compare_streaming_mutations(
+            operations("worldEntityNode", {"appearance": "default"})
+        )
+        self.assertEqual(
+            "AXL-NODE-MUTATION-DELETION-REDUNDANT", findings[0].rule_id
+        )
+        findings = compare_streaming_mutations(
+            operations("worldStaticMeshNode", {"scale": [1, 1, 1]})
+        )
+        self.assertEqual(
+            "AXL-NODE-MUTATION-DELETION-CONFLICT", findings[0].rule_id
+        )
 
     def test_archive_list_output(self) -> None:
         members = parse_archive_list_output("foo\\bar.json\nfoo\\mesh.mesh\n")

@@ -25,6 +25,10 @@ APPLYING_PATTERN = re.compile(
     r'\[info] \[WorldStreaming] Applying changes from "(?P<config>.+\.xl)"\.\.\.$',
     re.IGNORECASE,
 )
+PATCHING_PATTERN = re.compile(
+    r'\[info] \[WorldStreaming] Patching sector "(?P<sector>.+)"\.\.\.$',
+    re.IGNORECASE,
+)
 QUEST_PHASE_PATTERN = re.compile(
     r'^Phase "(?P<identity>.+)" doesn\'t exist\. Skipped\.$'
 )
@@ -35,6 +39,17 @@ LOCALIZATION_SUMMARY_PATTERN = re.compile(r"^Translations merged with issues\.$"
 WORLD_EXPECTATION_PATTERN = re.compile(
     r"^(?P<config>.+\.xl): The target sector has (?P<actual>\d+) node\(s\), "
     r"but the mod expects (?P<expected>\d+)\.$",
+    re.IGNORECASE,
+)
+WORLD_NODE_TYPE_PATTERN = re.compile(
+    r"^(?P<config>.+\.xl): The target node #(?P<index>\d+) has type "
+    r"(?P<actual>[^,]+), but the mod expects (?P<expected>[^.]+)\.$",
+    re.IGNORECASE,
+)
+WORLD_ELEMENT_COUNT_PATTERN = re.compile(
+    r"^(?P<config>.+\.xl): The target node #(?P<index>\d+) has "
+    r"(?P<actual>\d+) (?P<element>actor|instance)\(s\), but the mod expects "
+    r"(?P<expected>\d+)\.$",
     re.IGNORECASE,
 )
 WORLD_SKIPPED_PATTERN = re.compile(
@@ -92,6 +107,7 @@ def parse_archivexl_runtime_logs(
 ) -> tuple[list[ArchiveXLRuntimeEvent], int]:
     events: list[ArchiveXLRuntimeEvent] = []
     current_config: dict[str, str] = {}
+    current_sector: dict[str, str] = {}
     pending_localization: dict[str, int] = {}
     pending_world: dict[str, int] = {}
     pending_journal: dict[str, int] = {}
@@ -111,6 +127,11 @@ def parse_archivexl_runtime_logs(
                     thread_match = re.match(r"^\[[^]]+] \[(?P<thread>[^]]+)]", line)
                     if thread_match:
                         current_config[thread_match.group("thread")] = match.group("config")
+                    continue
+                if match := PATCHING_PATTERN.search(line):
+                    thread_match = re.match(r"^\[[^]]+] \[(?P<thread>[^]]+)]", line)
+                    if thread_match:
+                        current_sector[thread_match.group("thread")] = match.group("sector")
                     continue
 
                 match = LOG_LINE_PATTERN.match(line)
@@ -153,16 +174,54 @@ def parse_archivexl_runtime_logs(
                     details["expected_nodes"] = int(specific.group("expected"))
                     pending_world[thread] = len(events)
                 elif component == "WorldStreaming" and (
+                    specific := WORLD_NODE_TYPE_PATTERN.match(message)
+                ):
+                    rule_id = "AXL-RUNTIME-STREAMING-NODE-TYPE"
+                    config_name = specific.group("config")
+                    node_index = int(specific.group("index"))
+                    if sector := current_sector.get(thread):
+                        identity = f"{sector}#{node_index}"
+                    details.update(
+                        {
+                            "node_index": node_index,
+                            "actual_type": specific.group("actual"),
+                            "expected_type": specific.group("expected"),
+                        }
+                    )
+                    pending_world[thread] = len(events)
+                elif component == "WorldStreaming" and (
+                    specific := WORLD_ELEMENT_COUNT_PATTERN.match(message)
+                ):
+                    rule_id = "AXL-RUNTIME-STREAMING-ELEMENT-COUNT"
+                    config_name = specific.group("config")
+                    node_index = int(specific.group("index"))
+                    if sector := current_sector.get(thread):
+                        identity = f"{sector}#{node_index}"
+                    details.update(
+                        {
+                            "node_index": node_index,
+                            "element_kind": specific.group("element").casefold(),
+                            "actual_elements": int(specific.group("actual")),
+                            "expected_elements": int(specific.group("expected")),
+                        }
+                    )
+                    pending_world[thread] = len(events)
+                elif component == "WorldStreaming" and (
                     specific := WORLD_SKIPPED_PATTERN.match(message)
                 ):
+                    sector_identity = specific.group("identity")
                     rule_id = "AXL-RUNTIME-STREAMING-EXPECTED-NODES"
-                    identity = specific.group("identity")
+                    identity = sector_identity
                     details["consequence"] = True
                     pending_index = pending_world.get(thread)
                     if pending_index is not None:
                         pending = events[pending_index]
-                        pending.identity = identity
+                        if pending.identity is None:
+                            pending.identity = sector_identity
+                        identity = pending.identity
+                        rule_id = pending.rule_id
                         config_name = pending.config_name or config_name
+                        details["sector"] = sector_identity
                         details["related_log_path"] = pending.log_path
                         details["related_log_line"] = pending.log_line
                 elif component == "Journal" and (
@@ -378,7 +437,18 @@ def _static_correlations(
     if event.rule_id == "AXL-RUNTIME-LOCALIZATION-FAILED":
         allowed = {"AXL-RESOURCE-NOT-INDEXED", "AXL-CROSS-MOD-RESOURCE", "AXL-PAYLOAD-FAILED"}
     elif event.rule_id == "AXL-RUNTIME-STREAMING-EXPECTED-NODES":
-        allowed = {"AXL-SECTOR-EXPECTED-NODES", "AXL-SECTOR-MULTI-PATCH"}
+        allowed = {"AXL-SECTOR-EXPECTED-NODES", "AXL-SECTOR-NODE-DISJOINT"}
+    elif event.rule_id == "AXL-RUNTIME-STREAMING-NODE-TYPE":
+        allowed = {
+            "AXL-NODE-MUTATION-TYPE-CONFLICT",
+            "AXL-NODE-MUTATION-DELETION-TYPE-CONFLICT",
+            "AXL-NODE-DELETION-TYPE-CONFLICT",
+        }
+    elif event.rule_id == "AXL-RUNTIME-STREAMING-ELEMENT-COUNT":
+        allowed = {
+            "AXL-NODE-MUTATION-COUNT-CONFLICT",
+            "AXL-NODE-DELETION-COUNT-CONFLICT",
+        }
     elif event.rule_id == "AXL-RUNTIME-QUEST-PHASE-MISSING":
         allowed = {
             "AXL-QUEST-PHASE-NOT-FOUND",
@@ -527,6 +597,18 @@ def analyze_archivexl_runtime_logs(
             "streaming sector patches were rejected",
             "ArchiveXL rejected a world-streaming patch because the live sector node count "
             "did not equal the config's expectedNodes guard. The related patch was not applied.",
+        ),
+        "AXL-RUNTIME-STREAMING-NODE-TYPE": (
+            "error",
+            "high",
+            "streaming node type validations failed",
+            "ArchiveXL rejected a sector patch because a mutation or deletion expected a different native node type at the indexed node. No changes from that sector declaration were applied.",
+        ),
+        "AXL-RUNTIME-STREAMING-ELEMENT-COUNT": (
+            "error",
+            "high",
+            "streaming element-count validations failed",
+            "ArchiveXL rejected a sector patch because a node mutation or deletion expected a different actor/instance count. No changes from that sector declaration were applied.",
         ),
         "AXL-RUNTIME-JOURNAL-RESOURCE-FAILED": (
             "error",

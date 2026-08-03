@@ -56,7 +56,7 @@ frozen-corpus validation pass are complete.
   idempotent, or rule-dependent; adjust confidence/severity accordingly.
 - [x] Parse the one installed ArchiveXL `player` declaration and compare its
   effective player-state operation identities.
-- [ ] Parse `streaming.nodeMutations` below sector level and distinguish
+- [x] Parse `streaming.nodeMutations` below sector level and distinguish
   disjoint property/element mutations from incompatible writes.
 - [x] Correlate the newest rotated ArchiveXL log session with semantic
   references, pairing consequence messages and

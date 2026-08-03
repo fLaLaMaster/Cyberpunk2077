@@ -149,6 +149,22 @@ def write_reports(
                         f"{operation['unique_body_types']}/"
                         f"{operation['shared_body_types']} - {operation['note']}"
                     )
+            streaming_operations = analyzer.get("streaming_operations", [])
+            if streaming_operations:
+                lines.extend(["", "#### World streaming operations", ""])
+                for operation in streaming_operations:
+                    lines.append(
+                        f"- `{operation['name']}`: {operation['status']}; "
+                        f"documents={operation['documents']}; sectors={operation['sectors']}; "
+                        f"node mutations={operation['node_mutations']}; "
+                        f"element mutations={operation['element_mutations']}; "
+                        f"node deletions={operation['node_deletions']}; "
+                        f"node/element property writes="
+                        f"{operation['node_property_writes']}/"
+                        f"{operation['element_property_writes']}; "
+                        f"shared mutation nodes={operation['shared_mutation_nodes']} - "
+                        f"{operation['note']}"
+                    )
             quest_operations = analyzer.get("quest_operations", [])
             if quest_operations:
                 lines.extend(["", "#### Quest operations", ""])

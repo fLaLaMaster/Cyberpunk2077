@@ -333,6 +333,20 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "note", label: "Notes"}
         ]));
       }
+      if ((analyzer.streaming_operations || []).length) {
+        const label = document.createElement("h3"); label.textContent = "World streaming operations"; group.append(label);
+        group.append(coverageTable(analyzer.streaming_operations, [
+          {key: "name", label: "Operation"}, {key: "status", label: "Status"},
+          {key: "documents", label: "Documents"}, {key: "sectors", label: "Sectors"},
+          {key: "node_mutations", label: "Node mutations"},
+          {key: "element_mutations", label: "Element mutations"},
+          {key: "node_deletions", label: "Node deletions"},
+          {key: "node_property_writes", label: "Node writes"},
+          {key: "element_property_writes", label: "Element writes"},
+          {key: "shared_mutation_nodes", label: "Shared mutation nodes"},
+          {key: "note", label: "Notes"}
+        ]));
+      }
       if ((analyzer.quest_operations || []).length) {
         const label = document.createElement("h3"); label.textContent = "Quest operations"; group.append(label);
         group.append(coverageTable(analyzer.quest_operations, [

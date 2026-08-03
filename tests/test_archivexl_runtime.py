@@ -111,6 +111,31 @@ class ArchiveXLRuntimeTests(unittest.TestCase):
             self.assertEqual(6, events[3].details["actual_nodes"])
             self.assertTrue(events[4].details["consequence"])
 
+    def test_parser_attributes_streaming_node_validation_to_sector_index(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "ArchiveXL-2026-01-01-00-00-00.log"
+            path.write_text(
+                """[2026-01-01 00:00:00.000] [2] [info] [WorldStreaming] Patching sector "base\\world.streamingsector"...
+[2026-01-01 00:00:00.001] [2] [info] [WorldStreaming] Applying changes from "World.xl"...
+[2026-01-01 00:00:00.002] [2] [error] [WorldStreaming] World.xl: The target node #7 has type worldEntityNode, but the mod expects worldStaticMeshNode.
+[2026-01-01 00:00:00.003] [2] [warning] [WorldStreaming] No patches have been applied to "base\\world.streamingsector".
+""",
+                encoding="utf-8",
+            )
+            events, lines = parse_archivexl_runtime_logs([path])
+            self.assertEqual(4, lines)
+            self.assertEqual(2, len(events))
+            self.assertTrue(
+                all(
+                    event.rule_id == "AXL-RUNTIME-STREAMING-NODE-TYPE"
+                    for event in events
+                )
+            )
+            self.assertEqual(r"base\world.streamingsector#7", events[0].identity)
+            self.assertEqual(events[0].identity, events[1].identity)
+            self.assertEqual("worldEntityNode", events[0].details["actual_type"])
+            self.assertTrue(events[1].details["consequence"])
+
     def test_analyzer_attributes_semantic_and_source_text_matches(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

@@ -16,6 +16,7 @@ from .archivexl import (
     compare_quest_references,
     compare_references,
     compare_resource_references,
+    compare_streaming_mutations,
     internal_archive_collisions,
     parse_documents,
     resolve_archive_references,
@@ -115,6 +116,7 @@ def run_scan(args: argparse.Namespace) -> int:
     documents, references, archive_xl_findings = parse_documents(artifacts)
     findings.extend(archive_xl_findings)
     findings.extend(compare_references(references))
+    findings.extend(compare_streaming_mutations(references))
     findings.extend(compare_resource_references(references))
     findings.extend(compare_quest_references(references))
     findings.extend(compare_override_references(references))

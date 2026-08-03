@@ -6,14 +6,59 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.15.0`
+- Scanner version: `0.16.0`
 - Implemented ecosystems: ArchiveXL and TweakXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 74 passing
+- Automated tests: 79 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — ArchiveXL streaming node-mutation semantics
+
+Completed static and runtime-aware analysis of ArchiveXL
+`streaming.nodeMutations` using the installed upstream WorldStreaming
+implementation.
+
+Changes:
+
+- Parsed node transforms, effective resource/appearance/record aliases,
+  positive proxy-node deltas, expected actor/instance counts, and nested
+  actor/instance transform mutations with exact source lines.
+- Compared same-node writes by effective property and classified type/count
+  disagreements, conflicting last-wins values, idempotent repeats, disjoint
+  operations, and the special destructive-instance reset behavior.
+- Compared node mutations against full and partial deletions, including the
+  static-mesh and instanced-mesh scale cases that can revive deleted content.
+- Added compact warnings for unknown fields and accepted-but-ignored mutation
+  operations rather than silently discarding them.
+- Replaced generic review findings for shared sectors with high-confidence
+  node-disjoint information when every cross-mod node index is distinct.
+- Added ArchiveXL runtime parsing and attribution for node-type and
+  actor/instance-count validation failures, including their following
+  `No patches have been applied` consequence messages.
+- Added world-streaming operation coverage to JSON, Markdown, and HTML reports
+  and bumped the scanner to version 0.16.0.
+
+Validation:
+
+- All 79 automated tests pass with warnings promoted to errors.
+- The complete cached scan succeeded in about 20 seconds and now emits 60,343
+  ArchiveXL references: 1,314 node mutations and 279 nested element mutations
+  add 1,593 references to the v0.15 baseline.
+- The mutation analyzer records 1,728 node-property writes and 422 effective
+  element-property writes. No node mutation identity is shared by two mods.
+- It found 10 ignored operations and 9 unknown fields in the installed corpus,
+  consolidated into two high-confidence warnings with exact evidence lines.
+- Thirteen Immersive Night City Fixes mutations overlap full deletions from 4x
+  Vending Machine Framework; the deletions dominate, so the result is
+  informational redundancy rather than incompatibility.
+- Across shared sectors, 344 sectors in 14 participant groups touch disjoint
+  node indices. The previous 16 generic streaming review groups are gone.
+- The overall report contains 60 findings: 1 conflict, 9 errors, 11 warnings,
+  no review findings, and 39 informational findings.
+- Frozen Vortex and game inputs were not modified.
 
 ### 2026-08-03 — ArchiveXL player body-type semantics
 

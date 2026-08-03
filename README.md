@@ -15,6 +15,8 @@ Implemented analysis includes:
 - ArchiveXL reference resolution and streaming overlap checks, including
   ArchiveXL-aware classification of full-node, partial-element, and collision
   shape deletions;
+- ArchiveXL node and actor/instance mutation parsing with effective transform,
+  resource, appearance, record, and proxy-property comparison;
 - ArchiveXL `resource.patch`, `copy`, `link`, `scope`, and `fix` declaration
   analysis;
 - ArchiveXL on-screen localization payload serialization and locale-scoped
@@ -89,6 +91,16 @@ informational because ArchiveXL hides nodes in place and keeps indices stable.
 Compatible partial element deletions compose. Type/count disagreements and
 multiple collision-shape patches remain conflicts; the latter exercise a
 non-idempotent shared collision-preset override path in ArchiveXL.
+
+Streaming node mutations are compared at effective node-property and
+actor/instance-property level. Identical writes are idempotent, disjoint writes
+compose, and differing values on the same property are load-order conflicts.
+The analyzer also models ArchiveXL's special destructible-instance transform
+replacement, positive-only proxy-node deltas, mutation/deletion interactions,
+and node type plus actor/instance count guards. Shared sectors whose mods touch
+only distinct node indices are reported as high-confidence composition instead
+of requiring manual review. Fields or operations silently ignored by the
+installed ArchiveXL implementation are surfaced as warnings.
 
 The TweakXL parser preserves YAML anchors, aliases, repeated template roots,
 and the `!append`, `!append-once`, `!append-from`, `!prepend`,

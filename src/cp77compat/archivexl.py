@@ -66,8 +66,8 @@ SECTION_COVERAGE = {
         "Resource declarations and overlaps are analyzed; patch payload contents are pending.",
     ),
     "streaming": (
-        "partial",
-        "Blocks, sectors, and full/partial node deletions are analyzed; node mutations remain sector-level overlaps.",
+        "analyzed",
+        "Blocks, sectors, node mutations, element mutations, and full/partial node deletions are analyzed.",
     ),
 }
 
@@ -230,6 +230,334 @@ def _yaml_scalar_text(value: Any) -> str | None:
     if isinstance(value, bool):
         return "true" if value else "false"
     return str(value)
+
+
+def _float_vector(value: Any, lengths: set[int]) -> list[float] | None:
+    if not isinstance(value, list) or len(value) not in lengths:
+        return None
+    result: list[float] = []
+    for item in value:
+        if isinstance(item, bool):
+            return None
+        try:
+            result.append(float(item))
+        except (TypeError, ValueError):
+            return None
+    return result
+
+
+_NODE_MUTATION_FIELDS = {
+    "index", "type", "position", "orientation", "scale",
+    "nbNodesUnderProxyDiff", "resource", "mesh", "meshRef", "material",
+    "effect", "entityTemplate", "appearance", "appearanceName",
+    "meshAppearance", "recordID", "recordId", "objectRecordId",
+    "actorMutations", "expectedActors", "instanceMutations",
+    "expectedInstances",
+}
+_ELEMENT_MUTATION_FIELDS = {"index", "position", "orientation", "scale"}
+_ELEMENT_MUTATION_TYPES = {
+    "worldCollisionNode",
+    "worldInstancedMeshNode",
+    "worldInstancedDestructibleMeshNode",
+}
+
+
+def _extract_node_mutations(
+    document: ArchiveXLDocument,
+    sector: dict[str, Any],
+    sector_line: int | None,
+    findings: list[Finding],
+) -> list[Reference]:
+    mutations = sector.get("nodeMutations")
+    if not isinstance(mutations, list):
+        return []
+
+    path = sector.get("path")
+    if not isinstance(path, str):
+        return []
+    expected_nodes = _integer(sector.get("expectedNodes"))
+    refs: list[Reference] = []
+    shape_evidence: list[dict[str, Any]] = []
+    unknown_evidence: list[dict[str, Any]] = []
+    ignored_evidence: list[dict[str, Any]] = []
+
+    for mutation, mutation_line in _sequence_entries(mutations):
+        if not isinstance(mutation, dict):
+            shape_evidence.append({
+                "path": str(document.artifact.absolute_path),
+                "line": mutation_line or sector_line,
+                "reason": "node mutation is not a mapping",
+            })
+            continue
+
+        index_line = _mapping_line(mutation, "index", mutation_line or sector_line)
+        node_index = _integer(mutation.get("index"))
+        node_type = _yaml_scalar_text(mutation.get("type"))
+        if (
+            node_index is None
+            or node_type is None
+            or node_index < 0
+            or (expected_nodes is not None and expected_nodes > 0 and node_index >= expected_nodes)
+        ):
+            shape_evidence.append({
+                "path": str(document.artifact.absolute_path),
+                "line": index_line,
+                "reason": "node mutation has an invalid type or index",
+            })
+            continue
+
+        for raw_field in mutation:
+            field = str(raw_field)
+            if field not in _NODE_MUTATION_FIELDS:
+                unknown_evidence.append({
+                    "path": str(document.artifact.absolute_path),
+                    "line": _mapping_line(mutation, raw_field, mutation_line),
+                    "field": field,
+                    "identity": f"{path}#{node_index}",
+                })
+
+        writes: dict[str, Any] = {}
+        invalid_vector = False
+        for field, lengths in (
+            ("position", {3, 4}),
+            ("orientation", {4}),
+            ("scale", {3}),
+        ):
+            if field not in mutation:
+                continue
+            vector = _float_vector(mutation[field], lengths)
+            if vector is None:
+                shape_evidence.append({
+                    "path": str(document.artifact.absolute_path),
+                    "line": _mapping_line(mutation, field, mutation_line),
+                    "reason": f"invalid {field} vector",
+                    "identity": f"{path}#{node_index}",
+                })
+                invalid_vector = True
+                break
+            if field == "position":
+                vector = [*vector[:3], 0.0]
+            writes[field] = vector
+        if invalid_vector:
+            continue
+
+        if "nbNodesUnderProxyDiff" in mutation:
+            proxy_diff = _integer(mutation.get("nbNodesUnderProxyDiff"))
+            if proxy_diff is None:
+                shape_evidence.append({
+                    "path": str(document.artifact.absolute_path),
+                    "line": _mapping_line(mutation, "nbNodesUnderProxyDiff", mutation_line),
+                    "reason": "invalid nbNodesUnderProxyDiff scalar",
+                    "identity": f"{path}#{node_index}",
+                })
+                continue
+            if proxy_diff > 0:
+                writes["proxy_nodes_add"] = proxy_diff
+            else:
+                ignored_evidence.append({
+                    "path": str(document.artifact.absolute_path),
+                    "line": _mapping_line(mutation, "nbNodesUnderProxyDiff", mutation_line),
+                    "identity": f"{path}#{node_index}",
+                    "operation": f"nbNodesUnderProxyDiff: {proxy_diff}",
+                    "reason": "ArchiveXL applies only positive proxy-node deltas",
+                })
+
+        for target, aliases in (
+            ("resource", ("resource", "mesh", "meshRef", "material", "effect", "entityTemplate")),
+            ("appearance", ("appearance", "appearanceName", "meshAppearance")),
+            ("record_id", ("recordID", "recordId", "objectRecordId")),
+        ):
+            for alias in aliases:
+                if alias not in mutation:
+                    continue
+                value = _yaml_scalar_text(mutation[alias])
+                if value is not None:
+                    writes[target] = value
+
+        element_mutations: list[dict[str, Any]] = []
+        effective_expected_elements: int | None = None
+        for collection_field, count_field, element_kind in (
+            ("actorMutations", "expectedActors", "actor"),
+            ("instanceMutations", "expectedInstances", "instance"),
+        ):
+            if collection_field not in mutation:
+                continue
+            collection = mutation.get(collection_field)
+            expected_elements = _integer(mutation.get(count_field))
+            if not isinstance(collection, list) or expected_elements is None or expected_elements <= 0:
+                ignored_evidence.append({
+                    "path": str(document.artifact.absolute_path),
+                    "line": _mapping_line(mutation, collection_field, mutation_line),
+                    "identity": f"{path}#{node_index}",
+                    "operation": collection_field,
+                    "reason": f"ArchiveXL requires a sequence and positive {count_field}",
+                })
+                continue
+            effective_expected_elements = expected_elements
+            for element, element_line in _sequence_entries(collection):
+                if not isinstance(element, dict):
+                    ignored_evidence.append({
+                        "path": str(document.artifact.absolute_path),
+                        "line": element_line or _mapping_line(mutation, collection_field, mutation_line),
+                        "identity": f"{path}#{node_index}",
+                        "operation": collection_field,
+                        "reason": "ArchiveXL requires each element mutation to be a mapping",
+                    })
+                    continue
+                element_index = _integer(element.get("index"))
+                if element_index is None or not 0 <= element_index < expected_elements:
+                    ignored_evidence.append({
+                        "path": str(document.artifact.absolute_path),
+                        "line": _mapping_line(element, "index", element_line),
+                        "identity": f"{path}#{node_index}",
+                        "operation": collection_field,
+                        "reason": "element mutation index is invalid or outside the expected count",
+                    })
+                    continue
+                for raw_field in element:
+                    field = str(raw_field)
+                    if field not in _ELEMENT_MUTATION_FIELDS:
+                        unknown_evidence.append({
+                            "path": str(document.artifact.absolute_path),
+                            "line": _mapping_line(element, raw_field, element_line),
+                            "field": field,
+                            "identity": f"{path}#{node_index}#{element_index}",
+                        })
+                element_writes: dict[str, Any] = {}
+                element_invalid = False
+                for field, lengths in (
+                    ("position", {4}),
+                    ("orientation", {4}),
+                    ("scale", {3}),
+                ):
+                    if field not in element:
+                        continue
+                    vector = _float_vector(element[field], lengths)
+                    if vector is None:
+                        ignored_evidence.append({
+                            "path": str(document.artifact.absolute_path),
+                            "line": _mapping_line(element, field, element_line),
+                            "identity": f"{path}#{node_index}#{element_index}",
+                            "operation": field,
+                            "reason": "invalid element mutation vector",
+                        })
+                        element_invalid = True
+                        break
+                    if field == "position":
+                        vector = [*vector[:3], 0.0]
+                    element_writes[field] = vector
+                if element_invalid or not element_writes:
+                    continue
+                effective_writes = dict(element_writes)
+                if node_type in {"worldCollisionNode", "worldInstancedDestructibleMeshNode"}:
+                    effective_writes.pop("scale", None)
+                if node_type not in _ELEMENT_MUTATION_TYPES:
+                    effective_writes.clear()
+                if not effective_writes:
+                    ignored_evidence.append({
+                        "path": str(document.artifact.absolute_path),
+                        "line": element_line,
+                        "identity": f"{path}#{node_index}#{element_index}",
+                        "operation": collection_field,
+                        "reason": f"ArchiveXL does not apply these element properties to {node_type}",
+                    })
+                    continue
+                element_mutation = {
+                    "element_index": element_index,
+                    "element_kind": element_kind,
+                    "writes": effective_writes,
+                    "line": _mapping_line(element, "index", element_line),
+                }
+                element_mutations.append(element_mutation)
+                refs.append(
+                    _reference(
+                        document,
+                        "streaming.node_element_mutation",
+                        f"{path}#{node_index}#{element_index}",
+                        element_mutation["line"],
+                        sector=path,
+                        node_index=node_index,
+                        node_type=node_type,
+                        expected_elements=expected_elements,
+                        element_index=element_index,
+                        element_kind=element_kind,
+                        writes=effective_writes,
+                    )
+                )
+
+        refs.append(
+            _reference(
+                document,
+                "streaming.node_mutation",
+                f"{path}#{node_index}",
+                index_line,
+                sector=path,
+                index=node_index,
+                node_type=node_type,
+                writes=writes,
+                expected_elements=effective_expected_elements,
+                element_mutations=element_mutations,
+            )
+        )
+
+    for rule_id, severity, summary, explanation, evidence in (
+        (
+            "AXL-NODE-MUTATION-SHAPE", "error",
+            "Invalid ArchiveXL streaming node mutations",
+            "ArchiveXL skips a whole node mutation when its required index/type or transform vector has an invalid shape.",
+            shape_evidence,
+        ),
+        (
+            "AXL-NODE-MUTATION-UNKNOWN-FIELD", "warning",
+            "ArchiveXL node mutation fields are ignored",
+            "The installed ArchiveXL WorldStreaming parser does not read these fields, so the intended changes are not applied.",
+            unknown_evidence,
+        ),
+        (
+            "AXL-NODE-MUTATION-IGNORED", "warning",
+            "ArchiveXL node mutation operations are ignored",
+            "The installed ArchiveXL parser or application path accepts the surrounding declaration but does not apply these operations.",
+            ignored_evidence,
+        ),
+    ):
+        if evidence:
+            findings.append(
+                Finding(
+                    rule_id=rule_id,
+                    severity=severity,
+                    confidence="high",
+                    summary=f"{summary}: {len(evidence)} occurrence(s)",
+                    explanation=explanation,
+                    participants=[document.artifact.mod_name],
+                    evidence=evidence,
+                )
+            )
+    return refs
+
+
+def _consolidate_node_mutation_parse_findings(
+    items: Iterable[Finding],
+) -> list[Finding]:
+    grouped: dict[str, list[Finding]] = defaultdict(list)
+    for item in items:
+        grouped[item.rule_id].append(item)
+    consolidated: list[Finding] = []
+    for rule_id, group in grouped.items():
+        first = group[0]
+        evidence = [entry for item in group for entry in item.evidence]
+        summary = first.summary.rsplit(": ", 1)[0]
+        consolidated.append(
+            Finding(
+                rule_id=rule_id,
+                severity=first.severity,
+                confidence=first.confidence,
+                summary=f"{summary}: {len(evidence)} occurrence(s)",
+                explanation=first.explanation,
+                participants=first.participants,
+                evidence=evidence,
+            )
+        )
+    return consolidated
 
 
 def parse_documents(artifacts: Iterable[Artifact]) -> tuple[list[ArchiveXLDocument], list[Reference], list[Finding]]:
@@ -1230,6 +1558,7 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
         refs.append(_reference(document, "factory", item, line))
 
     streaming = data.get("streaming")
+    mutation_parse_findings: list[Finding] = []
     if isinstance(streaming, dict):
         for item, line in _as_paths(
             streaming.get("blocks"), _mapping_line(streaming, "blocks")
@@ -1321,6 +1650,17 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                                     element_deletions=element_deletions,
                                 )
                             )
+                refs.extend(
+                    _extract_node_mutations(
+                        document,
+                        sector,
+                        sector_line or path_line,
+                        mutation_parse_findings,
+                    )
+                )
+    findings.extend(
+        _consolidate_node_mutation_parse_findings(mutation_parse_findings)
+    )
     return refs
 
 
@@ -1400,11 +1740,21 @@ def _node_deletion_outcome(
 
 
 def compare_references(references: Iterable[Reference]) -> list[Finding]:
+    reference_list = list(references)
     findings: list[Finding] = []
     aggregate: dict[tuple[str, tuple[str, ...]], list[tuple[str, list[Reference]]]] = defaultdict(list)
     grouped: dict[tuple[str, str], list[Reference]] = defaultdict(list)
-    for ref in references:
+    node_mods_by_sector: dict[str, dict[str, set[str]]] = defaultdict(
+        lambda: defaultdict(set)
+    )
+    for ref in reference_list:
         grouped[(ref.kind, ref.normalized_identity)].append(ref)
+        if ref.kind in {"streaming.node_deletion", "streaming.node_mutation"}:
+            sector = ref.details.get("sector")
+            if isinstance(sector, str):
+                node_mods_by_sector[normalize_game_path(sector)][
+                    ref.normalized_identity
+                ].add(ref.mod_name)
 
     for (kind, _identity), group in grouped.items():
         mods = sorted({ref.mod_name for ref in group}, key=str.casefold)
@@ -1430,16 +1780,23 @@ def compare_references(references: Iterable[Reference]) -> list[Finding]:
                     f"The same sector is patched with different expectedNodes values: {sorted(expected)}.",
                 )
             else:
+                has_shared_node = any(
+                    len(node_mods.intersection(mods)) > 1
+                    for node_mods in node_mods_by_sector.get(first.normalized_identity, {}).values()
+                )
+                if has_shared_node:
+                    # Node-level mutation/deletion rules describe the actual overlap.
+                    continue
                 severity, rule, explanation = (
-                    "review",
-                    "AXL-SECTOR-MULTI-PATCH",
-                    "Multiple mods patch the same streaming sector; operations may still be additive.",
+                    "info",
+                    "AXL-SECTOR-NODE-DISJOINT",
+                    "These mods patch different node indices in the same sector. ArchiveXL keeps node indices stable, so the operations compose.",
                 )
         elif kind == "streaming.node_deletion":
             severity, confidence, rule, explanation = _node_deletion_outcome(group)
         else:
             continue
-        if rule == "AXL-SECTOR-MULTI-PATCH" or rule.startswith(
+        if rule == "AXL-SECTOR-NODE-DISJOINT" or rule.startswith(
             "AXL-NODE-DELETION-"
         ):
             aggregate[(rule, tuple(mods))].append((first.identity, group))
@@ -1460,13 +1817,14 @@ def compare_references(references: Iterable[Reference]) -> list[Finding]:
         aggregate.items(), key=lambda item: (item[0][0], tuple(value.casefold() for value in item[0][1]))
     ):
         count = len(overlaps)
-        if rule == "AXL-SECTOR-MULTI-PATCH":
-            severity = "review"
+        if rule == "AXL-SECTOR-NODE-DISJOINT":
+            severity = "info"
+            confidence = "high"
             noun = "streaming sector" if count == 1 else "streaming sectors"
-            summary = f"{count} overlapping {noun}"
+            summary = f"{count} node-disjoint shared {noun}"
             explanation = (
-                "These mods patch the same sectors. Different node operations may "
-                "be compatible, so manual review is required."
+                "These mods patch different node indices in the same sectors. "
+                "ArchiveXL keeps node indices stable, so the operations compose."
             )
         else:
             severity, confidence, _classified_rule, explanation = (
@@ -1486,7 +1844,7 @@ def compare_references(references: Iterable[Reference]) -> list[Finding]:
             Finding(
                 rule_id=rule,
                 severity=severity,
-                confidence=confidence if rule != "AXL-SECTOR-MULTI-PATCH" else "medium",
+                confidence=confidence,
                 summary=summary,
                 explanation=explanation,
                 participants=list(mods),
@@ -1508,6 +1866,266 @@ def compare_references(references: Iterable[Reference]) -> list[Finding]:
             )
         )
     return findings
+
+
+def _json_fingerprint(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _mutation_write_map(reference: Reference) -> dict[str, str]:
+    writes = {
+        f"node.{property_name}": _json_fingerprint(value)
+        for property_name, value in reference.details.get("writes", {}).items()
+    }
+    for element in reference.details.get("element_mutations", []):
+        element_index = element.get("element_index")
+        for property_name, value in element.get("writes", {}).items():
+            writes[f"element.{element_index}.{property_name}"] = _json_fingerprint(value)
+    return writes
+
+
+def _node_mutation_outcome(
+    group: list[Reference],
+) -> tuple[str, str, str]:
+    node_types = {str(reference.details.get("node_type") or "") for reference in group}
+    if len(node_types) > 1:
+        return (
+            "AXL-NODE-MUTATION-TYPE-CONFLICT",
+            "conflict",
+            "These mods expect different native types at the same sector node index. ArchiveXL validates every mutation before applying the sector patch, so they cannot all match the loaded node.",
+        )
+    expected_counts = {
+        reference.details.get("expected_elements")
+        for reference in group
+        if reference.details.get("element_mutations")
+        and reference.details.get("expected_elements") is not None
+    }
+    if len(expected_counts) > 1:
+        return (
+            "AXL-NODE-MUTATION-COUNT-CONFLICT",
+            "conflict",
+            "These mods expect different actor/instance counts for the same mutated node. ArchiveXL validates the live count before applying any changes from that sector declaration.",
+        )
+
+    per_mod: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    for reference in group:
+        for target, value in _mutation_write_map(reference).items():
+            per_mod[reference.mod_name][target].add(value)
+
+    participants = sorted(per_mod, key=str.casefold)
+    targets: dict[str, dict[str, set[str]]] = defaultdict(dict)
+    for mod_name, writes in per_mod.items():
+        for target, values in writes.items():
+            targets[target][mod_name] = values
+    for target, mod_values in targets.items():
+        if len(mod_values) < 2 or target == "node.proxy_nodes_add":
+            continue
+        if len({value for values in mod_values.values() for value in values}) > 1:
+            return (
+                "AXL-NODE-MUTATION-WRITE-CONFLICT",
+                "conflict",
+                "These mods write different values to the same node or element property. ArchiveXL applies the declarations sequentially, so the later value wins.",
+            )
+
+    if node_types == {"worldInstancedDestructibleMeshNode"}:
+        element_signatures: dict[int, dict[str, str]] = defaultdict(dict)
+        for reference in group:
+            for element in reference.details.get("element_mutations", []):
+                index = int(element["element_index"])
+                element_signatures[index][reference.mod_name] = _json_fingerprint(
+                    element.get("writes", {})
+                )
+        if any(
+            len(signatures) > 1 and len(set(signatures.values())) > 1
+            for signatures in element_signatures.values()
+        ):
+            return (
+                "AXL-NODE-MUTATION-DESTRUCTIBLE-CONFLICT",
+                "conflict",
+                "Separate mutations of the same destructible-mesh instance do not preserve unspecified transform fields: ArchiveXL rebuilds each edit from the node transform. Different edits to one instance are therefore load-order dependent even when their declared properties are disjoint.",
+            )
+
+    signatures = {
+        _json_fingerprint(
+            {target: sorted(values) for target, values in sorted(writes.items())}
+        )
+        for writes in per_mod.values()
+    }
+    if len(participants) > 1 and len(signatures) == 1:
+        return (
+            "AXL-NODE-MUTATION-IDEMPOTENT",
+            "info",
+            "These mods repeat the same effective property writes on the same node. Applying the exact mutation again is idempotent.",
+        )
+    return (
+        "AXL-NODE-MUTATION-COMPOSABLE",
+        "info",
+        "These mods mutate disjoint node/element properties, repeat equivalent values, or add positive proxy-node deltas. ArchiveXL can compose these effective operations.",
+    )
+
+
+def _mutation_deletion_outcome(
+    mutations: list[Reference], deletions: list[Reference]
+) -> tuple[str, str, str]:
+    node_types = {
+        str(reference.details.get("node_type") or "")
+        for reference in [*mutations, *deletions]
+    }
+    if len(node_types) > 1:
+        return (
+            "AXL-NODE-MUTATION-DELETION-TYPE-CONFLICT",
+            "conflict",
+            "The mutation and deletion declarations expect different native types at the same node index, so ArchiveXL cannot validate all affected sector patches.",
+        )
+    node_type = next(iter(node_types), "")
+    full_deletions = [
+        reference
+        for reference in deletions
+        if reference.details.get(
+            "effective_deletion_scope", reference.details.get("deletion_scope")
+        ) == "full"
+    ]
+    if full_deletions:
+        revives_static_mesh = node_type == "worldStaticMeshNode" and any(
+            "scale" in reference.details.get("writes", {}) for reference in mutations
+        )
+        revives_instanced_mesh = node_type == "worldInstancedMeshNode" and any(
+            "scale" in element.get("writes", {})
+            for reference in mutations
+            for element in reference.details.get("element_mutations", [])
+        )
+        if revives_static_mesh or revives_instanced_mesh:
+            return (
+                "AXL-NODE-MUTATION-DELETION-CONFLICT",
+                "conflict",
+                "A later scale mutation can make content visible again after ArchiveXL's specialized full deletion for this node type, while the reverse order leaves it hidden. The result is load-order dependent.",
+            )
+        return (
+            "AXL-NODE-MUTATION-DELETION-REDUNDANT",
+            "info",
+            "A full-node deletion dominates these mutations in either order. The mutation is redundant for the final visible result rather than incompatible.",
+        )
+
+    deleted_elements = [
+        element
+        for reference in deletions
+        for element in reference.details.get("element_deletions", [])
+    ]
+    mutated_elements = [
+        element
+        for reference in mutations
+        for element in reference.details.get("element_mutations", [])
+    ]
+    conflict = False
+    for deletion in deleted_elements:
+        for mutation in mutated_elements:
+            if deletion.get("element_index") != mutation.get("element_index"):
+                continue
+            writes = mutation.get("writes", {})
+            sub_index = int(deletion.get("sub_element_index", -1))
+            if (
+                (node_type == "worldCollisionNode" and sub_index < 0 and "position" in writes)
+                or (node_type == "worldInstancedMeshNode" and "scale" in writes)
+                or (node_type == "worldInstancedDestructibleMeshNode" and "position" in writes)
+            ):
+                conflict = True
+                break
+        if conflict:
+            break
+    if conflict:
+        return (
+            "AXL-NODE-MUTATION-DELETION-CONFLICT",
+            "conflict",
+            "A mutation writes the same effective transform property that a partial deletion uses to hide this element. The final visibility depends on which mod ArchiveXL applies last.",
+        )
+    return (
+        "AXL-NODE-MUTATION-DELETION-COMPOSABLE",
+        "info",
+        "The mutation and partial deletion affect different elements or effective properties, so ArchiveXL can apply both without one restoring the deleted content.",
+    )
+
+
+def compare_streaming_mutations(references: Iterable[Reference]) -> list[Finding]:
+    """Compare effective node/property mutations and mutation/deletion interactions."""
+    by_node: dict[str, dict[str, list[Reference]]] = defaultdict(
+        lambda: {"mutations": [], "deletions": []}
+    )
+    for reference in references:
+        if reference.kind == "streaming.node_mutation":
+            by_node[reference.normalized_identity]["mutations"].append(reference)
+        elif reference.kind == "streaming.node_deletion":
+            by_node[reference.normalized_identity]["deletions"].append(reference)
+
+    aggregate: dict[
+        tuple[str, str, str, tuple[str, ...]], list[dict[str, Any]]
+    ] = defaultdict(list)
+    for operations in by_node.values():
+        mutations = operations["mutations"]
+        deletions = operations["deletions"]
+        mutation_mods = {reference.mod_name for reference in mutations}
+        if len(mutation_mods) > 1:
+            rule, severity, explanation = _node_mutation_outcome(mutations)
+            participants = tuple(sorted(mutation_mods, key=str.casefold))
+            aggregate[(rule, severity, explanation, participants)].append(
+                {
+                    "identity": mutations[0].identity,
+                    "references": [reference.to_dict() for reference in mutations],
+                }
+            )
+        if mutations and deletions:
+            participants_set = {
+                reference.mod_name for reference in [*mutations, *deletions]
+            }
+            has_cross_mod_pair = any(
+                mutation.mod_name != deletion.mod_name
+                for mutation in mutations
+                for deletion in deletions
+            )
+            if len(participants_set) > 1 and has_cross_mod_pair:
+                rule, severity, explanation = _mutation_deletion_outcome(
+                    mutations, deletions
+                )
+                participants = tuple(sorted(participants_set, key=str.casefold))
+                aggregate[(rule, severity, explanation, participants)].append(
+                    {
+                        "identity": mutations[0].identity,
+                        "references": [
+                            reference.to_dict()
+                            for reference in [*mutations, *deletions]
+                        ],
+                    }
+                )
+
+    labels = {
+        "AXL-NODE-MUTATION-TYPE-CONFLICT": "node-mutation type conflicts",
+        "AXL-NODE-MUTATION-COUNT-CONFLICT": "node-mutation element-count conflicts",
+        "AXL-NODE-MUTATION-WRITE-CONFLICT": "competing node-mutation writes",
+        "AXL-NODE-MUTATION-DESTRUCTIBLE-CONFLICT": "destructible-instance mutation conflicts",
+        "AXL-NODE-MUTATION-IDEMPOTENT": "idempotent node-mutation overlaps",
+        "AXL-NODE-MUTATION-COMPOSABLE": "composable node-mutation overlaps",
+        "AXL-NODE-MUTATION-DELETION-TYPE-CONFLICT": "mutation/deletion type conflicts",
+        "AXL-NODE-MUTATION-DELETION-CONFLICT": "mutation/deletion write conflicts",
+        "AXL-NODE-MUTATION-DELETION-REDUNDANT": "redundant mutation/full-deletion overlaps",
+        "AXL-NODE-MUTATION-DELETION-COMPOSABLE": "composable mutation/deletion overlaps",
+    }
+    return [
+        Finding(
+            rule_id=rule,
+            severity=severity,
+            confidence="high",
+            summary=f"{len(evidence)} {labels[rule]}",
+            explanation=explanation,
+            participants=list(participants),
+            evidence=evidence,
+        )
+        for (rule, severity, explanation, participants), evidence in sorted(
+            aggregate.items(),
+            key=lambda item: (
+                item[0][0],
+                tuple(participant.casefold() for participant in item[0][3]),
+            ),
+        )
+    ]
 
 
 def compare_player_references(references: Iterable[Reference]) -> list[Finding]:
@@ -2065,6 +2683,58 @@ def build_archivexl_coverage(
                 ),
             }
         )
+    streaming_operations = []
+    if "streaming" in section_documents:
+        sector_refs = [
+            reference
+            for reference in reference_list
+            if reference.kind == "streaming.sector"
+        ]
+        mutation_refs = [
+            reference
+            for reference in reference_list
+            if reference.kind == "streaming.node_mutation"
+        ]
+        element_mutation_refs = [
+            reference
+            for reference in reference_list
+            if reference.kind == "streaming.node_element_mutation"
+        ]
+        deletion_refs = [
+            reference
+            for reference in reference_list
+            if reference.kind == "streaming.node_deletion"
+        ]
+        mutation_nodes: dict[str, set[str]] = defaultdict(set)
+        for reference in mutation_refs:
+            mutation_nodes[reference.normalized_identity].add(reference.mod_name)
+        streaming_operations.append(
+            {
+                "name": "streaming.sectors",
+                "documents": len(section_documents["streaming"]),
+                "sectors": len(sector_refs),
+                "node_mutations": len(mutation_refs),
+                "element_mutations": len(element_mutation_refs),
+                "node_deletions": len(deletion_refs),
+                "node_property_writes": sum(
+                    len(reference.details.get("writes", {}))
+                    for reference in mutation_refs
+                ),
+                "element_property_writes": sum(
+                    len(reference.details.get("writes", {}))
+                    for reference in element_mutation_refs
+                ),
+                "shared_mutation_nodes": sum(
+                    len(mods) > 1 for mods in mutation_nodes.values()
+                ),
+                "status": "analyzed",
+                "note": (
+                    "Node and element writes are compared by effective property; "
+                    "mutation/deletion interactions and expected type/count guards "
+                    "are also classified."
+                ),
+            }
+        )
     return {
         "documents": len(document_list),
         "sections": sections,
@@ -2072,6 +2742,7 @@ def build_archivexl_coverage(
         "quest_operations": quest_operations,
         "override_operations": override_operations,
         "player_operations": player_operations,
+        "streaming_operations": streaming_operations,
     }
 
 

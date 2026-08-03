@@ -129,15 +129,20 @@ python -m unittest discover -s tests -v
   indexed archives or loose mod files, and compares whole-definition,
   case-sensitive visual-tag component overrides. Streaming node deletion
   references preserve native type, declared/effective scope, expected element
-  counts, and actor/instance/shape indices. Player body-type declarations are
-  parsed into exact case-sensitive body type and `Body:<name>` tag identities.
+  counts, and actor/instance/shape indices. Streaming node and nested element
+  mutations are reduced to their effective property writes and compared with
+  other mutations and deletions using ArchiveXL's application semantics.
+  Player body-type declarations are parsed into exact case-sensitive body type
+  and `Body:<name>` tag identities.
 - `src/cp77compat/archivexl_runtime.py`
   Selects the newest ArchiveXL session, streams all rotated chunks in
   chronological order, pairs root-cause and consequence messages, attributes
   localization/streaming events through semantic references, and maps missing
-  quest phases through exact child or parent references. Journal resource and
-  merge failures are also attributed to their static declarations, and
-  customization native-type mismatch warnings are mapped to option names.
+  quest phases through exact child or parent references. Streaming node-type
+  and element-count validation failures are attributed to sector/node
+  identities. Journal resource and merge failures are also attributed to their
+  static declarations, and customization native-type mismatch warnings are
+  mapped to option names.
 - `src/cp77compat/tweakxl.py`
   Parses deployed `.yaml` and `.yml` files under `r6/tweaks`, preserves YAML
   anchors, aliases, duplicate template roots, and TweakXL tags, expands
@@ -192,7 +197,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.15.0 scan on 2026-08-03 reported:
+The successful v0.16.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -200,7 +205,8 @@ The successful v0.15.0 scan on 2026-08-03 reported:
   framework bundle placeholder.
 - 78 ArchiveXL-related archives indexed.
 - 5,458 indexed archive members.
-- 58,750 extracted ArchiveXL references, including one `player.body_type`
+- 60,343 extracted ArchiveXL references, including 1,314 streaming node
+  mutations, 279 nested element mutations, one `player.body_type`
   registration, 596 child/parent references from 298 quest phase merges, 4,124
   serialized localization entries, 14
   factory entity rows, 232 serialized journal entries, and 8,302 target-scoped
@@ -243,23 +249,23 @@ The successful v0.15.0 scan on 2026-08-03 reported:
   bytes, and 472,639 lines. Its two errors and six warnings were fully
   attributed and consolidated into four findings; all four quest events have
   exact static missing-target confirmations.
-- 59 consolidated findings overall:
+- 60 consolidated findings overall:
   - 1 conflict candidate.
   - 9 errors.
-  - 9 warnings.
-  - 16 review groups.
-  - 24 informational findings.
+  - 11 warnings.
+  - 0 review groups.
+  - 39 informational findings.
 - Zero WolvenKit indexing failures.
-- Seventy-four automated tests passing.
+- Seventy-nine automated tests passing.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
   seconds. The v0.7 dependency-enabled fully cached scan completes in about
   17.8 seconds, including indexing the local official TweakDB sources. The first
   customization payload pass completed in 110.9 seconds; the fully cached
-  v0.13 normal scan completed in 19.7 seconds; the fully cached v0.15 scans
-  complete in about 20 seconds.
-- All 116,205 ArchiveXL and TweakXL references have one-based declaration/source
+  v0.13 normal scan completed in 19.7 seconds; the fully cached v0.15 and v0.16
+  scans complete in about 20 seconds.
+- All 117,798 ArchiveXL and TweakXL references have one-based declaration/source
   lines in the generated reports. Serialized localization, factory, and journal
   entries additionally carry their zero-based payload `entry_index` or
   `row_index`. For minified one-line
@@ -279,8 +285,9 @@ Important current findings:
 4. NCEE NPC declares
    `localization\it-it\onscreens\ncee_onscreens.json`, but that resource is
    absent.
-5. Sixteen consolidated mod groups patch some of the same streaming sectors;
-   these are review candidates, not automatically confirmed incompatibilities.
+5. Fourteen participant groups share 344 streaming sectors while touching only
+   disjoint node indices. These are high-confidence informational overlaps, not
+   compatibility review candidates.
 6. TweakXL found 251 concrete TweakDB array identities shared across four mod
    participant groups. All use composable tagged operations in the frozen
    collection; no assignment or tagged-array incompatibility was found.
@@ -327,6 +334,14 @@ Important current findings:
     female and male `eyebrows` switcher options with disjoint choice names.
     ArchiveXL composes both overlaps; there are no customization conflicts,
     duplicate choices, or review findings in the frozen collection.
+22. No streaming node-mutation identity is shared across mods. Thirteen
+    Immersive Night City Fixes mutations target nodes fully deleted by 4x
+    Vending Machine Framework; the deletion dominates in either order, so the
+    overlap is informational redundancy.
+23. The node-mutation parser found 10 accepted-but-ignored operations and nine
+    unknown fields. These are consolidated into two warnings with exact source
+    lines; the unknown fields include seven `nodeRefHash` uses plus the
+    `sscale` and `rientation` spellings.
 
 Analyzer coverage is embedded in all primary reports. It currently records 45
 ArchiveXL documents with `resource` sections and marks all five installed
@@ -365,6 +380,11 @@ The one installed `player.bodyTypes` document is fully analyzed. It registers
 the case-sensitive `ANGEL` body type and `Body:ANGEL` tag at source line 27;
 there are no cross-mod duplicates. Exact duplicates would be informational and
 idempotent, while distinct body-type registrations compose.
+World-streaming mutation coverage is fully analyzed: 3,110 sector patches,
+1,314 node mutations, 279 nested element mutations, 1,728 effective node
+property writes, and 422 effective element-property writes. Comparisons account
+for alias precedence, node and element validation guards, destructible-instance
+replacement behavior, and mutation/deletion ordering.
 Streaming deletion analysis distinguishes full nodes, partial actors/instances,
 and collision shapes. Same-type full deletions and ordinary partial deletions
 are idempotent/composable; native-type or expected-element disagreements are

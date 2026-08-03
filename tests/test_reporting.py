@@ -55,6 +55,21 @@ class HtmlReportTests(unittest.TestCase):
                                     "note": "Example player coverage",
                                 }
                             ],
+                            "streaming_operations": [
+                                {
+                                    "name": "streaming.sectors",
+                                    "status": "analyzed",
+                                    "documents": 1,
+                                    "sectors": 1,
+                                    "node_mutations": 2,
+                                    "element_mutations": 1,
+                                    "node_deletions": 3,
+                                    "node_property_writes": 2,
+                                    "element_property_writes": 1,
+                                    "shared_mutation_nodes": 0,
+                                    "note": "Example streaming coverage",
+                                }
+                            ],
                             "runtime_logs": [
                                 {
                                     "name": "latest TweakXL log",
@@ -99,6 +114,7 @@ class HtmlReportTests(unittest.TestCase):
             self.assertIn('id="coverage"', html)
             self.assertIn("Payload inspection", html)
             self.assertIn("Player body types", html)
+            self.assertIn("World streaming operations", html)
             self.assertIn("Runtime log correlation", html)
             self.assertNotIn("</script><script>alert(1)</script>", html)
             match = re.search(
