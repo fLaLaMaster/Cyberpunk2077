@@ -22,6 +22,7 @@ def write_reports(
     archivexl_references: list[Reference],
     tweakxl_references: list[Reference],
     redscript_references: list[Reference],
+    cet_references: list[Reference],
     findings: list[Finding],
     metadata: dict[str, Any],
     coverage: dict[str, Any] | None = None,
@@ -36,6 +37,7 @@ def write_reports(
         "archivexl_references": len(archivexl_references),
         "tweakxl_references": len(tweakxl_references),
         "redscript_references": len(redscript_references),
+        "cet_references": len(cet_references),
         "findings": dict(sorted(Counter(item.severity for item in ordered_findings).items())),
         "coverage": coverage or {},
     }
@@ -96,6 +98,19 @@ def write_reports(
         },
     )
     _write_json(
+        output_dir / "cet-findings.json",
+        {
+            "metadata": metadata,
+            "summary": summary,
+            "references": [reference.to_dict() for reference in cet_references],
+            "findings": [
+                finding.to_dict()
+                for finding in ordered_findings
+                if finding.rule_id.startswith("CET-")
+            ],
+        },
+    )
+    _write_json(
         output_dir / "compatibility-findings.json",
         {
             "metadata": metadata,
@@ -116,6 +131,7 @@ def write_reports(
         f"- ArchiveXL references: {summary['archivexl_references']}",
         f"- TweakXL references: {summary['tweakxl_references']}",
         f"- REDscript references: {summary['redscript_references']}",
+        f"- CET references: {summary['cet_references']}",
         "- Findings: " + ", ".join(f"{key}={value}" for key, value in summary["findings"].items()),
         "",
     ]
@@ -199,6 +215,21 @@ def write_reports(
                         f"{operation['compatible_wrapper_chains']}/"
                         f"{operation['terminated_wrapper_chains']} - "
                         f"{operation['note']}"
+                    )
+            registration_operations = analyzer.get("registration_operations", [])
+            if registration_operations:
+                lines.extend(["", "#### CET Lua registrations", ""])
+                for operation in registration_operations:
+                    lines.append(
+                        f"- `{operation['name']}`: {operation['status']}; "
+                        f"documents/roots={operation['documents']}/{operation['mod_roots']}; "
+                        f"entrypoints/events={operation['entrypoints']}/{operation['events']}; "
+                        f"hotkeys/inputs={operation['hotkeys']}/{operation['inputs']}; "
+                        f"requires/GetMod={operation['requires']}/{operation['getmod_dependencies']}; "
+                        f"observers/overrides={operation['observers']}/{operation['overrides']}; "
+                        f"settings={operation['settings']}; dynamic={operation['dynamic_calls']}; "
+                        f"missing modules={operation['unresolved_modules']}; "
+                        f"shared hooks={operation['shared_hook_targets']} - {operation['note']}"
                     )
             quest_operations = analyzer.get("quest_operations", [])
             if quest_operations:

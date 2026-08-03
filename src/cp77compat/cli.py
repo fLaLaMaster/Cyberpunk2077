@@ -30,6 +30,8 @@ from .archivexl_payload_analysis import (
     inspect_resource_patch_payloads,
 )
 from .config import DEFAULT_CONFIG_PATH, ScannerConfig, load_config
+from .cet import analyze_cet_references, build_cet_coverage, parse_cet_documents
+from .cet_runtime import analyze_cet_runtime_logs
 from .deployment import load_deployment
 from .inventory import build_inventory, discover_mods, exact_path_findings
 from .models import Finding
@@ -206,10 +208,48 @@ def run_scan(args: argparse.Namespace) -> int:
             f"{redscript_runtime_coverage['warnings']} warnings, "
             f"{redscript_runtime_coverage['findings']} consolidated findings"
         )
+    cet_documents, cet_references, cet_findings = parse_cet_documents(artifacts)
+    findings.extend(cet_findings)
+    cet_static_findings = analyze_cet_references(cet_documents, cet_references)
+    findings.extend(cet_static_findings)
+    cet_coverage = build_cet_coverage(cet_documents, cet_references)
+    cet_runtime_findings, cet_runtime_coverage = analyze_cet_runtime_logs(
+        args.game,
+        artifacts,
+        cet_references,
+        cet_static_findings,
+    )
+    findings.extend(cet_runtime_findings)
+    cet_coverage["runtime_logs"] = [cet_runtime_coverage]
+    cet_coverage["sections"].append(
+        {
+            "name": "runtime log correlation",
+            "documents": cet_runtime_coverage["files"],
+            "status": cet_runtime_coverage["status"],
+            "note": (
+                f"Current CET logs: {cet_runtime_coverage['loaded_mods']} loaded mods, "
+                f"{cet_runtime_coverage['errors']} errors, "
+                f"{cet_runtime_coverage['warnings']} warnings, and "
+                f"{cet_runtime_coverage['correlated_events']} source-attributed events."
+                if cet_runtime_coverage["status"] == "analyzed"
+                else cet_runtime_coverage["note"]
+            ),
+        }
+    )
+    coverage["cet"] = cet_coverage
+    if cet_runtime_coverage["status"] == "analyzed":
+        print(
+            f"Parsed current CET logs: {cet_runtime_coverage['loaded_mods']} loaded mods, "
+            f"{cet_runtime_coverage['errors']} errors, "
+            f"{cet_runtime_coverage['warnings']} warnings, "
+            f"{cet_runtime_coverage['findings']} consolidated findings"
+        )
     print(
         f"Found {len(mods)} mods, {len(artifacts)} files, "
         f"{len(documents)} non-empty ArchiveXL configs, and "
-        f"{len(tweak_documents)} non-empty TweakXL configs"
+        f"{len(tweak_documents)} non-empty TweakXL configs, "
+        f"{len(redscript_documents)} REDscript files, and "
+        f"{len(cet_documents)} CET Lua files"
     )
 
     manifests = []
@@ -467,6 +507,7 @@ def run_scan(args: argparse.Namespace) -> int:
         references,
         tweak_references,
         redscript_references,
+        cet_references,
         findings,
         metadata,
         coverage,

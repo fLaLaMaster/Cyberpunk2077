@@ -233,7 +233,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
 
     for (const finding of findings) {
       const prefix = String(finding.rule_id || "").split("-", 1)[0];
-      finding._ecosystem = ({AXL: "ArchiveXL", TXL: "TweakXL", RS: "REDscript", CORE: "Core", WOLVENKIT: "WolvenKit"})[prefix] || "Other";
+      finding._ecosystem = ({AXL: "ArchiveXL", TXL: "TweakXL", RS: "REDscript", CET: "CET", CORE: "Core", WOLVENKIT: "WolvenKit"})[prefix] || "Other";
       finding._search = [finding.rule_id, finding.severity, finding.confidence, finding.summary,
         finding.explanation, ...(finding.participants || []), evidenceText(finding.evidence)]
         .join(" ").toLocaleLowerCase();
@@ -362,6 +362,21 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "note", label: "Notes"}
         ]));
       }
+      if ((analyzer.registration_operations || []).length) {
+        const label = document.createElement("h3"); label.textContent = "CET Lua registrations"; group.append(label);
+        group.append(coverageTable(analyzer.registration_operations, [
+          {key: "name", label: "Analyzer"}, {key: "status", label: "Status"},
+          {key: "documents", label: "Lua files"}, {key: "mod_roots", label: "Mod roots"},
+          {key: "entrypoints", label: "Entrypoints"}, {key: "events", label: "Events"},
+          {key: "hotkeys", label: "Hotkeys"}, {key: "inputs", label: "Inputs"},
+          {key: "requires", label: "Requires"}, {key: "getmod_dependencies", label: "GetMod"},
+          {key: "observers", label: "Observers"}, {key: "overrides", label: "Overrides"},
+          {key: "settings", label: "Settings IDs"}, {key: "dynamic_calls", label: "Dynamic calls"},
+          {key: "unresolved_modules", label: "Missing modules"},
+          {key: "shared_hook_targets", label: "Shared hooks"},
+          {key: "inactive_references", label: "Inactive refs"}, {key: "note", label: "Notes"}
+        ]));
+      }
       if ((analyzer.quest_operations || []).length) {
         const label = document.createElement("h3"); label.textContent = "Quest operations"; group.append(label);
         group.append(coverageTable(analyzer.quest_operations, [
@@ -445,7 +460,8 @@ _HTML_TEMPLATE = r'''<!doctype html>
       [summary.archive_manifests, "Archives"], [summary.archive_members, "Archive members"],
       [summary.archivexl_references, "ArchiveXL references"],
       [summary.tweakxl_references, "TweakXL references"],
-      [summary.redscript_references, "REDscript references"], [findings.length, "Findings"]
+      [summary.redscript_references, "REDscript references"],
+      [summary.cet_references, "CET references"], [findings.length, "Findings"]
     ];
     const statsElement = document.getElementById("stats");
     for (const [value, label] of stats) {

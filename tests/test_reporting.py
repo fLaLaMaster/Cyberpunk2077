@@ -33,6 +33,7 @@ class HtmlReportTests(unittest.TestCase):
                     "archivexl_references": 1,
                     "tweakxl_references": 2,
                     "redscript_references": 3,
+                    "cet_references": 4,
                     "coverage": {
                         "archivexl": {
                             "documents": 1,
@@ -120,6 +121,32 @@ class HtmlReportTests(unittest.TestCase):
                                 }
                             ],
                         },
+                        "cet": {
+                            "documents": 1,
+                            "sections": [],
+                            "registration_operations": [
+                                {
+                                    "name": "CET Lua API registrations",
+                                    "status": "analyzed",
+                                    "documents": 1,
+                                    "mod_roots": 1,
+                                    "entrypoints": 1,
+                                    "events": 1,
+                                    "hotkeys": 1,
+                                    "inputs": 1,
+                                    "requires": 0,
+                                    "getmod_dependencies": 0,
+                                    "observers": 1,
+                                    "overrides": 1,
+                                    "settings": 1,
+                                    "dynamic_calls": 0,
+                                    "unresolved_modules": 0,
+                                    "shared_hook_targets": 0,
+                                    "inactive_references": 0,
+                                    "note": "Example CET coverage",
+                                }
+                            ],
+                        },
                     },
                 },
                 [finding],
@@ -138,6 +165,7 @@ class HtmlReportTests(unittest.TestCase):
             self.assertIn("Player body types", html)
             self.assertIn("World streaming operations", html)
             self.assertIn("REDscript annotation operations", html)
+            self.assertIn("CET Lua registrations", html)
             self.assertIn("Runtime log correlation", html)
             self.assertNotIn("</script><script>alert(1)</script>", html)
             match = re.search(

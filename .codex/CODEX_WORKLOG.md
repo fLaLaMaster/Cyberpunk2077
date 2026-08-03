@@ -6,14 +6,63 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.17.0`
-- Implemented ecosystems: ArchiveXL, TweakXL, and REDscript
+- Scanner version: `0.18.0`
+- Implemented ecosystems: ArchiveXL, TweakXL, REDscript, and CET Lua
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 83 passing
+- Automated tests: 88 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — CET Lua and runtime-log analysis
+
+Implemented the first CET compatibility analyzer using the frozen Vortex
+corpus, current CET logs, and official Cyber Engine Tweaks source at commit
+`9a8522f2a3d66729d971c48ae48f1053abfb5208`.
+
+Changes:
+
+- Added a source-preserving Lua lexer and CET root/entrypoint discovery without
+  executing mod code.
+- Extracted lifecycle events, shared hotkey/input IDs, literal `require` and
+  `GetMod` dependencies, observers, overrides, and Native Settings paths.
+- Resolved modules through CET's exact/`.lua`/`init.lua` root-local lookup and
+  followed top-level literal imports to determine reachable active code.
+- Distinguished Vortex-overridden entries, isolated per-root sandboxes,
+  additive observer targets, pass-through override chains, duplicate
+  terminating callbacks, shared settings containers, and shared leaf controls.
+- Parsed `cyber_engine_tweaks.log`, `scripting.log`, and canonical per-root logs
+  for load state, missing hook targets, registration/module failures, and Lua
+  source errors.
+- Added `cet-findings.json`, CET summary and coverage panels in Markdown/HTML,
+  a CET HTML ecosystem filter, documentation, and scanner version 0.18.0.
+
+Validation:
+
+- All 88 tests pass with Python warnings promoted to errors.
+- A full cached scan completed in 26.9 seconds and parsed 248 Lua files across
+  61 active roots into 2,533 references; none has a null source line.
+- Current CET 1.37.1 logs show 61 loaded roots, two intentionally ignored
+  folders without `init.lua`, zero failed roots, one Lua error, and one missing
+  hook warning.
+- The Lua error maps to Immersive First Person
+  `Modules\GameSettings.lua:171` (`attempt to index a nil value`). The hook
+  warning targets absent `MenuScenario_PauseMenu.OnSwitchToCredits` but CET's
+  global scripting log does not identify which bundled GameUI helper emitted it.
+- No Shooting Delay `init.lua:3` requires absent `Modules/main.lua`. Six missing
+  literal `GetMod` targets remain review-level because the surrounding code may
+  treat those integrations as optional.
+- The known Damage Scaling and Classic Drinks entry winners were recognized.
+  Damage Scaling Extended intentionally imports two modules supplied by the
+  standalone package in their merged root.
+- Thirty-six cross-root observer groups are additive. Two legacy GameHUD
+  override targets contain identical terminating callbacks, and two shared
+  Native Settings tab paths are informational rather than compatibility
+  conflicts.
+- The combined report contains 177 findings: 2 conflicts, 10 errors, 17
+  warnings, 13 reviews, and 135 informational findings.
+- Frozen Vortex and game inputs were not modified.
 
 ### 2026-08-03 — REDscript annotation and compiler-log analysis
 

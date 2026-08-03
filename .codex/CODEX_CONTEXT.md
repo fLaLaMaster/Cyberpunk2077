@@ -10,9 +10,9 @@ mod packages, attributes deployed files through Vortex metadata, indexes
 resources inside `.archive` files with WolvenKit CLI, and performs
 ecosystem-specific semantic compatibility checks.
 
-The scanner is being developed incrementally. ArchiveXL, TweakXL, and
-REDscript are the currently supported ecosystems, including their relevant
-runtime/compiler logs. Planned ecosystems include CET Lua, input/config files,
+The scanner is being developed incrementally. ArchiveXL, TweakXL, REDscript,
+and CET Lua are the currently supported ecosystems, including their relevant
+runtime/compiler logs. Planned coverage includes shared input/config files,
 RED4ext native plugins, and runtime correlation for the remaining frameworks.
 
 ## Workspace paths
@@ -164,6 +164,16 @@ python -m unittest discover -s tests -v
   Parses `redscript_rCURRENT.log`, records compilation/output success, maps
   deployed diagnostic paths and lines back to staging artifacts and exact
   annotation signatures, and correlates static REDscript findings.
+- `src/cp77compat/cet.py`
+  Lexically parses CET Lua without executing it; resolves per-root entrypoints
+  and literal modules; extracts lifecycle events, hotkeys, inputs, `GetMod`
+  dependencies, observers, overrides, and Native Settings paths; and compares
+  them using the installed CET sandbox and callback-chain semantics.
+- `src/cp77compat/cet_runtime.py`
+  Parses current CET framework, scripting, and canonical per-mod logs; records
+  loaded/ignored/failed roots; and attributes missing hooks, rejected
+  registrations, module failures, and Lua errors to staging sources where
+  possible.
 - `src/cp77compat/reporting.py`
   Writes inventory, archive manifest, per-ecosystem reference/finding JSON,
   combined findings JSON, Markdown, and HTML reports.
@@ -174,7 +184,7 @@ python -m unittest discover -s tests -v
 - `src/cp77compat/cli.py`
   Orchestrates the scan and exposes CLI options.
 - `tests/`
-  Unit tests for ArchiveXL, TweakXL, and REDscript parsing/comparison; archive
+  Unit tests for ArchiveXL, TweakXL, REDscript, and CET parsing/comparison; archive
   output parsing; loose resource resolution; runtime/compiler-log correlation;
   configuration; and safe HTML embedding.
 
@@ -207,7 +217,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.17.0 scan on 2026-08-03 reported:
+The successful v0.18.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -231,6 +241,14 @@ The successful v0.17.0 scan on 2026-08-03 reported:
   source lines and zero parser failures. The effective installed set contains
   700 wrappers, 139 replacements, 14,024 added methods, and 1,885 added fields;
   27 conditional or Vortex-overridden annotations are inactive.
+- 248 CET Lua files across 61 active CET roots and 2,533 extracted references,
+  all with source lines. Effective registrations include 161 events, 18
+  hotkey/input bindings, 182 literal module imports, 47 `GetMod` dependencies,
+  806 observers, 239 overrides, and 495 Native Settings paths. Another 271
+  dynamically constructed calls are inventoried but intentionally not guessed.
+- Current CET logs cover 63 files and 19,285 lines. CET 1.37.1 loaded all 61
+  active roots, ignored two data directories without `init.lua`, and failed no
+  mod roots. Four runtime events produced three consolidated findings.
 - 181 archive-owned localization payloads serialized with zero failures; four
   declarations without an own indexed archive payload were skipped and remain
   covered by resource-resolution findings.
@@ -266,14 +284,14 @@ The successful v0.17.0 scan on 2026-08-03 reported:
 - The 1,277-line current REDscript compiler log successfully compiled 1,234
   deployed files and saved the modded output. Its zero errors and eight
   warnings were all source-attributed and statically confirmed.
-- 130 consolidated findings overall:
+- 177 consolidated findings overall:
   - 2 conflict candidates.
-  - 9 errors.
-  - 15 warnings.
-  - 12 review groups.
-  - 92 informational findings.
+  - 10 errors.
+  - 17 warnings.
+  - 13 review groups.
+  - 135 informational findings.
 - Zero WolvenKit indexing failures.
-- Eighty-three automated tests passing.
+- Eighty-eight automated tests passing with warnings promoted to errors.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
@@ -281,9 +299,9 @@ The successful v0.17.0 scan on 2026-08-03 reported:
   17.8 seconds, including indexing the local official TweakDB sources. The first
   customization payload pass completed in 110.9 seconds; the fully cached
   v0.13 normal scan completed in 19.7 seconds; the fully cached v0.15 and v0.16
-  scans complete in about 20 seconds, and the REDscript-enabled v0.17 scan
-  completed in about 26 seconds.
-- All 134,573 ArchiveXL, TweakXL, and REDscript references have one-based declaration/source
+  scans complete in about 20 seconds; the REDscript-enabled v0.17 scan completed
+  in about 26 seconds, and the CET-enabled v0.18 scan completed in 26.9 seconds.
+- All 137,106 ArchiveXL, TweakXL, REDscript, and CET references have one-based declaration/source
   lines in the generated reports. Serialized localization, factory, and journal
   entries additionally carry their zero-based payload `entry_index` or
   `row_index`. For minified one-line
@@ -375,6 +393,29 @@ Important current findings:
     chains in which every installed wrapper invokes `wrappedMethod`. Twenty-six
     active wrappers across 12 mods omit that call and remain explicit review
     findings even when no other installed mod wraps the same signature.
+28. Immersive First Person raised a live CET Lua error at
+    `Modules\GameSettings.lua:171`: `attempt to index a nil value`.
+29. No Shooting Delay `init.lua:3` requires `Modules/main.lua`, which does not
+    exist in its deployed CET root. CET still loaded the root, so the ignored
+    return value currently limits the visible failure to the mod log.
+30. CET rejected `MenuScenario_PauseMenu.OnSwitchToCredits` because the method
+    is absent in current game RTTI. Several mods bundle table-driven GameUI
+    helpers with that legacy target, and the global log does not identify which
+    sandbox emitted the registration.
+31. Six literal `GetMod` targets are absent. They are review findings because
+    Better Vehicle First Person, Time Is Running Out, Jacking Animation Patch,
+    trainSystem, and UnifiedModSettings integrations may be optional and nil
+    guarded.
+32. The known Damage Scaling Extended and Classic Drinks CET entry winners are
+    detected. Extended intentionally imports two active helper modules supplied
+    by the standalone Damage Scaling package in the merged `DamageScaling` root.
+33. Thirty-six participant groups observe 81 shared hook targets. CET retains
+    those callbacks, so the overlaps are informational rather than replacement
+    conflicts.
+34. Two legacy GameHUD targets have normalized-identical terminating overrides
+    across 0-Engine, Missing Persons, and Pacifica Typhoon. Two Native Settings
+    tab paths are also deliberately shared; neither case remains a review-level
+    finding.
 
 Analyzer coverage is embedded in all primary reports. It currently records 45
 ArchiveXL documents with `resource` sections and marks all five installed
@@ -401,6 +442,13 @@ than being guessed without property type metadata. The newest TweakXL runtime
 log is also analyzed automatically; coverage records the selected path, line
 and event counts, source attribution, static confirmations, and consolidated
 finding count.
+CET coverage records active roots, entrypoints, lifecycle/binding registrations,
+literal module and `GetMod` dependencies, hook and Native Settings operations,
+dynamic calls, inactive references, unresolved imports, and shared hook targets.
+The current framework/scripting/per-mod log pass records CET/game versions,
+loaded/ignored/failed roots, source-attributed runtime events, and compact
+findings. Dynamically assembled arguments and explicit global-symbol collisions
+inside multi-package roots remain partial/future coverage rather than guessed.
 The four installed `overrides.tags` documents are fully analyzed using
 ArchiveXL-equivalent effective component masks and whole-definition last-wins
 semantics. Their 12 tag names are all distinct.

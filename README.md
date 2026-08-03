@@ -56,6 +56,11 @@ Implemented analysis includes:
   including installed `@if(ModuleExists(...))` evaluation;
 - `redscript_rCURRENT.log` compiler diagnostic attribution and correlation with
   exact static annotation overlaps;
+- CET Lua root/entrypoint discovery, literal `require` and `GetMod` dependency
+  resolution, lifecycle event and binding validation, observer/override-chain
+  comparison, and Native Settings path analysis;
+- current CET framework, scripting, and per-mod log parsing with load-state,
+  missing-hook, registration, module, and Lua error attribution;
 - deterministic JSON and Markdown reports.
 
 Reports include an analyzer-coverage panel that distinguishes analyzed,
@@ -150,6 +155,26 @@ compiler-confirmed warning with equivalent final behavior. Duplicate added
 methods and fields are checked independently, and the current compiler log is
 used to confirm which static overlaps are active in the deployed game.
 
+CET analysis follows the framework's per-directory sandbox model: every direct
+child of the CET `mods` directory with an `init.lua` is a separate mod root.
+Literal module imports are resolved only inside that root, while Vortex packages
+that contribute files to the same root are treated as one merged CET mod. The
+scanner reports selected entrypoint winners, unresolved imports, and explicit
+cross-package module dependencies without treating symbols in separate CET
+roots as one global namespace.
+
+Lifecycle event registrations and hotkey/input IDs are compared within their
+own root. Shared observers are informational because CET retains each callback.
+Override chains are considered structurally compatible when every inline
+callback visibly invokes its final wrapped/next parameter; dynamic or terminating
+chains remain review findings. Native Settings tab/subcategory sharing is
+informational, while duplicate leaf control paths remain review findings.
+
+Each scan also reads the current `cyber_engine_tweaks.log`, `scripting.log`, and
+canonical `<mod-root>.log` files. Loaded, ignored, and failed roots are counted;
+missing RTTI hook targets and Lua source errors are mapped to Vortex artifacts
+and source lines where the logs provide enough information.
+
 ## Run
 
 From this directory:
@@ -234,6 +259,7 @@ different payloads are load-order conflicts.
 - `reports/current/archivexl-findings.json`: complete references and evidence.
 - `reports/current/tweakxl-findings.json`: TweakXL references and findings.
 - `reports/current/redscript-findings.json`: REDscript annotations and findings.
+- `reports/current/cet-findings.json`: CET Lua references and runtime findings.
 - `reports/current/compatibility-findings.json`: combined machine-readable findings.
 - `reports/current/compatibility-report.html`: searchable, filterable offline report.
 - `reports/current/compatibility-report.md`: concise human-readable report.
