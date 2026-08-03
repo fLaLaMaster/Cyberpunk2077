@@ -6,14 +6,51 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.13.0`
+- Scanner version: `0.14.0`
 - Implemented ecosystems: ArchiveXL and TweakXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 65 passing
+- Automated tests: 70 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — ArchiveXL streaming-node deletion semantics
+
+Replaced the blanket duplicate-deletion conflict with classifications derived
+from ArchiveXL's installed WorldStreaming implementation.
+
+Changes:
+
+- Preserved full/partial/effective deletion scope, native node type, expected
+  actor/instance counts, and scalar or actor/shape element identities.
+- Classified repeated same-type full-node deletions as high-confidence
+  idempotent information because ArchiveXL hides/moves nodes without erasing or
+  renumbering the node buffer.
+- Classified ordinary partial actor/instance deletions as composable, and
+  full-plus-partial overlaps as redundant but safe.
+- Kept native-type and expected-element disagreements as conflicts because
+  ArchiveXL validates them before applying the complete sector patch.
+- Added a dedicated conflict for multiple collision-shape deletion patches on
+  one node. ArchiveXL reuses a sector/node collision-preset allocation while
+  increasing its logical size on a later patch, so that path is not safely
+  idempotent.
+- Bumped the scanner to version 0.14.0 and updated README/TODO guidance.
+
+Validation:
+
+- All 70 automated tests pass, including full, partial, type/count mismatch,
+  and collision-shape cases.
+- The corpus contains 10,812 node-deletion references: 10,635 declared full and
+  177 declared partial, resolving to 10,672 effective full and 140 effective
+  partial operations. ArchiveXL treats 36 foliage and one instanced-occluder
+  declaration with element lists as whole-node deletions.
+- All 40 cross-mod overlaps across five participant groups are same-type full
+  deletions and are now informational. No installed partial or collision-shape
+  overlap exists.
+- The report remains at 59 findings, but the distribution changes from six
+  conflicts and 19 infos to one conflict and 24 infos.
+- Frozen Vortex and game inputs were not modified.
 
 ### 2026-08-03 — ArchiveXL character-customization analysis
 

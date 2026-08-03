@@ -887,11 +887,113 @@ class ArchiveXLTests(unittest.TestCase):
         self.assertEqual("AXL-SECTOR-EXPECTED-NODES", findings[0].rule_id)
         self.assertEqual("conflict", findings[0].severity)
 
+    def test_repeated_full_node_deletions_are_idempotent(self) -> None:
+        refs = [
+            Reference(
+                "archivexl",
+                "streaming.node_deletion",
+                r"base\sector#7",
+                mod,
+                f"{mod}.xl",
+                details={
+                    "node_type": "worldStaticMeshNode",
+                    "deletion_scope": "full",
+                    "expected_elements": [],
+                    "element_deletions": [],
+                },
+            )
+            for mod in ("A", "B")
+        ]
+        findings = compare_references(refs)
+        self.assertEqual(1, len(findings))
+        self.assertEqual("AXL-NODE-DELETION-IDEMPOTENT", findings[0].rule_id)
+        self.assertEqual("info", findings[0].severity)
+        self.assertEqual("high", findings[0].confidence)
+
+    def test_partial_node_deletions_are_composable_but_counts_must_match(self) -> None:
+        refs = [
+            Reference(
+                "archivexl",
+                "streaming.node_deletion",
+                r"base\sector#7",
+                mod,
+                f"{mod}.xl",
+                details={
+                    "node_type": "worldInstancedMeshNode",
+                    "deletion_scope": "partial",
+                    "expected_elements": [count],
+                    "element_deletions": [
+                        {"element_index": element, "sub_element_index": -1}
+                    ],
+                },
+            )
+            for mod, count, element in (("A", 4, 0), ("B", 4, 1))
+        ]
+        findings = compare_references(refs)
+        self.assertEqual("AXL-NODE-DELETION-COMPOSABLE", findings[0].rule_id)
+        self.assertEqual("info", findings[0].severity)
+
+        refs[1].details["expected_elements"] = [5]
+        findings = compare_references(refs)
+        self.assertEqual("AXL-NODE-DELETION-COUNT-CONFLICT", findings[0].rule_id)
+        self.assertEqual("conflict", findings[0].severity)
+
+    def test_node_deletion_type_disagreement_is_a_conflict(self) -> None:
+        refs = [
+            Reference(
+                "archivexl",
+                "streaming.node_deletion",
+                r"base\sector#7",
+                mod,
+                f"{mod}.xl",
+                details={
+                    "node_type": node_type,
+                    "deletion_scope": "full",
+                    "expected_elements": [],
+                    "element_deletions": [],
+                },
+            )
+            for mod, node_type in (
+                ("A", "worldStaticMeshNode"),
+                ("B", "worldEntityNode"),
+            )
+        ]
+        findings = compare_references(refs)
+        self.assertEqual("AXL-NODE-DELETION-TYPE-CONFLICT", findings[0].rule_id)
+        self.assertEqual("conflict", findings[0].severity)
+
+    def test_repeated_collision_shape_deletions_are_a_conflict(self) -> None:
+        refs = [
+            Reference(
+                "archivexl",
+                "streaming.node_deletion",
+                r"base\sector#7",
+                mod,
+                f"{mod}.xl",
+                details={
+                    "node_type": "worldCollisionNode",
+                    "deletion_scope": "partial",
+                    "effective_deletion_scope": "partial",
+                    "expected_elements": [4],
+                    "element_deletions": [
+                        {"element_index": actor, "sub_element_index": shape}
+                    ],
+                },
+            )
+            for mod, actor, shape in (("A", 1, 0), ("B", 2, 1))
+        ]
+        findings = compare_references(refs)
+        self.assertEqual(
+            "AXL-NODE-DELETION-COLLISION-SHAPE-CONFLICT",
+            findings[0].rule_id,
+        )
+        self.assertEqual("conflict", findings[0].severity)
+
     def test_sector_and_node_deletion_use_structural_source_lines(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "deletions.xl"
             path.write_text(
-                """streaming:
+                r"""streaming:
   sectors:
     - path: base\\worlds\\example.streamingsector
       nodeDeletions:
@@ -906,6 +1008,45 @@ class ArchiveXLTests(unittest.TestCase):
             lines = {item.kind: item.line for item in references}
             self.assertEqual(3, lines["streaming.sector"])
             self.assertEqual(5, lines["streaming.node_deletion"])
+            deletion = next(
+                item for item in references if item.kind == "streaming.node_deletion"
+            )
+            self.assertEqual("full", deletion.details["deletion_scope"])
+            self.assertEqual([], deletion.details["element_deletions"])
+            self.assertFalse([item for item in findings if item.severity == "error"])
+
+    def test_partial_node_deletion_preserves_actor_and_shape_identities(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "partial-deletions.xl"
+            path.write_text(
+                r"""streaming:
+  sectors:
+    - path: base\worlds\example.streamingsector
+      expectedNodes: 10
+      nodeDeletions:
+        - index: 7
+          type: worldCollisionNode
+          expectedActors: 4
+          actorDeletions: [1, [2, 3]]
+""",
+                encoding="utf-8",
+            )
+            _documents, references, findings = parse_documents(
+                [artifact(path, "Example")]
+            )
+            deletion = next(
+                item for item in references if item.kind == "streaming.node_deletion"
+            )
+            self.assertEqual("partial", deletion.details["deletion_scope"])
+            self.assertEqual("partial", deletion.details["effective_deletion_scope"])
+            self.assertEqual([4], deletion.details["expected_elements"])
+            self.assertEqual(
+                [
+                    {"element_index": 1, "sub_element_index": -1},
+                    {"element_index": 2, "sub_element_index": 3},
+                ],
+                deletion.details["element_deletions"],
+            )
             self.assertFalse([item for item in findings if item.severity == "error"])
 
     def test_sector_reviews_are_aggregated_by_mod_set(self) -> None:

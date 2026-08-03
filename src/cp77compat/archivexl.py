@@ -67,7 +67,7 @@ SECTION_COVERAGE = {
     ),
     "streaming": (
         "partial",
-        "Blocks, sectors, and node deletions are analyzed.",
+        "Blocks, sectors, and full/partial node deletions are analyzed; node mutations remain sector-level overlaps.",
     ),
 }
 
@@ -206,6 +206,19 @@ def _as_paths(value: Any, fallback_line: int | None = None) -> list[tuple[str, i
             paths.extend(_as_paths(item, line or fallback_line))
         return paths
     return []
+
+
+def _integer(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value.strip(), 10)
+        except ValueError:
+            return None
+    return None
 
 
 def parse_documents(artifacts: Iterable[Artifact]) -> tuple[list[ArchiveXLDocument], list[Reference], list[Finding]]:
@@ -1176,6 +1189,41 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                             index_line = _mapping_line(
                                 deletion, "index", deletion_line or path_line
                             )
+                            element_deletions: list[dict[str, int]] = []
+                            deletion_fields: list[str] = []
+                            expected_elements: list[Any] = []
+                            for deletion_field, expected_field in (
+                                ("actorDeletions", "expectedActors"),
+                                ("instanceDeletions", "expectedInstances"),
+                            ):
+                                values = deletion.get(deletion_field)
+                                if not isinstance(values, list):
+                                    continue
+                                deletion_fields.append(deletion_field)
+                                expected_elements.append(
+                                    _integer(deletion.get(expected_field))
+                                )
+                                for value in values:
+                                    element_index = _integer(value)
+                                    if element_index is not None:
+                                        element_deletions.append(
+                                            {
+                                                "element_index": element_index,
+                                                "sub_element_index": -1,
+                                            }
+                                        )
+                                    elif (
+                                        isinstance(value, list)
+                                        and len(value) == 2
+                                        and _integer(value[0]) is not None
+                                        and _integer(value[1]) is not None
+                                    ):
+                                        element_deletions.append(
+                                            {
+                                                "element_index": _integer(value[0]),
+                                                "sub_element_index": _integer(value[1]),
+                                            }
+                                        )
                             refs.append(
                                 _reference(
                                     document,
@@ -1185,9 +1233,101 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                                     sector=path,
                                     index=deletion["index"],
                                     node_type=deletion.get("type"),
+                                    deletion_scope=(
+                                        "partial" if element_deletions else "full"
+                                    ),
+                                    effective_deletion_scope=(
+                                        "partial"
+                                        if element_deletions
+                                        and deletion.get("type")
+                                        in {
+                                            "worldCollisionNode",
+                                            "worldInstancedMeshNode",
+                                            "worldInstancedDestructibleMeshNode",
+                                        }
+                                        else "full"
+                                    ),
+                                    deletion_fields=deletion_fields,
+                                    expected_elements=expected_elements,
+                                    element_deletions=element_deletions,
                                 )
                             )
     return refs
+
+
+def _node_deletion_outcome(
+    group: list[Reference],
+) -> tuple[str, str, str, str]:
+    node_types = {
+        str(reference.details.get("node_type") or "") for reference in group
+    }
+    if len(node_types) > 1:
+        return (
+            "conflict",
+            "high",
+            "AXL-NODE-DELETION-TYPE-CONFLICT",
+            "These mods target the same sector node index with different expected native types. ArchiveXL validates the type before applying a sector patch, so at least one declaration cannot match the loaded node.",
+        )
+
+    partial = [
+        reference
+        for reference in group
+        if reference.details.get(
+            "effective_deletion_scope", reference.details.get("deletion_scope")
+        )
+        == "partial"
+    ]
+    expected_counts = {
+        value
+        for reference in partial
+        for value in reference.details.get("expected_elements", [])
+        if value is not None
+    }
+    if len(expected_counts) > 1:
+        return (
+            "conflict",
+            "high",
+            "AXL-NODE-DELETION-COUNT-CONFLICT",
+            "These partial deletions expect different actor/instance counts for the same node. ArchiveXL validates the live count before applying each whole sector patch, so the declarations cannot all describe the same loaded node state.",
+        )
+
+    collision_shape_patches = [
+        reference
+        for reference in partial
+        if reference.details.get("node_type") == "worldCollisionNode"
+        and any(
+            int(element.get("sub_element_index", -1)) >= 0
+            for element in reference.details.get("element_deletions", [])
+        )
+    ]
+    if len(collision_shape_patches) > 1:
+        return (
+            "conflict",
+            "high",
+            "AXL-NODE-DELETION-COLLISION-SHAPE-CONFLICT",
+            "Multiple mods delete individual collision shapes from the same node. ArchiveXL stores one shared preset override per sector/node; subsequent patches reuse that allocation while extending its logical size, so this overlap is not safely idempotent or composable.",
+        )
+
+    if not partial:
+        return (
+            "info",
+            "high",
+            "AXL-NODE-DELETION-IDEMPOTENT",
+            "These mods repeat the same full-node deletion. ArchiveXL hides or moves nodes in place without removing or renumbering them, so applying the same deletion again is idempotent.",
+        )
+    if len(partial) != len(group):
+        return (
+            "info",
+            "high",
+            "AXL-NODE-DELETION-REDUNDANT",
+            "A full-node deletion overlaps partial element deletions on the same node. ArchiveXL keeps node and element indices stable; the full deletion makes the partial operations redundant rather than incompatible.",
+        )
+    return (
+        "info",
+        "high",
+        "AXL-NODE-DELETION-COMPOSABLE",
+        "These mods hide elements within the same node. ArchiveXL does not remove or renumber the element buffers, so disjoint deletions compose and repeated element deletions are idempotent.",
+    )
 
 
 def compare_references(references: Iterable[Reference]) -> list[Finding]:
@@ -1227,14 +1367,12 @@ def compare_references(references: Iterable[Reference]) -> list[Finding]:
                     "Multiple mods patch the same streaming sector; operations may still be additive.",
                 )
         elif kind == "streaming.node_deletion":
-            severity, rule, explanation = (
-                "conflict",
-                "AXL-NODE-DELETION-DUPLICATE",
-                "Multiple mods delete the same node index from the same streaming sector.",
-            )
+            severity, confidence, rule, explanation = _node_deletion_outcome(group)
         else:
             continue
-        if rule in {"AXL-SECTOR-MULTI-PATCH", "AXL-NODE-DELETION-DUPLICATE"}:
+        if rule == "AXL-SECTOR-MULTI-PATCH" or rule.startswith(
+            "AXL-NODE-DELETION-"
+        ):
             aggregate[(rule, tuple(mods))].append((first.identity, group))
             continue
         findings.append(
@@ -1256,23 +1394,31 @@ def compare_references(references: Iterable[Reference]) -> list[Finding]:
         if rule == "AXL-SECTOR-MULTI-PATCH":
             severity = "review"
             noun = "streaming sector" if count == 1 else "streaming sectors"
+            summary = f"{count} overlapping {noun}"
             explanation = (
                 "These mods patch the same sectors. Different node operations may "
                 "be compatible, so manual review is required."
             )
         else:
-            severity = "conflict"
-            noun = "streaming node deletion" if count == 1 else "streaming node deletions"
-            explanation = (
-                "These mods delete the same node indices from the same sectors, "
-                "indicating duplicated or overlapping world patches."
+            severity, confidence, _classified_rule, explanation = (
+                _node_deletion_outcome(overlaps[0][1])
             )
+            labels = {
+                "AXL-NODE-DELETION-IDEMPOTENT": "idempotent full-node deletion overlap",
+                "AXL-NODE-DELETION-COMPOSABLE": "composable partial-node deletion overlap",
+                "AXL-NODE-DELETION-REDUNDANT": "redundant full/partial node deletion overlap",
+                "AXL-NODE-DELETION-TYPE-CONFLICT": "node deletion type conflict",
+                "AXL-NODE-DELETION-COUNT-CONFLICT": "node deletion element-count conflict",
+                "AXL-NODE-DELETION-COLLISION-SHAPE-CONFLICT": "collision-shape deletion conflict",
+            }
+            noun = labels[rule] + ("s" if count != 1 else "")
+            summary = f"{count} {noun}"
         findings.append(
             Finding(
                 rule_id=rule,
                 severity=severity,
-                confidence="high" if severity == "conflict" else "medium",
-                summary=f"{count} overlapping {noun}",
+                confidence=confidence if rule != "AXL-SECTOR-MULTI-PATCH" else "medium",
+                summary=summary,
                 explanation=explanation,
                 participants=list(mods),
                 evidence=[

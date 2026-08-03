@@ -52,8 +52,12 @@ frozen-corpus validation pass are complete.
 - [x] Inspect identities inside serialized resource patch payloads when two or
   more mods patch the same target.
 - [x] Add `customizations` identity and slot/group collision checks.
-- [ ] Determine whether duplicate streaming node deletions are always unsafe,
+- [x] Determine whether duplicate streaming node deletions are always unsafe,
   idempotent, or rule-dependent; adjust confidence/severity accordingly.
+- [ ] Parse the one installed ArchiveXL `player` declaration and compare its
+  effective player-state operation identities.
+- [ ] Parse `streaming.nodeMutations` below sector level and distinguish
+  disjoint property/element mutations from incompatible writes.
 - [x] Correlate the newest rotated ArchiveXL log session with semantic
   references, pairing consequence messages and
   consolidating repeated events without discarding evidence.

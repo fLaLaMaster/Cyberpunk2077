@@ -12,7 +12,9 @@ Implemented analysis includes:
 - ArchiveXL YAML/JSON parsing;
 - WolvenKit CLI archive member indexing plus exact, cache-backed selective
   payload extraction;
-- ArchiveXL reference resolution and streaming overlap checks;
+- ArchiveXL reference resolution and streaming overlap checks, including
+  ArchiveXL-aware classification of full-node, partial-element, and collision
+  shape deletions;
 - ArchiveXL `resource.patch`, `copy`, `link`, `scope`, and `fix` declaration
   analysis;
 - ArchiveXL on-screen localization payload serialization and locale-scoped
@@ -71,6 +73,14 @@ shared options with distinct choices are normal composition. A native-type
 mismatch is a conflict, while a repeated appearance, morph, or switcher choice
 with different content is a load-order replacement conflict. Wildcard slot
 selectors are checked using the same directional prefix rule as ArchiveXL.
+
+Streaming node deletions are compared at sector/node level while retaining
+native type, full-versus-partial scope, expected actor/instance counts, and
+individual actor/instance/shape indices. Repeated full-node deletion is
+informational because ArchiveXL hides nodes in place and keeps indices stable.
+Compatible partial element deletions compose. Type/count disagreements and
+multiple collision-shape patches remain conflicts; the latter exercise a
+non-idempotent shared collision-preset override path in ArchiveXL.
 
 The TweakXL parser preserves YAML anchors, aliases, repeated template roots,
 and the `!append`, `!append-once`, `!append-from`, `!prepend`,

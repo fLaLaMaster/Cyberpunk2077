@@ -127,7 +127,9 @@ python -m unittest discover -s tests -v
   retains mapping/sequence source locations, compares streaming, resource, and
   quest phase operations, resolves resources plus custom quest parents against
   indexed archives or loose mod files, and compares whole-definition,
-  case-sensitive visual-tag component overrides.
+  case-sensitive visual-tag component overrides. Streaming node deletion
+  references preserve native type, declared/effective scope, expected element
+  counts, and actor/instance/shape indices.
 - `src/cp77compat/archivexl_runtime.py`
   Selects the newest ArchiveXL session, streams all rotated chunks in
   chronological order, pairs root-cause and consequence messages, attributes
@@ -189,7 +191,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.13.0 scan on 2026-08-03 reported:
+The successful v0.14.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -240,13 +242,13 @@ The successful v0.13.0 scan on 2026-08-03 reported:
   attributed and consolidated into four findings; all four quest events have
   exact static missing-target confirmations.
 - 59 consolidated findings overall:
-  - 6 conflict candidates.
+  - 1 conflict candidate.
   - 9 errors.
   - 9 warnings.
   - 16 review groups.
-  - 19 informational findings.
+  - 24 informational findings.
 - Zero WolvenKit indexing failures.
-- Sixty-five automated tests passing.
+- Seventy automated tests passing.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
@@ -265,8 +267,10 @@ Important current findings:
 
 1. Immersive Night City Fixes and TheNullifier patch the same streaming sector
    with different `expectedNodes` values: 1237 versus 1263.
-2. Five participant groups delete identical streaming node indices. The largest
-   is 29 overlaps between Immersive Night City Fixes and Road Fix V2.
+2. Five participant groups repeat 40 full streaming-node deletions. ArchiveXL
+   hides these nodes in place without removing or renumbering them, so all five
+   groups are high-confidence informational/idempotent overlaps. The largest is
+   29 shared deletions between Immersive Night City Fixes and Road Fix V2.
 3. Better Armor Tooltip declares
    `better_armor_tooltip\localization\es-mx.json`, but that resource is absent.
 4. NCEE NPC declares
@@ -354,6 +358,15 @@ payload level. Coverage includes exact resource resolution, ArchiveXL's
 anonymous appearance inheritance, named linked-option behavior, wildcard slot
 matching, group append semantics, native option types, and appearance/morph/
 switcher choice replacement identities.
+Streaming deletion analysis distinguishes full nodes, partial actors/instances,
+and collision shapes. Same-type full deletions and ordinary partial deletions
+are idempotent/composable; native-type or expected-element disagreements are
+conflicts. Multiple collision-shape deletion patches on one node remain a
+conflict because ArchiveXL's shared collision-preset override is not safely
+resized on later patches. The frozen corpus has 10,812 deletion references:
+10,635 declared full and 177 declared partial, resolving to 10,672 effective
+full and 140 effective partial operations. All 40 cross-mod overlaps are safe
+full-node repetitions.
 
 ## Generated reports
 
