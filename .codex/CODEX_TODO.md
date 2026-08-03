@@ -42,7 +42,7 @@ frozen-corpus validation pass are complete.
   and target `.ent`/`.app` paths.
 - [x] Verify factory target resources exist in the declaring mod or document an
   implicit cross-mod dependency.
-- [ ] Parse and analyze `quest.phases` operations and parent targets.
+- [x] Parse and analyze `quest.phases` operations and parent targets.
 - [ ] Parse and analyze `journal` resources.
 - [ ] Parse and analyze `overrides` operations.
 - [x] Parse `resource.patch`, `copy`, `link`, `scope`, and `fix`, preserving
@@ -55,7 +55,7 @@ frozen-corpus validation pass are complete.
 - [ ] Determine whether duplicate streaming node deletions are always unsafe,
   idempotent, or rule-dependent; adjust confidence/severity accordingly.
 - [x] Correlate the newest rotated ArchiveXL log session with semantic
-  references and source-text declarations, pairing consequence messages and
+  references, pairing consequence messages and
   consolidating repeated events without discarding evidence.
 
 ## TweakXL analyzer

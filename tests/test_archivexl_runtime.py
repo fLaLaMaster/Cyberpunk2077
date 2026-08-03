@@ -111,6 +111,11 @@ class ArchiveXLRuntimeTests(unittest.TestCase):
             ]
             references = [
                 Reference(
+                    "archivexl", "quest.parent",
+                    r"mod\quest\missing.quest", "Quest Mod", str(quest), 3,
+                    {"phase": r"mod\quest\child.questphase"},
+                ),
+                Reference(
                     "archivexl", "localization.onscreens",
                     r"mod\localization\en-us.json", "Localization Mod",
                     str(localization), 3,
@@ -122,6 +127,10 @@ class ArchiveXLRuntimeTests(unittest.TestCase):
                 ),
             ]
             static = [
+                Finding(
+                    "AXL-QUEST-PARENT-NOT-FOUND", "warning", "high", "quest", "quest",
+                    ["Quest Mod"], [{"identity": r"mod\quest\missing.quest"}],
+                ),
                 Finding(
                     "AXL-SECTOR-EXPECTED-NODES", "conflict", "high", "sector", "sector",
                     ["World Mod"], [{"identity": r"base\world.streamingsector"}],
@@ -136,7 +145,7 @@ class ArchiveXLRuntimeTests(unittest.TestCase):
             self.assertEqual(2, coverage["errors"])
             self.assertEqual(2, coverage["warnings"])
             self.assertEqual(4, coverage["correlated_events"])
-            self.assertEqual(2, coverage["static_confirmations"])
+            self.assertEqual(3, coverage["static_confirmations"])
             quest_finding = next(
                 item for item in findings if item.rule_id == "AXL-RUNTIME-QUEST-PHASE-MISSING"
             )

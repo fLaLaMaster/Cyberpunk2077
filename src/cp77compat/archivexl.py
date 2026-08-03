@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,8 +58,8 @@ SECTION_COVERAGE = {
         "Player declarations are not interpreted yet.",
     ),
     "quest": (
-        "unsupported",
-        "Quest phase operations are not interpreted yet.",
+        "partial",
+        "Quest phase merges and attachment points are compared; archive-backed phase and parent resolution requires archive indexing.",
     ),
     "resource": (
         "partial",
@@ -586,6 +587,111 @@ def _extract_resource_references(
     return refs
 
 
+def _quest_shape_finding(
+    document: ArchiveXLDocument,
+    explanation: str,
+    line: int | None,
+) -> Finding:
+    return Finding(
+        rule_id="AXL-QUEST-SHAPE",
+        severity="error",
+        confidence="high",
+        summary="Invalid ArchiveXL quest.phases declaration",
+        explanation=explanation,
+        participants=[document.artifact.mod_name],
+        evidence=[{"path": str(document.artifact.absolute_path), "line": line}],
+    )
+
+
+def _plain_value(value: Any) -> Any:
+    """Return a stable JSON-compatible representation of a YAML value."""
+    if isinstance(value, ArchiveXLTagged):
+        return {"tag": value.tag, "value": _plain_value(value.value)}
+    if isinstance(value, dict):
+        return {str(key): _plain_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_plain_value(item) for item in value]
+    return value
+
+
+def _extract_quest_references(
+    document: ArchiveXLDocument,
+    quest: dict[Any, Any],
+    findings: list[Finding],
+) -> list[Reference]:
+    phases_line = _mapping_line(quest, "phases", _mapping_line(document.data, "quest"))
+    phases = quest.get("phases")
+    if not isinstance(phases, list):
+        findings.append(
+            _quest_shape_finding(
+                document,
+                "quest.phases must be a sequence of phase merge mappings.",
+                phases_line,
+            )
+        )
+        return []
+
+    refs: list[Reference] = []
+    for declaration, declaration_line in _sequence_entries(phases):
+        if not isinstance(declaration, dict):
+            findings.append(
+                _quest_shape_finding(
+                    document,
+                    "Every quest.phases item must be a mapping.",
+                    declaration_line or phases_line,
+                )
+            )
+            continue
+        path = declaration.get("path")
+        parent = declaration.get("parent")
+        if not isinstance(path, str) or not isinstance(parent, str):
+            findings.append(
+                _quest_shape_finding(
+                    document,
+                    "Every quest phase merge requires string path and parent fields.",
+                    declaration_line or phases_line,
+                )
+            )
+            continue
+
+        attachment_keys = [key for key in ("connection", "input") if key in declaration]
+        if len(attachment_keys) > 1:
+            findings.append(
+                _quest_shape_finding(
+                    document,
+                    "A quest phase merge cannot declare both connection and input.",
+                    _mapping_line(declaration, attachment_keys[1], declaration_line),
+                )
+            )
+            continue
+        attachment_kind = attachment_keys[0] if attachment_keys else "root"
+        attachment = (
+            _plain_value(declaration.get(attachment_kind))
+            if attachment_keys
+            else None
+        )
+        attachment_key = json.dumps(
+            attachment,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        path_line = _mapping_line(declaration, "path", declaration_line)
+        parent_line = _mapping_line(declaration, "parent", declaration_line)
+        common = {
+            "phase": path,
+            "phase_line": path_line,
+            "parent": parent,
+            "parent_line": parent_line,
+            "attachment_kind": attachment_kind,
+            "attachment": attachment,
+            "attachment_key": attachment_key,
+        }
+        refs.append(_reference(document, "quest.phase", path, path_line, **common))
+        refs.append(_reference(document, "quest.parent", parent, parent_line, **common))
+    return refs
+
+
 def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) -> list[Reference]:
     data = document.data
     refs: list[Reference] = []
@@ -593,6 +699,19 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
     resource = data.get("resource")
     if isinstance(resource, dict):
         refs.extend(_extract_resource_references(document, resource, findings))
+
+    quest = data.get("quest")
+    if quest is not None:
+        if isinstance(quest, dict):
+            refs.extend(_extract_quest_references(document, quest, findings))
+        else:
+            findings.append(
+                _quest_shape_finding(
+                    document,
+                    "quest must be a mapping containing a phases sequence.",
+                    _mapping_line(data, "quest"),
+                )
+            )
 
     localization = data.get("localization")
     if isinstance(localization, dict):
@@ -781,6 +900,76 @@ def compare_references(references: Iterable[Reference]) -> list[Finding]:
                 ],
             )
         )
+    return findings
+
+
+def compare_quest_references(references: Iterable[Reference]) -> list[Finding]:
+    """Compare only identical child/parent quest merges across different mods."""
+    by_phase_parent: dict[tuple[str, str], list[Reference]] = defaultdict(list)
+    for reference in references:
+        if reference.kind != "quest.phase":
+            continue
+        parent = reference.details.get("parent")
+        if isinstance(parent, str):
+            by_phase_parent[
+                (reference.normalized_identity, normalize_game_path(parent))
+            ].append(reference)
+
+    findings: list[Finding] = []
+    for (_phase, _parent), group in by_phase_parent.items():
+        mods = sorted({reference.mod_name for reference in group}, key=str.casefold)
+        if len(mods) < 2:
+            continue
+        signatures: dict[tuple[str, str], list[Reference]] = defaultdict(list)
+        for reference in group:
+            signatures[
+                (
+                    str(reference.details.get("attachment_kind", "root")),
+                    str(reference.details.get("attachment_key", "null")),
+                )
+            ].append(reference)
+
+        duplicate_refs = [
+            refs
+            for refs in signatures.values()
+            if len({reference.mod_name for reference in refs}) > 1
+        ]
+        for refs in duplicate_refs:
+            participants = sorted(
+                {reference.mod_name for reference in refs}, key=str.casefold
+            )
+            findings.append(
+                Finding(
+                    rule_id="AXL-QUEST-MERGE-DUPLICATE",
+                    severity="warning",
+                    confidence="high",
+                    summary=f"Duplicate quest phase merge: {refs[0].identity}",
+                    explanation=(
+                        "Multiple mods attach the same child phase to the same parent "
+                        "at the same connection or input. The merge may be applied more "
+                        "than once and should be reviewed as a duplicated integration."
+                    ),
+                    participants=participants,
+                    evidence=[reference.to_dict() for reference in refs],
+                )
+            )
+
+        if len(signatures) > 1:
+            findings.append(
+                Finding(
+                    rule_id="AXL-QUEST-ATTACHMENT-OVERLAP",
+                    severity="review",
+                    confidence="medium",
+                    summary=f"Quest phase has competing attachment points: {group[0].identity}",
+                    explanation=(
+                        "Multiple mods attach the same child phase to the same parent "
+                        "using different connection or input descriptors. This may be "
+                        "intentional, but it can also insert the same phase more than once."
+                    ),
+                    participants=mods,
+                    evidence=[reference.to_dict() for reference in group],
+                )
+            )
     return findings
 
 
@@ -1009,11 +1198,161 @@ def build_archivexl_coverage(
                 ),
             }
         )
+    quest_phase_refs = [
+        reference for reference in reference_list if reference.kind == "quest.phase"
+    ]
+    quest_operations = []
+    if quest_phase_refs:
+        quest_operations.append(
+            {
+                "name": "quest.phases",
+                "documents": len({reference.source_path for reference in quest_phase_refs}),
+                "declarations": len(quest_phase_refs),
+                "phase_own": "pending",
+                "phase_cross_mod": "pending",
+                "phase_missing": "pending",
+                "parent_official": "pending",
+                "parent_own": "pending",
+                "parent_cross_mod": "pending",
+                "parent_missing": "pending",
+                "missing_targets": "pending",
+                "status": "partial",
+                "note": (
+                    "Child/parent identities and attachment points are parsed and "
+                    "compared; resource resolution requires archive indexing."
+                ),
+            }
+        )
     return {
         "documents": len(document_list),
         "sections": sections,
         "resource_operations": resource_operations,
+        "quest_operations": quest_operations,
     }
+
+
+def resolve_quest_references(
+    references: Iterable[Reference],
+    manifests: Iterable[ArchiveManifest],
+    artifacts: Iterable[Artifact] = (),
+) -> tuple[list[Finding], dict[str, Any]]:
+    """Resolve quest child phases and custom parent targets against mod resources."""
+    by_mod: dict[str, set[str]] = defaultdict(set)
+    global_members: dict[str, set[str]] = defaultdict(set)
+    for manifest in manifests:
+        for member in manifest.members:
+            by_mod[manifest.mod_name].add(member.normalized_path)
+            global_members[member.normalized_path].add(manifest.mod_name)
+
+    archive_prefix = "archive\\pc\\mod\\"
+    for artifact in artifacts:
+        normalized = artifact.normalized_path
+        candidates = {normalized}
+        if normalized.startswith(archive_prefix):
+            candidates.add(normalized[len(archive_prefix):])
+        for candidate in candidates:
+            by_mod[artifact.mod_name].add(candidate)
+            global_members[candidate].add(artifact.mod_name)
+
+    phase_refs = [reference for reference in references if reference.kind == "quest.phase"]
+    parent_refs = [reference for reference in references if reference.kind == "quest.parent"]
+    stats: dict[str, Any] = {
+        "name": "quest.phases",
+        "documents": len({reference.source_path for reference in phase_refs}),
+        "declarations": len(phase_refs),
+        "phase_own": 0,
+        "phase_cross_mod": 0,
+        "phase_missing": 0,
+        "parent_official": 0,
+        "parent_own": 0,
+        "parent_cross_mod": 0,
+        "parent_missing": 0,
+        "missing_targets": 0,
+        "status": "analyzed",
+        "note": (
+            "Child phase resources and custom parent targets are resolved; official "
+            "base, expansion, and DLC parents are recognized without indexing game archives."
+        ),
+    }
+    grouped: dict[
+        tuple[str, str, tuple[str, ...]], list[Reference]
+    ] = defaultdict(list)
+
+    for reference in [*phase_refs, *parent_refs]:
+        identity = reference.normalized_identity
+        role = "phase" if reference.kind == "quest.phase" else "parent"
+        if role == "parent" and identity.startswith(("base\\", "ep1\\", "dlc\\")):
+            stats["parent_official"] += 1
+            continue
+        if identity in by_mod.get(reference.mod_name, set()):
+            stats[f"{role}_own"] += 1
+            continue
+        providers = tuple(
+            sorted(global_members.get(identity, set()), key=str.casefold)
+        )
+        if providers:
+            stats[f"{role}_cross_mod"] += 1
+            grouped[(f"cross-{role}", identity, providers)].append(reference)
+        else:
+            stats[f"{role}_missing"] += 1
+            grouped[(f"missing-{role}", identity, ())].append(reference)
+
+    stats["missing_targets"] = len(
+        {
+            identity
+            for (state, identity, _providers) in grouped
+            if state.startswith("missing-")
+        }
+    )
+    findings: list[Finding] = []
+    for (state, _identity, providers), group in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0], item[0][1]),
+    ):
+        reference = group[0]
+        role = "child phase" if state.endswith("phase") else "parent target"
+        if state.startswith("cross-"):
+            rule_id = (
+                "AXL-QUEST-CROSS-MOD-PHASE"
+                if state.endswith("phase")
+                else "AXL-QUEST-CROSS-MOD-PARENT"
+            )
+            participants = sorted(
+                {item.mod_name for item in group} | set(providers), key=str.casefold
+            )
+            explanation = (
+                f"The declaring mod does not provide this quest {role}, but another "
+                "installed mod does. The quest merge therefore has an implicit dependency."
+            )
+            evidence = [
+                {**item.to_dict(), "providers": list(providers)} for item in group
+            ]
+            summary = f"Quest {role} comes from another mod: {reference.identity}"
+        else:
+            rule_id = (
+                "AXL-QUEST-PHASE-NOT-FOUND"
+                if state.endswith("phase")
+                else "AXL-QUEST-PARENT-NOT-FOUND"
+            )
+            participants = sorted({item.mod_name for item in group}, key=str.casefold)
+            explanation = (
+                f"The quest {role} was not present as a loose mod file or in any "
+                "indexed mod archive. ArchiveXL cannot apply declarations that depend on it."
+            )
+            evidence = [item.to_dict() for item in group]
+            summary = f"Quest {role} was not found: {reference.identity}"
+        findings.append(
+            Finding(
+                rule_id=rule_id,
+                severity="warning",
+                confidence="high",
+                summary=summary,
+                explanation=explanation,
+                participants=participants,
+                evidence=evidence,
+            )
+        )
+    return findings, stats
 
 
 def resolve_archive_references(

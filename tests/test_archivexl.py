@@ -7,10 +7,12 @@ from pathlib import Path
 from cp77compat.archives import parse_archive_list_output
 from cp77compat.archivexl import (
     build_archivexl_coverage,
+    compare_quest_references,
     compare_references,
     compare_resource_references,
     parse_documents,
     resolve_archive_references,
+    resolve_quest_references,
 )
 from cp77compat.archivexl_payload_analysis import (
     compare_factory_entries,
@@ -37,6 +39,98 @@ def artifact(path: Path, mod: str) -> Artifact:
 
 
 class ArchiveXLTests(unittest.TestCase):
+    def test_extracts_quest_phase_parent_and_attachment_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "quest.xl"
+            path.write_text(
+                """quest:
+  phases:
+    - path: mod\\example\\child.questphase
+      parent: base\\quest\\cyberpunk2077.quest
+      input:
+        node: [4]
+        socket: Out1
+""",
+                encoding="utf-8",
+            )
+            documents, references, findings = parse_documents(
+                [artifact(path, "Example")]
+            )
+            self.assertEqual([], findings)
+            self.assertEqual({"quest.phase", "quest.parent"}, {r.kind for r in references})
+            phase = next(r for r in references if r.kind == "quest.phase")
+            parent = next(r for r in references if r.kind == "quest.parent")
+            self.assertEqual(3, phase.line)
+            self.assertEqual(4, parent.line)
+            self.assertEqual("input", phase.details["attachment_kind"])
+            self.assertEqual({"node": [4], "socket": "Out1"}, phase.details["attachment"])
+            coverage = build_archivexl_coverage(documents, references)
+            self.assertEqual(1, coverage["quest_operations"][0]["declarations"])
+
+    def test_duplicate_quest_merge_is_reported_without_flagging_shared_parent(self) -> None:
+        duplicate = [
+            Reference(
+                "archivexl", "quest.phase", r"mod\shared.questphase", mod,
+                f"{mod}.xl", details={
+                    "parent": r"base\quest\cyberpunk2077.quest",
+                    "attachment_kind": "connection",
+                    "attachment_key": "[1,2,3]",
+                },
+            )
+            for mod in ("A", "B")
+        ]
+        shared_parent_only = Reference(
+            "archivexl", "quest.phase", r"mod\different.questphase", "C", "c.xl",
+            details={
+                "parent": r"base\quest\cyberpunk2077.quest",
+                "attachment_kind": "root",
+                "attachment_key": "null",
+            },
+        )
+        findings = compare_quest_references([*duplicate, shared_parent_only])
+        self.assertEqual(1, len(findings))
+        self.assertEqual("AXL-QUEST-MERGE-DUPLICATE", findings[0].rule_id)
+
+    def test_quest_resolution_distinguishes_owned_official_cross_mod_and_missing(self) -> None:
+        references = [
+            Reference("archivexl", "quest.phase", r"mod\owned.questphase", "A", "a.xl"),
+            Reference("archivexl", "quest.parent", r"base\quest\cyberpunk2077.quest", "A", "a.xl"),
+            Reference("archivexl", "quest.phase", r"mod\foreign.questphase", "A", "a.xl"),
+            Reference("archivexl", "quest.parent", r"mod\foreign.quest", "A", "a.xl"),
+            Reference("archivexl", "quest.phase", r"mod\missing.questphase", "A", "a.xl"),
+            Reference("archivexl", "quest.parent", r"mod\missing.quest", "A", "a.xl"),
+        ]
+        manifests = [
+            ArchiveManifest(
+                "A", "a.archive", "a" * 64, 1, "test",
+                [ArchiveMember(r"mod\owned.questphase")],
+            ),
+            ArchiveManifest(
+                "B", "b.archive", "b" * 64, 1, "test",
+                [
+                    ArchiveMember(r"mod\foreign.questphase"),
+                    ArchiveMember(r"mod\foreign.quest"),
+                ],
+            ),
+        ]
+        findings, stats = resolve_quest_references(references, manifests)
+        self.assertEqual(
+            {
+                "AXL-QUEST-CROSS-MOD-PARENT",
+                "AXL-QUEST-CROSS-MOD-PHASE",
+                "AXL-QUEST-PARENT-NOT-FOUND",
+                "AXL-QUEST-PHASE-NOT-FOUND",
+            },
+            {finding.rule_id for finding in findings},
+        )
+        self.assertEqual(1, stats["phase_own"])
+        self.assertEqual(1, stats["phase_cross_mod"])
+        self.assertEqual(1, stats["phase_missing"])
+        self.assertEqual(1, stats["parent_official"])
+        self.assertEqual(1, stats["parent_cross_mod"])
+        self.assertEqual(1, stats["parent_missing"])
+        self.assertEqual(2, stats["missing_targets"])
+
     def test_patch_payload_named_objects_have_stable_identities(self) -> None:
         declaration = Reference(
             "archivexl",

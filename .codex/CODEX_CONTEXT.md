@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last updated: 2026-08-02
+Last updated: 2026-08-03
 
 ## Purpose
 
@@ -119,14 +119,14 @@ python -m unittest discover -s tests -v
 - `src/cp77compat/archivexl.py`
   Parses YAML and JSON `.xl` files, rejects duplicate YAML keys, tolerates the
   tab variants present in the frozen corpus, extracts ArchiveXL references,
-  retains mapping/sequence source locations, compares streaming and resource
-  operations, and resolves resources against indexed archives or loose mod
-  files.
+  retains mapping/sequence source locations, compares streaming, resource, and
+  quest phase operations, and resolves resources plus custom quest parents
+  against indexed archives or loose mod files.
 - `src/cp77compat/archivexl_runtime.py`
   Selects the newest ArchiveXL session, streams all rotated chunks in
   chronological order, pairs root-cause and consequence messages, attributes
   localization/streaming events through semantic references, and maps missing
-  quest phases through exact source declarations.
+  quest phases through exact child or parent references.
 - `src/cp77compat/tweakxl.py`
   Parses deployed `.yaml` and `.yml` files under `r6/tweaks`, preserves YAML
   anchors, aliases, duplicate template roots, and TweakXL tags, expands
@@ -181,7 +181,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.9.0 scan on 2026-08-03 reported:
+The successful v0.10.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -189,9 +189,9 @@ The successful v0.9.0 scan on 2026-08-03 reported:
   framework bundle placeholder.
 - 78 ArchiveXL-related archives indexed.
 - 5,458 indexed archive members.
-- 48,366 extracted ArchiveXL references: 35,926 declaration/streaming/resource
-  references, 4,124 serialized localization entries, 14 factory entity rows,
-  and 8,302 target-scoped resource patch inner identities.
+- 48,962 extracted ArchiveXL references, including 596 child/parent references
+  from 298 quest phase merges, 4,124 serialized localization entries, 14
+  factory entity rows, and 8,302 target-scoped resource patch inner identities.
 - 216 deployed TweakXL YAML files: 214 non-empty configs parsed and two empty
   configs reported informationally.
 - 57,455 concrete TweakXL references after `$instances` expansion.
@@ -219,15 +219,16 @@ The successful v0.9.0 scan on 2026-08-03 reported:
   runtime findings; the static `$base` capitalization error was confirmed.
 - The newest ArchiveXL runtime session spans two rotated files, 137,845,003
   bytes, and 472,639 lines. Its two errors and six warnings were fully
-  attributed and consolidated into four findings.
-- 53 consolidated findings overall:
+  attributed and consolidated into four findings; all four quest events have
+  exact static missing-target confirmations.
+- 57 consolidated findings overall:
   - 6 conflict candidates.
   - 9 errors.
-  - 5 warnings.
+  - 9 warnings.
   - 16 review groups.
   - 17 informational findings.
 - Zero WolvenKit indexing failures.
-- Fifty automated tests passing.
+- Fifty-three automated tests passing.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
@@ -307,8 +308,9 @@ Shared-target resource patch payload counts and disjoint/duplicate/conflict/
 uninspected outcomes are recorded there as well. ArchiveXL runtime coverage
 records the selected session, rotated files, byte/line counts, event
 attribution, static correlations, and consolidated findings. Quest coverage is
-partial because missing phases are runtime-attributed while general static
-quest operation comparison remains pending.
+analyzed for all 298 installed `quest.phases` merges: child resources and custom
+parents are resolved, attachment identities are compared, official parents are
+classified, and all four runtime missing targets confirm matching static rules.
 TweakXL coverage now includes record-provider indexing, `$base` resolution and
 cycle counts, explicit foreign-key results, and conservative implicit
 custom-provider matches. Arbitrary implicit scalar values remain partial rather

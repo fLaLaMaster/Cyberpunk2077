@@ -301,6 +301,13 @@ def _static_correlations(
         allowed = {"AXL-RESOURCE-NOT-INDEXED", "AXL-CROSS-MOD-RESOURCE", "AXL-PAYLOAD-FAILED"}
     elif event.rule_id == "AXL-RUNTIME-STREAMING-EXPECTED-NODES":
         allowed = {"AXL-SECTOR-EXPECTED-NODES", "AXL-SECTOR-MULTI-PATCH"}
+    elif event.rule_id == "AXL-RUNTIME-QUEST-PHASE-MISSING":
+        allowed = {
+            "AXL-QUEST-PHASE-NOT-FOUND",
+            "AXL-QUEST-PARENT-NOT-FOUND",
+            "AXL-QUEST-CROSS-MOD-PHASE",
+            "AXL-QUEST-CROSS-MOD-PARENT",
+        }
     else:
         return []
     normalized = normalize_game_path(event.identity)
@@ -399,8 +406,8 @@ def analyze_archivexl_runtime_logs(
             "high",
             "missing quest phases",
             "ArchiveXL skipped quest phase operations because the referenced parent or phase "
-            "resource does not exist in the active loadout. Source-text matches identify all "
-            "installed declarations that depend on each missing phase.",
+            "resource does not exist in the active loadout. Semantic quest references identify "
+            "all installed declarations that depend on each missing phase.",
         ),
         "AXL-RUNTIME-LOCALIZATION-FAILED": (
             "error",

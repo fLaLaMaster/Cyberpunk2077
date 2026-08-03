@@ -6,14 +6,52 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.9.0`
+- Scanner version: `0.10.0`
 - Implemented ecosystems: ArchiveXL and TweakXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 50 passing
+- Automated tests: 53 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — ArchiveXL quest phase analysis
+
+Completed static `quest.phases` parsing, comparison, dependency resolution, and
+runtime confirmation against the frozen collection.
+
+Changes:
+
+- Added structural extraction of child phase paths, parent targets, and
+  `connection`/`input` attachment descriptors with one-based lines.
+- Added shape validation, exact duplicate-merge warnings, and conservative
+  review findings for the same child/parent pair using different attachment
+  points. Merely sharing a parent remains explicitly composable.
+- Resolved child and custom parent paths against indexed mod archives and loose
+  resources. Official `base`, `ep1`, and `dlc` parents are recognized without
+  indexing the game's large vanilla archives.
+- Consolidated repeated missing targets while retaining every declaration as
+  evidence, and correlated ArchiveXL runtime missing-phase messages with the
+  exact static child or parent rule.
+- Added a Quest operations table to Markdown and HTML coverage and bumped the
+  scanner to version 0.10.0.
+
+Validation:
+
+- All 53 automated tests pass.
+- A full cached frozen-corpus scan completed successfully in 19.5 seconds;
+  staging and game inputs were not modified.
+- Parsed 298 phase merges from 13 documents. There are no cross-mod duplicate
+  child/parent operations or competing attachment points.
+- 296 child declarations resolve in their own mods. Two declarations share one
+  missing They Will Remember phase resource.
+- 229 parent references are official game targets. The remaining 69 references
+  consolidate to three absent New Game Plus parents used by HG Enemies, NCEE
+  Enemies, and NCEE NPC.
+- All four static missing targets exactly confirm the four runtime quest
+  missing-phase events.
+- Reports now contain 57 findings: 6 conflicts, 9 errors, 9 warnings, 16
+  reviews, and 17 infos.
 
 ### 2026-08-03 — ArchiveXL runtime log correlation
 

@@ -11,11 +11,13 @@ from .archive_payloads import WolvenKitArchivePayloadProvider
 from .archivexl_runtime import analyze_archivexl_runtime_logs
 from .archivexl import (
     build_archivexl_coverage,
+    compare_quest_references,
     compare_references,
     compare_resource_references,
     internal_archive_collisions,
     parse_documents,
     resolve_archive_references,
+    resolve_quest_references,
 )
 from .archivexl_payload_analysis import (
     inspect_factory_payloads,
@@ -102,6 +104,7 @@ def run_scan(args: argparse.Namespace) -> int:
     findings.extend(archive_xl_findings)
     findings.extend(compare_references(references))
     findings.extend(compare_resource_references(references))
+    findings.extend(compare_quest_references(references))
     coverage = {"archivexl": build_archivexl_coverage(documents, references)}
     tweak_documents, tweak_references, tweak_findings = parse_tweak_documents(artifacts)
     findings.extend(tweak_findings)
@@ -179,6 +182,16 @@ def run_scan(args: argparse.Namespace) -> int:
             manifests, index_findings = indexer.index(archive_artifacts)
             findings.extend(index_findings)
             findings.extend(resolve_archive_references(references, manifests, artifacts))
+            quest_findings, quest_stats = resolve_quest_references(
+                references, manifests, artifacts
+            )
+            findings.extend(quest_findings)
+            coverage["archivexl"]["quest_operations"] = [quest_stats]
+            for section in coverage["archivexl"]["sections"]:
+                if section["name"] == "quest":
+                    section["status"] = "analyzed"
+                    section["note"] = quest_stats["note"]
+                    break
             findings.extend(internal_archive_collisions(manifests))
             payload_coverage = {}
             if args.payload_scope != "none":
@@ -301,10 +314,11 @@ def run_scan(args: argparse.Namespace) -> int:
     ):
         for section in coverage["archivexl"]["sections"]:
             if section["name"] == "quest":
-                section["status"] = "partial"
-                section["note"] = (
-                    "Static quest operations are not yet compared, but runtime "
-                    "missing-phase messages are attributed to declarations."
+                if section["status"] != "analyzed":
+                    section["status"] = "partial"
+                section["note"] += (
+                    " Runtime missing-phase messages are correlated with exact "
+                    "phase or parent declarations."
                 )
                 break
     if archive_runtime_coverage["status"] == "analyzed":

@@ -312,6 +312,18 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "note", label: "Coverage note"}
         ]));
       }
+      if ((analyzer.quest_operations || []).length) {
+        const label = document.createElement("h3"); label.textContent = "Quest operations"; group.append(label);
+        group.append(coverageTable(analyzer.quest_operations, [
+          {key: "name", label: "Operation"}, {key: "status", label: "Status"},
+          {key: "documents", label: "Documents"}, {key: "declarations", label: "Merges"},
+          {key: "phase_own", label: "Child: own"}, {key: "phase_cross_mod", label: "Child: cross-mod"},
+          {key: "phase_missing", label: "Child: missing"}, {key: "parent_official", label: "Parent: official"},
+          {key: "parent_own", label: "Parent: own"}, {key: "parent_cross_mod", label: "Parent: cross-mod"},
+          {key: "parent_missing", label: "Parent: missing"}, {key: "missing_targets", label: "Missing targets"},
+          {key: "note", label: "Coverage note"}
+        ]));
+      }
       if ((analyzer.dependencies || []).length) {
         const label = document.createElement("h3"); label.textContent = "Dependency analysis"; group.append(label);
         group.append(coverageTable(analyzer.dependencies, [

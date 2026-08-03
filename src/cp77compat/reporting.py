@@ -121,6 +121,22 @@ def write_reports(
                         f"documents={operation['documents']}; "
                         f"references={operation['references']} — {operation['note']}"
                     )
+            quest_operations = analyzer.get("quest_operations", [])
+            if quest_operations:
+                lines.extend(["", "#### Quest operations", ""])
+                for operation in quest_operations:
+                    lines.append(
+                        f"- `{operation['name']}`: {operation['status']}; "
+                        f"documents={operation['documents']}; "
+                        f"declarations={operation['declarations']}; "
+                        f"phase own/cross/missing={operation['phase_own']}/"
+                        f"{operation['phase_cross_mod']}/{operation['phase_missing']}; "
+                        f"parent official/own/cross/missing={operation['parent_official']}/"
+                        f"{operation['parent_own']}/{operation['parent_cross_mod']}/"
+                        f"{operation['parent_missing']}; "
+                        f"unique missing targets={operation['missing_targets']} - "
+                        f"{operation['note']}"
+                    )
             dependencies = analyzer.get("dependencies", [])
             if dependencies:
                 lines.extend(["", "#### Dependency analysis", ""])

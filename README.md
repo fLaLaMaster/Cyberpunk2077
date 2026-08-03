@@ -21,8 +21,12 @@ Implemented analysis includes:
   factory target resource validation;
 - ArchiveXL shared-target resource patch serialization and comparison of stable
   inner identities for the installed `.mesh`, `.ent`, and `.devices` overlaps;
+- ArchiveXL `quest.phases` parsing with structural source lines, child/parent
+  resource resolution, attachment-point comparison, and compact missing-target
+  findings;
 - newest-session ArchiveXL runtime parsing across rotated log chunks, with
-  localization, quest-phase, and streaming-sector source attribution;
+  localization, quest-phase, and streaming-sector source attribution plus
+  static quest-target confirmation;
 - TweakXL `.yaml`/`.yml` parsing under `r6/tweaks`;
 - TweakDB record, flat, property, `$base`, `$type`, and `$instances` extraction;
 - semantic comparison of complete assignments and tagged array operations;
@@ -39,6 +43,10 @@ partially analyzed, and unsupported installed sections. Resource operations are
 compared at declaration-identity level. Localization and factory payload entries
 are inspected, and patch sources sharing targets are compared by stable inner
 identities. Unshared patch payload contents remain outside the selective scope.
+Quest phase analysis treats multiple mods attaching different children to the
+same parent as normal composition. It reports only duplicated child/parent
+merges or competing attachment points, and resolves custom child and parent
+resources against indexed mod archives and loose files.
 
 The TweakXL parser preserves YAML anchors, aliases, repeated template roots,
 and the `!append`, `!append-once`, `!append-from`, `!prepend`,
