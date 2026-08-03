@@ -233,7 +233,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
 
     for (const finding of findings) {
       const prefix = String(finding.rule_id || "").split("-", 1)[0];
-      finding._ecosystem = ({AXL: "ArchiveXL", TXL: "TweakXL", RS: "REDscript", CET: "CET", CFG: "Configuration", CORE: "Core", WOLVENKIT: "WolvenKit"})[prefix] || "Other";
+      finding._ecosystem = ({AXL: "ArchiveXL", TXL: "TweakXL", RS: "REDscript", CET: "CET", CFG: "Configuration", INPUT: "Input mappings", CORE: "Core", WOLVENKIT: "WolvenKit"})[prefix] || "Other";
       finding._search = [finding.rule_id, finding.severity, finding.confidence, finding.summary,
         finding.explanation, ...(finding.participants || []), evidenceText(finding.evidence)]
         .join(" ").toLocaleLowerCase();
@@ -399,6 +399,20 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "note", label: "Notes"}
         ]));
       }
+      if ((analyzer.input_operations || []).length) {
+        const label = document.createElement("h3"); label.textContent = "Input Loader mappings"; group.append(label);
+        group.append(coverageTable(analyzer.input_operations, [
+          {key: "name", label: "Analyzer"}, {key: "status", label: "Status"},
+          {key: "documents", label: "Documents"}, {key: "active_documents", label: "Active"},
+          {key: "references", label: "References"}, {key: "top_level_nodes", label: "Top-level nodes"},
+          {key: "mappings", label: "Mappings"}, {key: "contexts", label: "Contexts"},
+          {key: "action_policies", label: "Action policies"},
+          {key: "baseline_overwrites", label: "Base overwrites"}, {key: "baseline_appends", label: "Base appends"},
+          {key: "shared_append_nodes", label: "Shared appends"}, {key: "competing_nodes", label: "Competing nodes"},
+          {key: "missing_targets", label: "Missing targets"}, {key: "cache_mismatches", label: "Cache mismatches"},
+          {key: "note", label: "Notes"}
+        ]));
+      }
       if ((analyzer.quest_operations || []).length) {
         const label = document.createElement("h3"); label.textContent = "Quest operations"; group.append(label);
         group.append(coverageTable(analyzer.quest_operations, [
@@ -484,7 +498,8 @@ _HTML_TEMPLATE = r'''<!doctype html>
       [summary.tweakxl_references, "TweakXL references"],
       [summary.redscript_references, "REDscript references"],
       [summary.cet_references, "CET references"],
-      [summary.config_references, "Configuration files"], [findings.length, "Findings"]
+      [summary.config_references, "Configuration files"],
+      [summary.input_references, "Input references"], [findings.length, "Findings"]
     ];
     const statsElement = document.getElementById("stats");
     for (const [value, label] of stats) {

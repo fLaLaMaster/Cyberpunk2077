@@ -6,14 +6,53 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.20.0`
-- Implemented ecosystems: ArchiveXL, TweakXL, REDscript, and CET Lua
+- Scanner version: `0.21.0`
+- Implemented ecosystems: ArchiveXL, TweakXL, REDscript, CET Lua, and Input Loader XML
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 91 passing
+- Automated tests: 94 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — Input Loader XML semantic analyzer
+
+Implemented mapping/context compatibility analysis using Input Loader's actual
+merge behavior and current generated state.
+
+Changes:
+
+- Added `input_mapping.py` with Expat-based structural parsing and exact source
+  lines for top-level nodes and their direct children.
+- Modeled Input Loader's `(tag, name)` whole-node replacement and
+  `append="true"` child-copy behavior from the installed plugin/source model.
+- Added cross-mod whole-node overwrite, identical duplicate, composable append,
+  appended-child conflict, and action-policy conflict rules.
+- Resolved action `map`, context `include`, and timing/event action targets
+  against the effective generated input files.
+- Compared active fragments to vanilla input definitions and to both generated
+  cache files, and correlated the current `input_loader.log` session.
+- Added `input-findings.json`, Input mapping HTML filtering/statistics, Input
+  Loader coverage tables, README documentation, and scanner version 0.21.0.
+
+Validation:
+
+- All 94 tests pass with warnings promoted to errors.
+- The frozen corpus contains seven active input fragments and 449 source-lined
+  references across 189 top-level nodes: 72 mappings, 101 contexts, 15
+  timing/event policies, and one button group.
+- Twenty-one cross-mod top-level targets use compatible append semantics. No
+  competing whole-node providers, incompatible appended children, or missing
+  mapping/context/action targets were found.
+- Every active node/child matches the generated `inputContexts.xml` and
+  `inputUserMappings.xml`; the startup log loaded all seven fragments with no
+  errors or warnings.
+- Dodge Dash Sprint with Shift intentionally replaces the base-game
+  `Dodge_Button`. Its `ToggleSprint_Button` definition is semantically identical
+  to vanilla and produces no behavioral overwrite finding.
+- The full cached scan completed in 27.7 seconds. The combined report contains
+  185 findings: 2 conflicts, 11 errors, 18 warnings, 13 reviews, and 141 info.
+- Frozen Vortex and game inputs were not modified.
 
 ### 2026-08-03 — Shared configuration ownership and validation
 

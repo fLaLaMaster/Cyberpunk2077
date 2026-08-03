@@ -35,6 +35,7 @@ class HtmlReportTests(unittest.TestCase):
                     "redscript_references": 3,
                     "cet_references": 4,
                     "config_references": 5,
+                    "input_references": 6,
                     "coverage": {
                         "archivexl": {
                             "documents": 1,
@@ -172,6 +173,22 @@ class HtmlReportTests(unittest.TestCase):
                                 }
                             ],
                         },
+                        "input": {
+                            "documents": 1,
+                            "sections": [],
+                            "input_operations": [
+                                {
+                                    "name": "Input Loader mappings", "status": "analyzed",
+                                    "documents": 1, "active_documents": 1,
+                                    "references": 3, "top_level_nodes": 2,
+                                    "mappings": 1, "contexts": 1, "action_policies": 0,
+                                    "baseline_overwrites": 0, "baseline_appends": 1,
+                                    "shared_append_nodes": 0, "competing_nodes": 0,
+                                    "missing_targets": 0, "cache_mismatches": 0,
+                                    "note": "Example input coverage",
+                                }
+                            ],
+                        },
                     },
                 },
                 [finding],
@@ -193,6 +210,7 @@ class HtmlReportTests(unittest.TestCase):
             self.assertIn("CET Lua registrations", html)
             self.assertIn("Configuration formats", html)
             self.assertIn("Configuration ownership", html)
+            self.assertIn("Input Loader mappings", html)
             self.assertIn("Runtime log correlation", html)
             self.assertNotIn("</script><script>alert(1)</script>", html)
             match = re.search(

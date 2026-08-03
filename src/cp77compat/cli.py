@@ -34,6 +34,7 @@ from .cet import analyze_cet_references, build_cet_coverage, parse_cet_documents
 from .cet_runtime import analyze_cet_runtime_logs
 from .deployment import load_deployment
 from .inventory import build_inventory, discover_mods, exact_path_findings
+from .input_mapping import analyze_input_documents, parse_input_documents
 from .models import Finding
 from .reporting import write_reports
 from .shared_config import (
@@ -257,13 +258,22 @@ def run_scan(args: argparse.Namespace) -> int:
     coverage["config"] = build_config_coverage(
         config_documents, config_references
     )
+    input_documents, input_references = parse_input_documents(artifacts)
+    input_findings, input_coverage = analyze_input_documents(
+        input_documents,
+        input_references,
+        args.game,
+    )
+    findings.extend(input_findings)
+    coverage["input"] = input_coverage
     print(
         f"Found {len(mods)} mods, {len(artifacts)} files, "
         f"{len(documents)} non-empty ArchiveXL configs, and "
         f"{len(tweak_documents)} non-empty TweakXL configs, "
         f"{len(redscript_documents)} REDscript files, "
         f"{len(cet_documents)} CET Lua files, and "
-        f"{len(config_documents)} shared configuration files"
+        f"{len(config_documents)} shared configuration files, and "
+        f"{len(input_documents)} Input Loader XML fragments"
     )
 
     manifests = []
@@ -523,6 +533,7 @@ def run_scan(args: argparse.Namespace) -> int:
         redscript_references,
         cet_references,
         config_references,
+        input_references,
         findings,
         metadata,
         coverage,

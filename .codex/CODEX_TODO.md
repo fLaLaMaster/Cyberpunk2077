@@ -103,7 +103,7 @@ frozen-corpus validation pass are complete.
 - [x] Detect explicit global-symbol collisions inside CET roots assembled from
   multiple Vortex packages.
 - [x] Inventory shared JSON, TOML, INI, and XML ownership.
-- [ ] Parse input mapping IDs and identify duplicate or overwritten mappings.
+- [x] Parse input mapping IDs and identify duplicate or overwritten mappings.
 - [x] Correlate CET findings with CET framework, scripting, and per-mod logs.
 
 ## RED4ext and framework validation

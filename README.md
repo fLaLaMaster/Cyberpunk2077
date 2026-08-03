@@ -64,6 +64,10 @@ Implemented analysis includes:
 - JSON, TOML, INI, and XML ownership inventory with strict structural parsing,
   encoding/duplicate-key diagnostics, semantic fingerprints, exact-path
   provider comparison, and shared CET/framework scope attribution;
+- Input Loader XML analysis with structural source lines, exact whole-node
+  replacement versus child-append semantics, nested action identity checks,
+  mapping/context/action target resolution, vanilla override detection,
+  generated-cache validation, and startup-log correlation;
 - deterministic JSON and Markdown reports.
 
 Reports include an analyzer-coverage panel that distinguishes analyzed,
@@ -190,14 +194,24 @@ and `.xml` file. Format-normalized fingerprints ignore irrelevant JSON/TOML key
 order and formatting when comparing multiple providers of one deployed path.
 Different files contributed to the same CET root, input directory, engine
 configuration domain, or REDscript user-hint directory are retained as
-informational ownership context. XML input IDs are not compared at this layer;
-they are reserved for the dedicated input-mapping analyzer.
+informational ownership context. Input XML receives additional semantic
+analysis from the dedicated Input Loader analyzer.
 
 Parsing is strict for each underlying format. JSON duplicate keys and non-UTF-8
 fallback decoding are warnings, while malformed documents are errors with a
 source line when the parser exposes one. A failed document remains in the
 ownership inventory and makes semantic coverage partial rather than silently
 disappearing.
+
+Input mapping analysis follows Input Loader's installed merge algorithm. A
+same-tag, same-name top-level node replaces the earlier whole definition unless
+the incoming node has `append="true"`; append mode copies only its children.
+The scanner compares cross-mod providers using those rules, checks repeated
+actions and timing/event policies, resolves action mappings and included
+contexts against the effective cache, and validates every active fragment
+against `r6/cache/inputContexts.xml`, `r6/cache/inputUserMappings.xml`, and the
+current `red4ext/logs/input_loader.log`. Ordinary shared append targets remain
+informational; incompatible whole-node providers are conflicts.
 
 ## Run
 
@@ -286,6 +300,8 @@ different payloads are load-order conflicts.
 - `reports/current/cet-findings.json`: CET Lua references and runtime findings.
 - `reports/current/config-findings.json`: shared configuration ownership,
   parsing, and exact-path findings.
+- `reports/current/input-findings.json`: Input Loader mappings, contexts,
+  source lines, cache validation, and startup-log findings.
 - `reports/current/compatibility-findings.json`: combined machine-readable findings.
 - `reports/current/compatibility-report.html`: searchable, filterable offline report.
 - `reports/current/compatibility-report.md`: concise human-readable report.

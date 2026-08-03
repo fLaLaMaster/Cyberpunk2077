@@ -11,10 +11,10 @@ resources inside `.archive` files with WolvenKit CLI, and performs
 ecosystem-specific semantic compatibility checks.
 
 The scanner is being developed incrementally. ArchiveXL, TweakXL, REDscript,
-and CET Lua are the currently supported ecosystems, including their relevant
-runtime/compiler logs. Shared JSON/TOML/INI/XML ownership is also supported.
-Planned coverage includes input mapping semantics, RED4ext native plugins, and
-runtime correlation for the remaining frameworks.
+CET Lua, and Input Loader XML are the currently supported ecosystems, including
+their relevant runtime/compiler logs. Shared JSON/TOML/INI/XML ownership is also
+supported. Planned coverage includes RED4ext native plugins and runtime
+correlation for the remaining frameworks.
 
 ## Workspace paths
 
@@ -180,6 +180,11 @@ python -m unittest discover -s tests -v
   tracks encoding and duplicate JSON keys; computes format-normalized semantic
   hashes; compares exact-path providers; and reports broader multi-package
   configuration scopes without treating them as conflicts.
+- `src/cp77compat/input_mapping.py`
+  Parses `r6/input/*.xml` with structural source lines; models Input Loader's
+  exact whole-node replacement and child-append semantics; resolves mapping,
+  context, and action targets; compares vanilla definitions; validates the two
+  generated cache files; and correlates `input_loader.log`.
 - `src/cp77compat/reporting.py`
   Writes inventory, archive manifest, per-ecosystem reference/finding JSON,
   combined findings JSON, Markdown, and HTML reports.
@@ -223,7 +228,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.20.0 scan on 2026-08-03 reported:
+The successful v0.21.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -260,6 +265,11 @@ The successful v0.20.0 scan on 2026-08-03 reported:
   scopes; four scopes have multiple package owners and no exact path is shared.
 - All TOML, INI, and XML documents parse. JSON parses 137 of 138 documents;
   one JSON file uses CP-1252 and no duplicate JSON key was found.
+- Seven active Input Loader XML fragments provide 449 source-lined references
+  across 189 top-level nodes: 72 mappings, 101 contexts, 15 timing/event
+  policies, and one button group. Twenty-one shared targets compose through
+  `append="true"`; no cross-mod whole-node conflicts, child conflicts, missing
+  targets, cache mismatches, or runtime diagnostics were found.
 - Current CET logs cover 63 files and 19,285 lines. CET 1.37.1 loaded all 61
   active roots, ignored two data directories without `init.lua`, and failed no
   mod roots. Four runtime events produced three consolidated findings.
@@ -446,6 +456,13 @@ Important current findings:
     `cet:WeatherSwitcher`, `engine-config`, `r6-input`, and
     `redscript-user-hints`. No exact JSON/TOML/INI/XML path is supplied by more
     than one package.
+39. Twenty-one Input Loader targets are shared by multiple mods, and every
+    provider uses `append="true"`. Their nested action/include identities do not
+    conflict, so Input Loader retains all contributions.
+40. Dodge Dash Sprint with Shift intentionally replaces the vanilla
+    `Dodge_Button`; its `ToggleSprint_Button` definition is identical to the
+    current vanilla definition. Both generated caches match all seven active
+    fragments, and the startup log contains no diagnostics.
 
 Analyzer coverage is embedded in all primary reports. It currently records 45
 ArchiveXL documents with `resource` sections and marks all five installed
@@ -482,8 +499,9 @@ merged roots. Computed names and ambiguous lexical writes remain partial rather
 than being guessed.
 Configuration coverage records format-level parse/entry/encoding results,
 format-normalized semantic fingerprints, exact shared paths, and broader
-multi-package ownership scopes. XML structure is validated here, while input
-mapping IDs remain reserved for the next dedicated analyzer.
+multi-package ownership scopes. Input Loader coverage separately records XML
+node/reference counts, vanilla replacements/appends, cross-mod identities,
+missing targets, generated-cache mismatches, and current startup-log results.
 The four installed `overrides.tags` documents are fully analyzed using
 ArchiveXL-equivalent effective component masks and whole-definition last-wins
 semantics. Their 12 tag names are all distinct.
@@ -532,6 +550,14 @@ current compiler log confirms all eight active replacement-overwrite warnings.
 - `reports/current/redscript-findings.json`
   All REDscript annotation references, condition/deployment state, static
   compatibility findings, and correlated compiler diagnostics.
+- `reports/current/cet-findings.json`
+  CET Lua registrations, dependencies, hooks, namespace findings, and runtime
+  diagnostics.
+- `reports/current/config-findings.json`
+  Shared JSON/TOML/INI/XML ownership, parsing, and exact-path findings.
+- `reports/current/input-findings.json`
+  All Input Loader XML references with source lines, merge findings, vanilla
+  comparison, generated-cache validation, and startup-log coverage.
 - `reports/current/compatibility-findings.json`
   Combined machine-readable findings without the full reference inventories.
 - `reports/current/archive-manifests.json`

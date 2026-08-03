@@ -24,6 +24,7 @@ def write_reports(
     redscript_references: list[Reference],
     cet_references: list[Reference],
     config_references: list[Reference],
+    input_references: list[Reference],
     findings: list[Finding],
     metadata: dict[str, Any],
     coverage: dict[str, Any] | None = None,
@@ -40,6 +41,7 @@ def write_reports(
         "redscript_references": len(redscript_references),
         "cet_references": len(cet_references),
         "config_references": len(config_references),
+        "input_references": len(input_references),
         "findings": dict(sorted(Counter(item.severity for item in ordered_findings).items())),
         "coverage": coverage or {},
     }
@@ -126,6 +128,19 @@ def write_reports(
         },
     )
     _write_json(
+        output_dir / "input-findings.json",
+        {
+            "metadata": metadata,
+            "summary": summary,
+            "references": [reference.to_dict() for reference in input_references],
+            "findings": [
+                finding.to_dict()
+                for finding in ordered_findings
+                if finding.rule_id.startswith("INPUT-")
+            ],
+        },
+    )
+    _write_json(
         output_dir / "compatibility-findings.json",
         {
             "metadata": metadata,
@@ -148,6 +163,7 @@ def write_reports(
         f"- REDscript references: {summary['redscript_references']}",
         f"- CET references: {summary['cet_references']}",
         f"- Configuration references: {summary['config_references']}",
+        f"- Input mapping references: {summary['input_references']}",
         "- Findings: " + ", ".join(f"{key}={value}" for key, value in summary["findings"].items()),
         "",
     ]
@@ -268,6 +284,22 @@ def write_reports(
                         f"documents/active={operation['documents']}/{operation['active_documents']}; "
                         f"scopes/shared scopes={operation['scopes']}/{operation['shared_scopes']}; "
                         f"shared paths={operation['shared_paths']} - {operation['note']}"
+                    )
+            input_operations = analyzer.get("input_operations", [])
+            if input_operations:
+                lines.extend(["", "#### Input Loader mappings", ""])
+                for operation in input_operations:
+                    lines.append(
+                        f"- `{operation['name']}`: {operation['status']}; "
+                        f"documents/active={operation['documents']}/{operation['active_documents']}; "
+                        f"references={operation['references']}; "
+                        f"mappings/contexts/policies={operation['mappings']}/"
+                        f"{operation['contexts']}/{operation['action_policies']}; "
+                        f"base overwrites/appends={operation['baseline_overwrites']}/"
+                        f"{operation['baseline_appends']}; shared appends/competing="
+                        f"{operation['shared_append_nodes']}/{operation['competing_nodes']}; "
+                        f"missing/cache mismatches={operation['missing_targets']}/"
+                        f"{operation['cache_mismatches']} - {operation['note']}"
                     )
             quest_operations = analyzer.get("quest_operations", [])
             if quest_operations:
