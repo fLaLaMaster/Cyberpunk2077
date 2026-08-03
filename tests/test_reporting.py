@@ -19,7 +19,13 @@ class HtmlReportTests(unittest.TestCase):
             summary="Example </script><script>alert(1)</script>",
             explanation="Searchable explanation",
             participants=["Example Mod"],
-            evidence=[{"identity": r"base\example.streamingsector"}],
+            evidence=[{
+                "identity": r"base\example.streamingsector",
+                "sources": [{
+                    "source_path": r"C:\Example Mod\r6\scripts\example.reds",
+                    "line": 7,
+                }],
+            }],
             fingerprint="a" * 64,
         )
         with tempfile.TemporaryDirectory() as temp:
@@ -252,6 +258,11 @@ class HtmlReportTests(unittest.TestCase):
             self.assertIn('controls.ecosystem.value = ""', html)
             self.assertIn("function readHash()", html)
             self.assertIn("function coverageCards", html)
+            self.assertIn("function sourceFolderUrl", html)
+            self.assertIn("function evidencePre", html)
+            self.assertIn('link.className = "source-folder-link"', html)
+            self.assertIn('return `file:///${drive[1]}/', html)
+            self.assertIn('return `file://${host}/', html)
             self.assertIn("function acknowledgementsYaml", html)
             self.assertIn("showSaveFilePicker", html)
             self.assertIn("min(1740px", html)

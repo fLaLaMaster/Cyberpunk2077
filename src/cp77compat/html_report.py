@@ -152,6 +152,8 @@ _HTML_TEMPLATE = r'''<!doctype html>
     .evidence { margin-top: 13px; background: #0e1115; border: 1px solid var(--border); border-radius: 5px; }
     .evidence summary { cursor: pointer; padding: 9px 11px; color: var(--muted); font-size: 12px; }
     pre { max-height: 520px; overflow: auto; margin: 0; padding: 12px; border-top: 1px solid var(--border); color: #c8d1dc; font: 12px/1.5 Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+    pre a.source-folder-link { color: #8ecbff; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
+    pre a.source-folder-link:hover { color: #c8e7ff; text-decoration-style: solid; }
     .pager { justify-content: center; margin-top: 18px; }
     .pager button { min-width: 92px; }
     .empty { padding: 50px 20px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 8px; }
@@ -677,6 +679,55 @@ _HTML_TEMPLATE = r'''<!doctype html>
       );
     }
 
+    function sourceFolderUrl(sourcePath) {
+      if (typeof sourcePath !== "string") return null;
+      const normalized = sourcePath.replaceAll("\\", "/");
+      const separator = normalized.lastIndexOf("/");
+      if (separator < 0) return null;
+      const folder = normalized.slice(0, separator);
+      const drive = folder.match(/^([A-Za-z]:)(?:\/(.*))?$/);
+      if (drive) {
+        const rest = (drive[2] || "").split("/").filter(Boolean).map(encodeURIComponent).join("/");
+        return `file:///${drive[1]}/${rest}${rest ? "/" : ""}`;
+      }
+      if (folder.startsWith("//")) {
+        const parts = folder.slice(2).split("/").filter(Boolean);
+        if (parts.length < 2) return null;
+        const host = encodeURIComponent(parts.shift());
+        const path = parts.map(encodeURIComponent).join("/");
+        return `file://${host}/${path}${path ? "/" : ""}`;
+      }
+      return null;
+    }
+
+    function evidencePre(value) {
+      const serialized = JSON.stringify(value, null, 2);
+      const pre = document.createElement("pre");
+      const sourcePattern = /("source_path"\s*:\s*)("(?:\\.|[^"\\])*")/g;
+      let cursor = 0;
+      for (const match of serialized.matchAll(sourcePattern)) {
+        pre.append(document.createTextNode(serialized.slice(cursor, match.index) + match[1]));
+        let sourcePath = null;
+        try { sourcePath = JSON.parse(match[2]); } catch (_error) { /* keep malformed text unlinked */ }
+        const folderUrl = sourceFolderUrl(sourcePath);
+        if (folderUrl) {
+          const link = document.createElement("a");
+          link.className = "source-folder-link";
+          link.href = folderUrl;
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.title = `Open parent folder: ${sourcePath.slice(0, Math.max(sourcePath.lastIndexOf("\\"), sourcePath.lastIndexOf("/")))}`;
+          link.textContent = match[2];
+          pre.append(link);
+        } else {
+          pre.append(document.createTextNode(match[2]));
+        }
+        cursor = match.index + match[0].length;
+      }
+      pre.append(document.createTextNode(serialized.slice(cursor)));
+      return pre;
+    }
+
     function findingElement(finding) {
       const details = document.createElement("details"); details.className = "finding";
       details.dataset.severity = finding.severity;
@@ -764,8 +815,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
         evidence.append(evidenceSummary);
         evidence.addEventListener("toggle", () => {
           if (evidence.open && !evidence.dataset.loaded) {
-            const pre = document.createElement("pre"); pre.textContent = JSON.stringify(finding.evidence, null, 2);
-            evidence.append(pre); evidence.dataset.loaded = "true";
+            evidence.append(evidencePre(finding.evidence)); evidence.dataset.loaded = "true";
           }
         });
         body.append(evidence);

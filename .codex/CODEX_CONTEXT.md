@@ -209,7 +209,8 @@ python -m unittest discover -s tests -v
   Generates a self-contained offline HTML report with search, status/change and
   ecosystem filters, responsive coverage tables/cards, pagination, lazily
   expanded evidence, inline acknowledgement controls, and user-approved YAML
-  saving with a download fallback.
+  saving with a download fallback. Absolute Windows `source_path` values retain
+  their full JSON text while linking to encoded `file:///` parent directories.
 - `src/cp77compat/cli.py`
   Orchestrates the scan and exposes CLI options.
 - `tests/`
@@ -247,7 +248,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.25.0 scan on 2026-08-03 reported:
+The successful v0.26.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.

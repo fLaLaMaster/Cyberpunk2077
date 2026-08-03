@@ -145,6 +145,8 @@ frozen-corpus validation pass are complete.
   user-approved YAML saving from the HTML report.
 - [x] Replace overly wide ArchiveXL runtime and CET registration coverage rows
   with responsive metric cards.
+- [x] Make absolute `source_path` values in HTML evidence link to their parent
+  folders without changing the displayed path or finding fingerprints.
 - [ ] Avoid re-hashing unchanged archives by caching a verified
   size/mtime/file-identity fingerprint before SHA-256 fallback.
 - [ ] Separate the large ArchiveXL reference list from the primary findings JSON

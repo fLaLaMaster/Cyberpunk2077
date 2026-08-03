@@ -370,4 +370,7 @@ stale entries remain inspectable. Expanding a finding exposes an acknowledgement
 checkbox and editable note. `Save acknowledgements` uses a Chromium file picker
 to write the separate YAML file after explicit user approval; browsers without
 that API download a replacement file instead. The report is self-contained and
-does not require a web server.
+does not require a web server. Every absolute Windows `source_path` value in
+expanded evidence remains displayed as the complete JSON path but is also a
+`file:///` link to its parent directory. Drive-letter and UNC paths are encoded
+segment by segment so spaces and URL-special characters remain valid.

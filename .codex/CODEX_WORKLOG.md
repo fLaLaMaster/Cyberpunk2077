@@ -6,7 +6,7 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.25.0`
+- Scanner version: `0.26.0`
 - Implemented ecosystems: ArchiveXL, TweakXL, REDscript, CET Lua, Input Loader XML, RED4ext/native frameworks, and CET-to-REDscript method-hook cross-analysis
 - Primary report: `reports/current/compatibility-report.html`
 - Automated tests: 106 passing
@@ -14,6 +14,33 @@ do not use it as a raw command transcript.
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — Clickable source folders in HTML evidence
+
+Made source evidence easier to navigate from the offline report.
+
+Changes:
+
+- Replaced the lazy evidence block's plain JSON insertion with a safe DOM
+  renderer that preserves all JSON formatting and values.
+- Absolute `source_path` string tokens now display the same complete escaped
+  file path as before while linking to the file's parent directory.
+- Added `file:///` drive-path and UNC-folder generation with per-segment URL
+  encoding for spaces and special characters.
+- Added dedicated link styling without using HTML string interpolation, so
+  evidence remains protected from markup injection.
+- Updated documentation and scanner version 0.26.0.
+
+Validation:
+
+- All 106 tests pass with warnings promoted to errors.
+- A complete frozen-corpus scan completed in 28.4 seconds and regenerated the
+  v0.26.0 reports.
+- Generated HTML contains the lazy source-link renderer, drive/UNC URL paths,
+  and unchanged embedded evidence.
+- Current state is 211 active and four acknowledged findings, no stale
+  acknowledgements, and all 215 findings unchanged from the preceding scan.
+- Frozen Vortex and game inputs were not modified.
 
 ### 2026-08-03 — CET-to-REDscript cross-ecosystem method analysis
 
