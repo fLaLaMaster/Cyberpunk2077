@@ -6,14 +6,56 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.8.0`
+- Scanner version: `0.9.0`
 - Implemented ecosystems: ArchiveXL and TweakXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 47 passing
-- Last complete scan: successful on 2026-08-02
+- Automated tests: 50 passing
+- Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — ArchiveXL runtime log correlation
+
+Finished ArchiveXL runtime analysis using the user's fresh new-save launch.
+
+Changes:
+
+- Added newest-session discovery for ArchiveXL logs and chronological parsing
+  of numbered rotation chunks before the continuing unnumbered log.
+- Streamed large logs instead of loading them into memory; the real session is
+  about 138 MB across two files.
+- Added focused rules for missing quest phases, failed localization resources,
+  rejected streaming patches, and generic future errors/warnings.
+- Paired localization summary warnings and streaming “no patches applied”
+  warnings with their preceding root-cause errors while retaining both log
+  lines as evidence.
+- Attributed localization and streaming failures through semantic ArchiveXL
+  references. Missing quest phases are attributed through exact source-text
+  declarations because static quest parsing remains a later milestone.
+- Added ArchiveXL session/file/byte/line/event coverage to JSON, Markdown, and
+  HTML reports, and marked quest coverage partial rather than unsupported.
+- Bumped the scanner to version 0.9.0 and documented session-aware analysis.
+
+Validation:
+
+- All 50 automated tests pass.
+- A full cached frozen-corpus scan completed successfully in 34.2 seconds;
+  staging and game inputs were not modified.
+- Parsed session `2026-08-02-23-32-59`: two files, 137,845,003 bytes, 472,639
+  lines, two errors, and six warnings.
+- All eight events were source-attributed and consolidated into four findings.
+- Cyberware EX Keybinds failed to load its English localization resource from
+  the declaration at line 3.
+- Immersive Night City Fixes expected four nodes for the sector declared at
+  line 11,134, but runtime found six and skipped the patch.
+- Three missing New Game Plus phase parents affect HG Enemies, NCEE Enemies,
+  and NCEE NPC. A separate missing retaliation phase affects They Will
+  Remember at lines 63 and 65.
+- No runtime event matched an existing static finding, demonstrating that these
+  failures complement rather than duplicate current static coverage.
+- Reports now contain 53 findings: 6 conflicts, 9 errors, 5 warnings, 16
+  reviews, and 17 infos.
 
 ### 2026-08-02 — TweakXL runtime log correlation
 

@@ -21,6 +21,8 @@ Implemented analysis includes:
   factory target resource validation;
 - ArchiveXL shared-target resource patch serialization and comparison of stable
   inner identities for the installed `.mesh`, `.ent`, and `.devices` overlaps;
+- newest-session ArchiveXL runtime parsing across rotated log chunks, with
+  localization, quest-phase, and streaming-sector source attribution;
 - TweakXL `.yaml`/`.yml` parsing under `r6/tweaks`;
 - TweakDB record, flat, property, `$base`, `$type`, and `$instances` extraction;
 - semantic comparison of complete assignments and tagged array operations;
@@ -57,6 +59,11 @@ back to its Vortex staging artifact and source line where possible. Later
 hash-only validation warnings are correlated through their owning TweakDB flat.
 The runtime log remains a read-only input and repeated events are consolidated
 without discarding their individual log evidence.
+
+ArchiveXL logs are session-aware: the scanner selects the newest timestamp and
+reads its numbered rotation chunks before the continuing unnumbered log. Paired
+messages such as a node-count error followed by “no patches applied” remain one
+actionable finding while both physical log lines are preserved as evidence.
 
 ## Run
 

@@ -8,6 +8,7 @@ from pathlib import Path
 from . import __version__
 from .archives import WolvenKitArchiveIndexer
 from .archive_payloads import WolvenKitArchivePayloadProvider
+from .archivexl_runtime import analyze_archivexl_runtime_logs
 from .archivexl import (
     build_archivexl_coverage,
     compare_references,
@@ -271,6 +272,48 @@ def run_scan(args: argparse.Namespace) -> int:
                 )
             if payload_coverage:
                 coverage["archivexl"]["payloads"] = payload_coverage
+
+    archive_runtime_findings, archive_runtime_coverage = analyze_archivexl_runtime_logs(
+        args.game,
+        artifacts,
+        references,
+        findings,
+    )
+    findings.extend(archive_runtime_findings)
+    coverage["archivexl"]["runtime_logs"] = [archive_runtime_coverage]
+    coverage["archivexl"]["sections"].append(
+        {
+            "name": "runtime log correlation",
+            "documents": archive_runtime_coverage["files"],
+            "status": archive_runtime_coverage["status"],
+            "note": (
+                f"Latest ArchiveXL session: {archive_runtime_coverage['errors']} errors, "
+                f"{archive_runtime_coverage['warnings']} warnings, "
+                f"{archive_runtime_coverage['correlated_events']} source-attributed events."
+                if archive_runtime_coverage["status"] == "analyzed"
+                else archive_runtime_coverage["note"]
+            ),
+        }
+    )
+    if any(
+        finding.rule_id == "AXL-RUNTIME-QUEST-PHASE-MISSING"
+        for finding in archive_runtime_findings
+    ):
+        for section in coverage["archivexl"]["sections"]:
+            if section["name"] == "quest":
+                section["status"] = "partial"
+                section["note"] = (
+                    "Static quest operations are not yet compared, but runtime "
+                    "missing-phase messages are attributed to declarations."
+                )
+                break
+    if archive_runtime_coverage["status"] == "analyzed":
+        print(
+            f"Parsed latest ArchiveXL runtime session: "
+            f"{archive_runtime_coverage['errors']} errors, "
+            f"{archive_runtime_coverage['warnings']} warnings, "
+            f"{archive_runtime_coverage['findings']} consolidated findings"
+        )
 
     metadata = {
         "scanner_version": __version__,

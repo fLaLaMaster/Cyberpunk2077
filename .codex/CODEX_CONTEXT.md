@@ -11,9 +11,9 @@ resources inside `.archive` files with WolvenKit CLI, and performs
 ecosystem-specific semantic compatibility checks.
 
 The scanner is being developed incrementally. ArchiveXL and TweakXL are the
-currently supported ecosystems. TweakXL runtime logs are supported. Planned
-ecosystems include REDscript, CET Lua, input/config files, RED4ext native
-plugins, and runtime correlation for the remaining frameworks.
+currently supported ecosystems. ArchiveXL and TweakXL runtime logs are
+supported. Planned ecosystems include REDscript, CET Lua, input/config files,
+RED4ext native plugins, and runtime correlation for the remaining frameworks.
 
 ## Workspace paths
 
@@ -122,6 +122,11 @@ python -m unittest discover -s tests -v
   retains mapping/sequence source locations, compares streaming and resource
   operations, and resolves resources against indexed archives or loose mod
   files.
+- `src/cp77compat/archivexl_runtime.py`
+  Selects the newest ArchiveXL session, streams all rotated chunks in
+  chronological order, pairs root-cause and consequence messages, attributes
+  localization/streaming events through semantic references, and maps missing
+  quest phases through exact source declarations.
 - `src/cp77compat/tweakxl.py`
   Parses deployed `.yaml` and `.yml` files under `r6/tweaks`, preserves YAML
   anchors, aliases, duplicate template roots, and TweakXL tags, expands
@@ -176,7 +181,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.8.0 scan on 2026-08-02 reported:
+The successful v0.9.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -212,14 +217,17 @@ The successful v0.8.0 scan on 2026-08-02 reported:
 - The newest 333-line TweakXL runtime log contained 74 errors and 12 warnings.
   All 86 events were attributed to staging sources and consolidated into seven
   runtime findings; the static `$base` capitalization error was confirmed.
-- 49 consolidated findings overall:
+- The newest ArchiveXL runtime session spans two rotated files, 137,845,003
+  bytes, and 472,639 lines. Its two errors and six warnings were fully
+  attributed and consolidated into four findings.
+- 53 consolidated findings overall:
   - 6 conflict candidates.
-  - 7 errors.
-  - 3 warnings.
+  - 9 errors.
+  - 5 warnings.
   - 16 review groups.
   - 17 informational findings.
 - Zero WolvenKit indexing failures.
-- Forty-seven automated tests passing.
+- Fifty automated tests passing.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
@@ -279,6 +287,13 @@ Important current findings:
 17. TweakXL validation reports 12 hash-only missing targets from
     `Items.TechMod2_Common.placementSlots`; all three mods above mutate that
     flat and are retained as source candidates.
+18. Cyberware EX Keybinds declares its English localization resource at line
+    3, but ArchiveXL fails to load it at runtime.
+19. Immersive Night City Fixes declares an `expectedNodes: 4` streaming guard
+    at line 11,134; runtime sees six nodes and skips that sector patch.
+20. HG Enemies, NCEE Enemies, and NCEE NPC reference three absent New Game Plus
+    quest parents. They Will Remember separately references an absent
+    retaliation phase at lines 63 and 65.
 
 Analyzer coverage is embedded in all primary reports. It currently records 45
 ArchiveXL documents with `resource` sections and marks all five installed
@@ -289,7 +304,11 @@ archive-owned on-screen resources and its extraction/serialization cache counts
 are embedded in report coverage. Factory declarations are also marked analyzed,
 with row counts, cache counts, and target-resolution results in the same panel.
 Shared-target resource patch payload counts and disjoint/duplicate/conflict/
-uninspected outcomes are recorded there as well.
+uninspected outcomes are recorded there as well. ArchiveXL runtime coverage
+records the selected session, rotated files, byte/line counts, event
+attribution, static correlations, and consolidated findings. Quest coverage is
+partial because missing phases are runtime-attributed while general static
+quest operation comparison remains pending.
 TweakXL coverage now includes record-provider indexing, `$base` resolution and
 cycle counts, explicit foreign-key results, and conservative implicit
 custom-provider matches. Arbitrary implicit scalar values remain partial rather

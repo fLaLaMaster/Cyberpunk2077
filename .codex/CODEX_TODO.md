@@ -54,8 +54,9 @@ frozen-corpus validation pass are complete.
 - [ ] Add `customizations` identity and slot/group collision checks.
 - [ ] Determine whether duplicate streaming node deletions are always unsafe,
   idempotent, or rule-dependent; adjust confidence/severity accordingly.
-- [ ] Correlate ArchiveXL static findings with ArchiveXL/RED4ext runtime logs
-  after the user produces a fresh modded-game launch log.
+- [x] Correlate the newest rotated ArchiveXL log session with semantic
+  references and source-text declarations, pairing consequence messages and
+  consolidating repeated events without discarding evidence.
 
 ## TweakXL analyzer
 

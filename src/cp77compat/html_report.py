@@ -327,6 +327,8 @@ _HTML_TEMPLATE = r'''<!doctype html>
         const label = document.createElement("h3"); label.textContent = "Runtime log correlation"; group.append(label);
         group.append(coverageTable(analyzer.runtime_logs, [
           {key: "name", label: "Log analyzer"}, {key: "status", label: "Status"},
+          {key: "session", label: "Session"}, {key: "files", label: "Files"},
+          {key: "bytes", label: "Bytes"},
           {key: "lines", label: "Lines"}, {key: "errors", label: "Errors"},
           {key: "warnings", label: "Warnings"}, {key: "events", label: "Events"},
           {key: "correlated_events", label: "Source-attributed"},
