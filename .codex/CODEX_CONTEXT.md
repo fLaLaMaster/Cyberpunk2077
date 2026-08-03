@@ -34,8 +34,13 @@ cross-ecosystem analysis are also supported.
 
 ## Safety and ownership rules
 
-1. The Vortex staging collection and game directory are frozen reference
-   inputs. Do not edit, rename, delete, redeploy, or extract files into them.
+1. The v0.27.0 report is the final frozen reference baseline. Starting after
+   that scan, the user is manually reviewing and may add compatibility mods or
+   change Vortex deployment. Existing author-provided mod packages remain
+   read-only: never edit, rename, delete, or place our files inside them. Treat
+   deployed state as mutable and rescan before relying on old findings. Codex
+   must not install or redeploy anything unless the user explicitly requests
+   that exact action.
 2. Scanner source, tests, reports, and caches belong only under the scanner
    repository.
 3. WolvenKit inspection must remain read-only with respect to source archives.
@@ -374,6 +379,37 @@ The successful v0.27.0 scan on 2026-08-03 reported:
   that physical source line.
 
 Important current findings:
+
+## Post-baseline review phase
+
+After the v0.27.0 validation scan, the user began manual finding review and
+explicitly unfroze the mod collection. They may modify the installed/staged set
+before returning. On resumption:
+
+- inspect current deployment and Git state instead of assuming the v0.27.0
+  inventory still matches;
+- preserve the v0.27.0 report as historical context, not current truth;
+- rescan after requested mod changes or compatibility patches;
+- never modify a source mod merely because a finding recommends it—confirm the
+  exact desired outcome with the user first;
+- prefer a separately owned compatibility patch/package when practical instead
+  of destructively editing an upstream mod.
+
+Compatibility fixes follow a strict overlay-mod workflow:
+
+- every change is created as a new, independently named mod/package;
+- a compatibility mod contains only the minimal new or overriding files needed
+  for its purpose;
+- original mod folders and files are never modified, even when an override is
+  simple;
+- the compatibility mod is imported into Vortex, and Vortex deployment rules
+  make its files win over the original providers;
+- multiple unrelated fixes should remain separate small mods unless the user
+  explicitly chooses to combine them;
+- after import/deployment, rescan the effective collection and verify both the
+  intended winner and any new semantic interactions;
+- keep our package identity and filenames distinct enough that later author
+  updates cannot be confused with locally maintained fixes.
 
 1. Immersive Night City Fixes and TheNullifier patch the same streaming sector
    with different `expectedNodes` values: 1237 versus 1263.

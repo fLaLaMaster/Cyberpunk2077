@@ -11,9 +11,26 @@ do not use it as a raw command transcript.
 - Primary report: `reports/current/compatibility-report.html`
 - Automated tests: 110 passing
 - Last complete scan: successful on 2026-08-03
-- Frozen inputs were not modified
+- The v0.27.0 frozen baseline was not modified by Codex; the user has now begun
+  manual review and may change the mod collection
 
 ## History
+
+### 2026-08-03 — Collection moved into manual review
+
+The user confirmed that manual finding review is starting and that the mod
+collection is no longer frozen. The generated v0.27.0 report remains the last
+verified frozen baseline, but future sessions must rediscover current staged and
+deployed state before treating its findings as current. Codex remains
+unauthorized to modify mods or deployment state unless the user returns with an
+explicit change or compatibility-patch request. Prefer separately owned patches
+when practical and run a fresh scan after changes.
+
+The user subsequently made the patch policy explicit: existing author mods stay
+read-only. Every local change must be packaged as a new, independently named,
+minimal mod, imported through Vortex, and given deployment precedence over the
+original provider. Separate fixes should normally remain separate small mods so
+local work, author updates, and Vortex winners remain unambiguous.
 
 ### 2026-08-03 — CET TweakDB-to-TweakXL cross-ecosystem analysis
 
