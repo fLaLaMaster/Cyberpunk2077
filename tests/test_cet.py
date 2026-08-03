@@ -123,6 +123,62 @@ require('missing/module')
             self.assertEqual("info", by_rule["CET-OVERRIDE-CHAIN-DUPLICATE"].severity)
             self.assertEqual("info", by_rule["CET-SETTINGS-CONTAINER-SHARED"].severity)
 
+    def test_explicit_globals_collide_only_inside_one_merged_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            init = root / "init.lua"
+            addon = root / "addon.lua"
+            other = root / "other.lua"
+            init.write_text(
+                """local hidden = {}
+function hidden.method() end
+local localTable = { fakeGlobal = true }
+Shared = {}
+GlobalTable = { fakeMember = true }
+function Shared.Run() end
+_G.explicit = 1
+_G['indexed'] = true
+_G[dynamicName] = false
+rawset(_ENV, 'rawName', {})
+require('addon')
+""",
+                encoding="utf-8",
+            )
+            addon.write_text(
+                "function Shared.Run() return true end\n_G.explicit = 2\n",
+                encoding="utf-8",
+            )
+            other.write_text(
+                "function Shared.Run() return false end\n_G.explicit = 3\n",
+                encoding="utf-8",
+            )
+            documents, references, parse_findings = parse_cet_documents([
+                artifact(init, "Merged", "Package A"),
+                artifact(addon, "Merged", "Package B", "addon.lua"),
+                artifact(other, "Separate", "Package C", "init.lua"),
+            ])
+            self.assertEqual([], parse_findings)
+            findings = analyze_cet_references(documents, references)
+            global_symbols = {
+                item.details.get("symbol")
+                for item in references
+                if item.kind in {"global.assignment", "global.function"}
+            }
+            self.assertNotIn("hidden.method", global_symbols)
+            self.assertNotIn("fakeGlobal", global_symbols)
+            self.assertNotIn("fakeMember", global_symbols)
+            self.assertTrue({"Shared", "GlobalTable", "Shared.Run", "explicit", "indexed", "rawName"} <= global_symbols)
+            dynamic = [item for item in references if item.kind == "global.dynamic"]
+            self.assertEqual(1, len(dynamic))
+            shared = [item for item in findings if item.rule_id == "CET-GLOBAL-SYMBOL-SHARED"]
+            self.assertEqual(1, len(shared))
+            self.assertEqual("review", shared[0].severity)
+            self.assertEqual(2, len(shared[0].evidence))
+            coverage = build_cet_coverage(documents, references)["registration_operations"][0]
+            self.assertEqual(1, coverage["merged_roots"])
+            self.assertEqual(2, coverage["shared_globals"])
+            self.assertEqual(1, coverage["dynamic_globals"])
+
 
 if __name__ == "__main__":
     unittest.main()

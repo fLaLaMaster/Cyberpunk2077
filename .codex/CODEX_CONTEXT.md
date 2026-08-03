@@ -217,7 +217,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.18.0 scan on 2026-08-03 reported:
+The successful v0.19.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -241,11 +241,14 @@ The successful v0.18.0 scan on 2026-08-03 reported:
   source lines and zero parser failures. The effective installed set contains
   700 wrappers, 139 replacements, 14,024 added methods, and 1,885 added fields;
   27 conditional or Vortex-overridden annotations are inactive.
-- 248 CET Lua files across 61 active CET roots and 2,533 extracted references,
+- 248 CET Lua files across 61 active CET roots and 3,105 extracted references,
   all with source lines. Effective registrations include 161 events, 18
   hotkey/input bindings, 182 literal module imports, 47 `GetMod` dependencies,
   806 observers, 239 overrides, and 495 Native Settings paths. Another 271
   dynamically constructed calls are inventoried but intentionally not guessed.
+- Definite global-symbol extraction found 492 reachable writes plus two
+  computed-name writes across 64 files. `DamageScaling` is the only active root
+  assembled from multiple Vortex packages, and it has zero shared exact globals.
 - Current CET logs cover 63 files and 19,285 lines. CET 1.37.1 loaded all 61
   active roots, ignored two data directories without `init.lua`, and failed no
   mod roots. Four runtime events produced three consolidated findings.
@@ -291,7 +294,7 @@ The successful v0.18.0 scan on 2026-08-03 reported:
   - 13 review groups.
   - 135 informational findings.
 - Zero WolvenKit indexing failures.
-- Eighty-eight automated tests passing with warnings promoted to errors.
+- Eighty-nine automated tests passing with warnings promoted to errors.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
@@ -300,8 +303,9 @@ The successful v0.18.0 scan on 2026-08-03 reported:
   customization payload pass completed in 110.9 seconds; the fully cached
   v0.13 normal scan completed in 19.7 seconds; the fully cached v0.15 and v0.16
   scans complete in about 20 seconds; the REDscript-enabled v0.17 scan completed
-  in about 26 seconds, and the CET-enabled v0.18 scan completed in 26.9 seconds.
-- All 137,106 ArchiveXL, TweakXL, REDscript, and CET references have one-based declaration/source
+  in about 26 seconds, the CET-enabled v0.18 scan completed in 26.9 seconds,
+  and the global-analysis v0.19 scan completed in 27.5 seconds.
+- All 137,678 ArchiveXL, TweakXL, REDscript, and CET references have one-based declaration/source
   lines in the generated reports. Serialized localization, factory, and journal
   entries additionally carry their zero-based payload `entry_index` or
   `row_index`. For minified one-line
@@ -416,6 +420,10 @@ Important current findings:
     across 0-Engine, Missing Persons, and Pacifica Typhoon. Two Native Settings
     tab paths are also deliberately shared; neither case remains a review-level
     finding.
+35. `DamageScaling` is the only active CET root built from multiple Vortex
+    packages. Its 14 reachable explicit global functions all belong to the
+    Extended entry; the imported standalone GameUI/GameSettings modules expose
+    local returned tables, so no cross-package global collision exists.
 
 Analyzer coverage is embedded in all primary reports. It currently records 45
 ArchiveXL documents with `resource` sections and marks all five installed
@@ -447,8 +455,9 @@ literal module and `GetMod` dependencies, hook and Native Settings operations,
 dynamic calls, inactive references, unresolved imports, and shared hook targets.
 The current framework/scripting/per-mod log pass records CET/game versions,
 loaded/ignored/failed roots, source-attributed runtime events, and compact
-findings. Dynamically assembled arguments and explicit global-symbol collisions
-inside multi-package roots remain partial/future coverage rather than guessed.
+findings. Definite explicit global writes are compared across packages inside
+merged roots. Computed names and ambiguous lexical writes remain partial rather
+than being guessed.
 The four installed `overrides.tags` documents are fully analyzed using
 ArchiveXL-equivalent effective component masks and whole-definition last-wins
 semantics. Their 12 tag names are all distinct.

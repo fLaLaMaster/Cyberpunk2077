@@ -100,7 +100,7 @@ frozen-corpus validation pass are complete.
 - [x] Extract registered event, hotkey, input, and settings identifiers.
 - [x] Resolve literal Lua modules, detect missing and cross-package providers,
   and respect CET's isolated per-root global namespaces.
-- [ ] Detect explicit global-symbol collisions inside CET roots assembled from
+- [x] Detect explicit global-symbol collisions inside CET roots assembled from
   multiple Vortex packages.
 - [ ] Inventory shared JSON, TOML, INI, and XML ownership.
 - [ ] Parse input mapping IDs and identify duplicate or overwritten mappings.

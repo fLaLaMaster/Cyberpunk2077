@@ -371,7 +371,9 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "hotkeys", label: "Hotkeys"}, {key: "inputs", label: "Inputs"},
           {key: "requires", label: "Requires"}, {key: "getmod_dependencies", label: "GetMod"},
           {key: "observers", label: "Observers"}, {key: "overrides", label: "Overrides"},
-          {key: "settings", label: "Settings IDs"}, {key: "dynamic_calls", label: "Dynamic calls"},
+          {key: "settings", label: "Settings IDs"}, {key: "global_writes", label: "Global writes"},
+          {key: "merged_roots", label: "Merged roots"}, {key: "shared_globals", label: "Shared globals"},
+          {key: "dynamic_globals", label: "Dynamic globals"}, {key: "dynamic_calls", label: "Dynamic calls"},
           {key: "unresolved_modules", label: "Missing modules"},
           {key: "shared_hook_targets", label: "Shared hooks"},
           {key: "inactive_references", label: "Inactive refs"}, {key: "note", label: "Notes"}

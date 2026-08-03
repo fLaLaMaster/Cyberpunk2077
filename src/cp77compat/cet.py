@@ -280,6 +280,199 @@ def _function_depths(tokens: list[_Token]) -> list[int]:
     return depths
 
 
+def _delimiter_depths(tokens: list[_Token]) -> list[tuple[int, int, int]]:
+    depths: list[tuple[int, int, int]] = []
+    paren = 0
+    bracket = 0
+    brace = 0
+    for token in tokens:
+        depths.append((paren, bracket, brace))
+        if token.value == "(":
+            paren += 1
+        elif token.value == ")" and paren:
+            paren -= 1
+        elif token.value == "[":
+            bracket += 1
+        elif token.value == "]" and bracket:
+            bracket -= 1
+        elif token.value == "{":
+            brace += 1
+        elif token.value == "}" and brace:
+            brace -= 1
+    return depths
+
+
+def _name_path(tokens: list[_Token], start: int) -> tuple[list[str], int]:
+    if start >= len(tokens) or tokens[start].kind != "name":
+        return [], start
+    parts = [tokens[start].value]
+    cursor = start + 1
+    while (
+        cursor + 1 < len(tokens)
+        and tokens[cursor].value in {".", ":"}
+        and tokens[cursor + 1].kind == "name"
+    ):
+        parts.append(tokens[cursor + 1].value)
+        cursor += 2
+    return parts, cursor
+
+
+def _global_symbol(parts: list[str]) -> tuple[str | None, bool]:
+    if not parts:
+        return None, False
+    if parts[0] in {"_G", "_ENV"}:
+        return (".".join(parts[1:]) or None), True
+    return ".".join(parts), False
+
+
+def _global_reference(
+    artifact: Artifact,
+    root: str,
+    relative: str,
+    token: _Token,
+    symbol: str,
+    kind: str,
+    write_form: str,
+    top_level: bool,
+    explicit_environment: bool = False,
+) -> Reference:
+    details = _base_details(artifact, root, relative, top_level)
+    details.update({
+        "symbol": symbol,
+        "root_symbol": symbol.split(".", 1)[0],
+        "write_form": write_form,
+        "explicit_environment": explicit_environment,
+    })
+    return Reference(
+        ecosystem="cet",
+        kind=kind,
+        identity=f"{root}:{symbol}",
+        mod_name=artifact.mod_name,
+        source_path=str(artifact.absolute_path),
+        line=token.line,
+        details=details,
+    )
+
+
+def _extract_global_references(
+    artifact: Artifact,
+    root: str,
+    relative: str,
+    tokens: list[_Token],
+    depths: list[int],
+) -> list[Reference]:
+    references: list[Reference] = []
+    top_level_locals: set[str] = set()
+    delimiter_depths = _delimiter_depths(tokens)
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        top_level = depths[index] == 0
+        statement_level = top_level and delimiter_depths[index] == (0, 0, 0)
+
+        if statement_level and token.value == "local" and index + 1 < len(tokens):
+            cursor = index + 1
+            if tokens[cursor].value == "function":
+                cursor += 1
+            while cursor < len(tokens) and tokens[cursor].kind == "name":
+                top_level_locals.add(tokens[cursor].value)
+                cursor += 1
+                if cursor >= len(tokens) or tokens[cursor].value != ",":
+                    break
+                cursor += 1
+            index += 1
+            continue
+
+        if statement_level and token.value == "for" and index + 1 < len(tokens):
+            cursor = index + 1
+            while cursor < len(tokens) and tokens[cursor].kind == "name":
+                top_level_locals.add(tokens[cursor].value)
+                cursor += 1
+                if cursor >= len(tokens) or tokens[cursor].value != ",":
+                    break
+                cursor += 1
+
+        if token.value == "rawset" and index + 1 < len(tokens) and tokens[index + 1].value == "(":
+            starts, _ = _argument_starts(tokens, index + 1)
+            if len(starts) >= 2 and tokens[starts[0]].value in {"_G", "_ENV"}:
+                symbol = _literal_argument(tokens, starts, 1)
+                if symbol is not None:
+                    references.append(_global_reference(
+                        artifact, root, relative, token, symbol,
+                        "global.assignment", "rawset", top_level, True,
+                    ))
+                else:
+                    references.append(_global_reference(
+                        artifact, root, relative, token, f"<dynamic>@{token.line}",
+                        "global.dynamic", "rawset", top_level, True,
+                    ))
+            index += 1
+            continue
+
+        if token.value == "function" and index + 1 < len(tokens):
+            parts, cursor = _name_path(tokens, index + 1)
+            symbol, explicit = _global_symbol(parts)
+            is_local_function = index > 0 and tokens[index - 1].value == "local"
+            if (
+                statement_level
+                and symbol
+                and not is_local_function
+                and (explicit or parts[0] not in top_level_locals)
+                and cursor < len(tokens)
+                and tokens[cursor].value == "("
+            ):
+                references.append(_global_reference(
+                    artifact, root, relative, token, symbol,
+                    "global.function", "function declaration", True, explicit,
+                ))
+            index += 1
+            continue
+
+        if token.kind == "name":
+            parts, cursor = _name_path(tokens, index)
+            explicit_root = bool(parts and parts[0] in {"_G", "_ENV"})
+            if cursor < len(tokens) and tokens[cursor].value == "[":
+                close = _matching(tokens, cursor, "[", "]")
+                if close is not None and close + 1 < len(tokens) and tokens[close + 1].value == "=":
+                    root_is_global = explicit_root or (
+                        statement_level and parts and parts[0] not in top_level_locals
+                    )
+                    if not root_is_global:
+                        index += 1
+                        continue
+                    base_parts = parts[1:] if explicit_root else parts
+                    if close == cursor + 2 and tokens[cursor + 1].kind == "string":
+                        symbol = ".".join([*base_parts, tokens[cursor + 1].value])
+                        references.append(_global_reference(
+                            artifact, root, relative, token, symbol,
+                            "global.assignment", "index assignment", top_level, explicit_root,
+                        ))
+                    else:
+                        references.append(_global_reference(
+                            artifact, root, relative, token, f"<dynamic>@{token.line}",
+                            "global.dynamic", "index assignment", top_level, explicit_root,
+                        ))
+                    index = close + 1
+                    continue
+
+            previous = tokens[index - 1].value if index else None
+            symbol, explicit = _global_symbol(parts)
+            if (
+                cursor < len(tokens)
+                and tokens[cursor].value == "="
+                and previous not in {".", ":", "local", "function"}
+                and symbol
+                and (explicit or (statement_level and parts[0] not in top_level_locals))
+            ):
+                references.append(_global_reference(
+                    artifact, root, relative, token, symbol,
+                    "global.assignment", "assignment", top_level, explicit,
+                ))
+                index = cursor
+        index += 1
+    return references
+
+
 def _override_callback_details(
     tokens: list[_Token], starts: list[int], close_index: int | None
 ) -> dict[str, Any]:
@@ -349,6 +542,12 @@ def _parse_document(
             )
         )
         counts["mod.entry"] += 1
+
+    for reference in _extract_global_references(
+        artifact, root, relative, tokens, depths
+    ):
+        references.append(reference)
+        counts[reference.kind] += 1
 
     for index, token in enumerate(tokens[:-1]):
         if token.kind != "name" or tokens[index + 1].value != "(":
@@ -710,6 +909,27 @@ def analyze_cet_references(
             )
         )
 
+    globals_by_identity: dict[tuple[str, str], list[Reference]] = defaultdict(list)
+    for reference in effective:
+        if reference.kind in {"global.assignment", "global.function"}:
+            globals_by_identity[(
+                str(reference.details.get("mod_root", "")).casefold(),
+                str(reference.details.get("symbol", "")),
+            )].append(reference)
+    shared_globals = [
+        (f"{group[0].details['mod_root']}:{symbol}", group)
+        for (_, symbol), group in globals_by_identity.items()
+        if len({item.mod_name.casefold() for item in group}) > 1
+    ]
+    findings.extend(_aggregate(
+        shared_globals,
+        "CET-GLOBAL-SYMBOL-SHARED",
+        "review",
+        "high",
+        "cross-package CET global-symbol overwrite",
+        "These active files come from different Vortex packages but execute in the same CET mod-root sandbox and write the same explicit global symbol. The last executed write is effective; review the import order and intended integration before treating the overlap as an incompatibility.",
+    ))
+
     installed_roots = {
         reference.identity for reference in active if reference.kind == "mod.entry"
     }
@@ -850,6 +1070,27 @@ def build_cet_coverage(
             [item for item in effective if item.kind.startswith("hook.") and item.kind != "hook.dynamic"]
         ).values()
     )
+    packages_by_root: dict[str, set[str]] = defaultdict(set)
+    for reference in effective:
+        packages_by_root[str(reference.details.get("mod_root", "")).casefold()].add(
+            reference.mod_name
+        )
+    merged_roots = sum(len(packages) > 1 for packages in packages_by_root.values())
+    global_writes = sum(
+        counts[kind] for kind in ("global.assignment", "global.function")
+    )
+    dynamic_globals = counts["global.dynamic"]
+    global_groups: dict[tuple[str, str], list[Reference]] = defaultdict(list)
+    for item in effective:
+        if item.kind in {"global.assignment", "global.function"}:
+            global_groups[(
+                str(item.details.get("mod_root", "")).casefold(),
+                str(item.details.get("symbol", "")),
+            )].append(item)
+    shared_globals = sum(
+        len({item.mod_name.casefold() for item in group}) > 1
+        for group in global_groups.values()
+    )
     return {
         "documents": len(document_list),
         "sections": [
@@ -864,6 +1105,15 @@ def build_cet_coverage(
                 "documents": sum(bool(document.call_counts) for document in document_list),
                 "status": "partial" if dynamic else "analyzed",
                 "note": "Literal lifecycle events, bindings, dependencies, Native Settings paths, observers, and overrides are extracted. Dynamic argument construction remains inventoried but not compared.",
+            },
+            {
+                "name": "CET explicit global symbols",
+                "documents": sum(
+                    any(kind.startswith("global.") for kind in document.call_counts)
+                    for document in document_list
+                ),
+                "status": "partial",
+                "note": "Definite top-level global assignments/functions plus explicit _G/_ENV/rawset writes are inventoried. Cross-package duplicates are compared only inside one merged CET root; computed names and ambiguous lexical writes remain partial.",
             },
         ],
         "registration_operations": [
@@ -881,6 +1131,10 @@ def build_cet_coverage(
                 "observers": counts["hook.observe_before"] + counts["hook.observe_after"],
                 "overrides": counts["hook.override"],
                 "settings": sum(value for kind, value in counts.items() if kind.startswith("settings.") and kind != "settings.dynamic"),
+                "global_writes": global_writes,
+                "merged_roots": merged_roots,
+                "shared_globals": shared_globals,
+                "dynamic_globals": dynamic_globals,
                 "dynamic_calls": dynamic,
                 "unresolved_modules": unresolved_modules,
                 "shared_hook_targets": shared_hooks,

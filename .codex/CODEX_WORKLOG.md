@@ -6,14 +6,45 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.18.0`
+- Scanner version: `0.19.0`
 - Implemented ecosystems: ArchiveXL, TweakXL, REDscript, and CET Lua
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 88 passing
+- Automated tests: 89 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — CET explicit global-symbol analysis
+
+Completed conservative global-namespace analysis for CET roots assembled from
+multiple Vortex packages.
+
+Changes:
+
+- Extracted definite top-level global assignments and named functions while
+  suppressing known `local` roots and fields inside table constructors.
+- Added explicit `_G`, `_ENV`, literal indexed, and `rawset` writes, including
+  an inventory count for computed keys that cannot be resolved statically.
+- Compared exact symbols only among reachable active files from different
+  packages inside the same CET root. Separate roots remain isolated.
+- Added `CET-GLOBAL-SYMBOL-SHARED` review findings and global/merged-root
+  coverage to JSON, Markdown, and HTML.
+- Bumped scanner version to 0.19.0 and completed the corresponding TODO item.
+
+Validation:
+
+- All 89 tests pass with warnings promoted to errors, including merged-root,
+  separate-root, local-table, explicit-environment, and computed-key cases.
+- The frozen corpus contains 492 reachable definite global writes and two
+  reachable computed global writes across 64 source files.
+- `DamageScaling` is the only active CET root assembled from more than one
+  Vortex package. It contains no exact global symbol written by both packages;
+  the imported standalone GameUI/GameSettings modules keep their tables local.
+- The full cached scan completed in 27.5 seconds. CET references increased to
+  3,105 with no null source lines and no new finding; the combined result stays
+  at 177 findings.
+- Frozen Vortex and game inputs were not modified.
 
 ### 2026-08-03 — CET Lua and runtime-log analysis
 

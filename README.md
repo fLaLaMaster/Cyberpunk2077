@@ -163,6 +163,13 @@ scanner reports selected entrypoint winners, unresolved imports, and explicit
 cross-package module dependencies without treating symbols in separate CET
 roots as one global namespace.
 
+Within a merged root, definite top-level global assignments and function
+declarations are inventoried alongside explicit `_G`, `_ENV`, indexed, and
+`rawset` writes. The same symbol written by different Vortex packages becomes a
+review finding because execution/import order determines the effective value.
+Computed keys and assignments whose lexical scope cannot be proven remain
+partial coverage instead of being treated as collisions.
+
 Lifecycle event registrations and hotkey/input IDs are compared within their
 own root. Shared observers are informational because CET retains each callback.
 Override chains are considered structurally compatible when every inline

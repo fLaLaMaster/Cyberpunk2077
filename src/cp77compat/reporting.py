@@ -227,7 +227,9 @@ def write_reports(
                         f"hotkeys/inputs={operation['hotkeys']}/{operation['inputs']}; "
                         f"requires/GetMod={operation['requires']}/{operation['getmod_dependencies']}; "
                         f"observers/overrides={operation['observers']}/{operation['overrides']}; "
-                        f"settings={operation['settings']}; dynamic={operation['dynamic_calls']}; "
+                        f"settings={operation['settings']}; globals={operation['global_writes']}; "
+                        f"merged roots/shared globals={operation['merged_roots']}/{operation['shared_globals']}; "
+                        f"dynamic globals/API calls={operation['dynamic_globals']}/{operation['dynamic_calls']}; "
                         f"missing modules={operation['unresolved_modules']}; "
                         f"shared hooks={operation['shared_hook_targets']} - {operation['note']}"
                     )
