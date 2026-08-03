@@ -16,11 +16,13 @@ from cp77compat.archivexl import (
     resolve_quest_references,
 )
 from cp77compat.archivexl_payload_analysis import (
+    compare_customization_entries,
     compare_journal_entries,
     compare_factory_entries,
     compare_localization_entries,
     compare_patch_target_entries,
     parse_factory_payload,
+    parse_customization_payload,
     parse_journal_payload,
     parse_localization_payload,
     parse_resource_patch_payload,
@@ -42,6 +44,151 @@ def artifact(path: Path, mod: str) -> Artifact:
 
 
 class ArchiveXLTests(unittest.TestCase):
+    def test_extracts_customization_declarations_with_gender_and_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "customizations.xl"
+            path.write_text(
+                "customizations:\n  female:\n    - mod\\female.inkcharcustomization\n"
+                "  male: mod\\male.inkcharcustomization\n",
+                encoding="utf-8",
+            )
+            _documents, references, findings = parse_documents(
+                [artifact(path, "Example")]
+            )
+            self.assertEqual([], findings)
+            self.assertEqual([3, 4], [item.line for item in references])
+            self.assertEqual(["female", "male"], [item.details["gender"] for item in references])
+            self.assertTrue(all(item.kind == "customization" for item in references))
+
+    def test_parses_customization_groups_options_and_choices(self) -> None:
+        declaration = Reference(
+            "archivexl",
+            "customization",
+            r"mod\female.inkcharcustomization",
+            "A",
+            "a.xl",
+            4,
+            {"gender": "female"},
+        )
+        payload = {
+            "Data": {
+                "RootChunk": {
+                    "$type": "gameuiCharacterCustomizationInfoResource",
+                    "armsGroups": [],
+                    "armsCustomizationOptions": [],
+                    "bodyGroups": [],
+                    "bodyCustomizationOptions": [],
+                    "headGroups": [
+                        {"name": {"$value": "TPP"}, "options": [{"$value": "hair_a"}]}
+                    ],
+                    "headCustomizationOptions": [
+                        {
+                            "Data": {
+                                "$type": "gameuiSwitcherInfo",
+                                "name": {"$value": "hairstyle"},
+                                "uiSlot": {"$value": "hair"},
+                                "options": [
+                                    {
+                                        "$type": "gameuiSwitcherOption",
+                                        "localizedName": "Hair A",
+                                        "names": [{"$value": "hair_a"}],
+                                    }
+                                ],
+                            }
+                        }
+                    ],
+                }
+            }
+        }
+        references, findings = parse_customization_payload(
+            declaration, payload, "a.archive"
+        )
+        self.assertEqual([], findings)
+        self.assertEqual(
+            {
+                "female/head/group/TPP/hair_a",
+                "female/head/name/hairstyle",
+                "female/head/name/hairstyle/choice/Hair A",
+            },
+            {item.identity for item in references},
+        )
+        self.assertTrue(all(item.line == 4 for item in references))
+
+    def test_customization_comparison_separates_composition_and_replacement(self) -> None:
+        options = [
+            Reference(
+                "archivexl",
+                "customization.option",
+                "female/head/name/eyebrows",
+                mod,
+                f"{mod}.xl",
+                details={
+                    "option_type": "gameuiSwitcherInfo",
+                    "metadata_fingerprint": "same",
+                    "named": True,
+                    "gender": "female",
+                    "part": "head",
+                },
+            )
+            for mod in ("A", "B")
+        ]
+        choices = [
+            Reference(
+                "archivexl",
+                "customization.choice",
+                "female/head/name/eyebrows/choice/shared",
+                mod,
+                f"{mod}.xl",
+                details={"fingerprint": fingerprint},
+            )
+            for mod, fingerprint in (("A", "first"), ("B", "second"))
+        ]
+        findings, stats = compare_customization_entries([*options, *choices])
+        self.assertEqual(
+            {
+                "AXL-CUSTOMIZATION-OPTION-COMPOSABLE",
+                "AXL-CUSTOMIZATION-CHOICE-CONFLICT",
+            },
+            {item.rule_id for item in findings},
+        )
+        self.assertEqual(1, stats["composable_entries"])
+        self.assertEqual(1, stats["conflicting_entries"])
+
+    def test_customization_selector_overlap_honors_wildcards_not_empty_cnames(self) -> None:
+        def option(mod: str, identity: str, slot: str) -> Reference:
+            return Reference(
+                "archivexl",
+                "customization.option",
+                identity,
+                mod,
+                f"{mod}.xl",
+                details={
+                    "named": False,
+                    "gender": "female",
+                    "part": "head",
+                    "ui_slot": slot,
+                    "link": "",
+                    "option_type": "gameuiAppearanceInfo",
+                    "metadata_fingerprint": mod,
+                },
+            )
+
+        findings, stats = compare_customization_entries(
+            [
+                option("A", "female/head/selector/slot=eyes_color*", "eyes_color*"),
+                option("B", "female/head/selector/slot=eyes_color", "eyes_color"),
+                option("C", "female/head/selector/slot=hair_color", "hair_color"),
+            ]
+        )
+        selector_findings = [
+            item
+            for item in findings
+            if item.rule_id == "AXL-CUSTOMIZATION-SELECTOR-OVERLAP"
+        ]
+        self.assertEqual(1, len(selector_findings))
+        self.assertEqual(["A", "B"], selector_findings[0].participants)
+        self.assertEqual(1, stats["review_entries"])
+
     def test_extracts_override_tags_with_effective_masks_and_lines(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "overrides.xl"

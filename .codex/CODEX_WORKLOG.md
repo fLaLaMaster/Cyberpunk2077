@@ -6,14 +6,51 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.12.0`
+- Scanner version: `0.13.0`
 - Implemented ecosystems: ArchiveXL and TweakXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 60 passing
+- Automated tests: 65 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — ArchiveXL character-customization analysis
+
+Completed static and payload-level analysis of ArchiveXL `customizations`.
+
+Changes:
+
+- Parsed exact `female`/`male` declarations with structural source lines and
+  resolved every resource against its declaring mod archive.
+- Added selective serialization of `.inkcharcustomization` resources and
+  ArchiveXL-equivalent identities for arms/body/head groups, named options,
+  anonymous `uiSlot`/`link` selectors, and appearance/morph/switcher choices.
+- Modeled anonymous appearance inheritance, named linked-option content,
+  case-sensitive identities, wildcard slot matching, native-type rejection,
+  and last-wins choice replacement.
+- Added composable, duplicate, conflict, metadata-review, and selector-review
+  rules with participant-set consolidation.
+- Added `customizations` as a payload-scope choice and exposed group, option,
+  choice, cache, and outcome counts in Markdown/HTML coverage.
+- Added ArchiveXL runtime recognition and attribution for character
+  customization native-type mismatch warnings.
+- Bumped the scanner to version 0.13.0 and updated README/config guidance.
+
+Validation:
+
+- All 65 automated tests pass; bytecode compilation and `git diff --check`
+  succeed.
+- The frozen corpus contains 30 declarations over 29 unique payloads; all 29
+  serialized successfully with zero failures.
+- Extracted 720 group entries, 335 options, and 8,455 choices (9,510 merge
+  identities).
+- Found two composable overlaps: the female and male `eyebrows` switchers from
+  Beautiful Eyebrows 01 and 02. No customization conflict, duplicate, or review
+  identity remains.
+- First population took 110.9 seconds; the fully cached complete scan took
+  19.7 seconds and regenerated the searchable HTML report.
+- Frozen Vortex and game inputs were not modified.
 
 ### 2026-08-03 — ArchiveXL visual-tag override analysis
 

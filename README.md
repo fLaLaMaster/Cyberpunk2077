@@ -29,6 +29,9 @@ Implemented analysis includes:
   edit markers;
 - ArchiveXL `overrides.tags` parsing for hide/show chunk lists, shorthand hide
   lists, and raw masks, with whole-tag last-wins collision checks;
+- ArchiveXL character-customization payload inspection with case-sensitive
+  group, named-option, anonymous slot/link selector, native-type, and
+  type-specific choice comparison;
 - newest-session ArchiveXL runtime parsing across rotated log chunks, with
   localization, quest-phase, and streaming-sector source attribution plus
   static quest-target confirmation;
@@ -61,6 +64,13 @@ names are case-sensitive, and a later same-name tag replaces the entire earlier
 definition. Identical definitions are informational duplicates; different
 definitions are load-order conflicts even when their component lists are
 disjoint.
+
+Character-customization analysis follows ArchiveXL's two-pass merge model:
+named options merge first, then anonymous `uiSlot`/`link` selectors. Compatible
+shared options with distinct choices are normal composition. A native-type
+mismatch is a conflict, while a repeated appearance, morph, or switcher choice
+with different content is a load-order replacement conflict. Wildcard slot
+selectors are checked using the same directional prefix rule as ArchiveXL.
 
 The TweakXL parser preserves YAML anchors, aliases, repeated template roots,
 and the `!append`, `!append-once`, `!append-from`, `!prepend`,
@@ -145,9 +155,9 @@ Archive modes:
 - `--no-refresh-cache` overrides a YAML `refresh_cache: true` value.
 - `--payload-scope all` inspects every implemented ArchiveXL payload type
   (default).
-- `--payload-scope localization`, `--payload-scope factories`,
-  `--payload-scope journals`, or `--payload-scope patches` limits inspection to
-  that payload type.
+- `--payload-scope customizations`, `--payload-scope localization`,
+  `--payload-scope factories`, `--payload-scope journals`, or
+  `--payload-scope patches` limits inspection to that payload type.
 - `--payload-scope none` keeps the scan declaration-only and does not
   materialize payloads.
 
@@ -156,6 +166,13 @@ Every payload is written only beneath
 `.cache/archives/<archive-sha256>/extracted`; metadata records the exact command,
 tool version, source hash, resource hash, result, timing, size, and payload hash.
 CR2W JSON serialization is cached separately for fast repeat scans.
+
+Customization inspection selectively serializes declared male/female
+`.inkcharcustomization` resources. It compares case-sensitive group entries,
+named options, anonymous `uiSlot`/`link` selectors, native option types, and the
+type-specific choice identities used by ArchiveXL. Distinct choices on a
+compatible shared option are reported as composable; repeated choices with
+different payloads are load-order conflicts.
 
 ## Reports
 

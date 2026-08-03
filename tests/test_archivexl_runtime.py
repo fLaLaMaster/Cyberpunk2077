@@ -26,6 +26,26 @@ def artifact(path: Path, mod: str, relative_path: str) -> Artifact:
 
 
 class ArchiveXLRuntimeTests(unittest.TestCase):
+    def test_parser_extracts_customization_type_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "ArchiveXL-2026-01-01-00-00-00.log"
+            path.write_text(
+                '[2026-01-01 00:00:00.000] [1] [warning] '
+                '[CharacterCustomization] Option "eyebrows" can\'t be merged: '
+                'expected gameuiSwitcherInfo, got gameuiMorphInfo.\n',
+                encoding="utf-8",
+            )
+            events, lines = parse_archivexl_runtime_logs([path])
+            self.assertEqual(1, lines)
+            self.assertEqual(1, len(events))
+            self.assertEqual(
+                "AXL-RUNTIME-CUSTOMIZATION-TYPE-MISMATCH",
+                events[0].rule_id,
+            )
+            self.assertEqual("eyebrows", events[0].identity)
+            self.assertEqual("gameuiSwitcherInfo", events[0].details["expected_type"])
+            self.assertEqual("gameuiMorphInfo", events[0].details["actual_type"])
+
     def test_parser_pairs_journal_issue_and_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "ArchiveXL-2026-01-01-00-00-00.log"

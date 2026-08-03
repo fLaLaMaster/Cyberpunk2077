@@ -17,7 +17,8 @@ scan:
   # all: every mod archive.
   archive_scope: xl
 
-  # none: declarations only; localization/factories/journals/patches: inspect that type;
+  # none: declarations only; customizations/localization/factories/journals/patches:
+  # inspect that type;
   # all: inspect every implemented ArchiveXL payload type.
   payload_scope: all
 

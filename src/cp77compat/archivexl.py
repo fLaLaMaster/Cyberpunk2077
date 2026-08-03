@@ -34,8 +34,8 @@ RESOURCE_OPERATIONS = {"copy", "fix", "link", "patch", "scope"}
 
 SECTION_COVERAGE = {
     "customizations": (
-        "unsupported",
-        "Declarations are inventoried but customization identities are not compared yet.",
+        "partial",
+        "Male and female customization resources are resolved; option, group, and choice identities require selective payload inspection.",
     ),
     "factories": (
         "partial",
@@ -971,6 +971,87 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
     data = document.data
     refs: list[Reference] = []
 
+    customizations = data.get("customizations")
+    customization_line = _mapping_line(data, "customizations")
+    if customizations is not None:
+        if not isinstance(customizations, dict):
+            findings.append(
+                Finding(
+                    rule_id="AXL-CUSTOMIZATION-SHAPE",
+                    severity="error",
+                    confidence="high",
+                    summary="Invalid ArchiveXL customizations declaration",
+                    explanation=(
+                        "customizations must be a mapping containing male and/or "
+                        "female resource paths."
+                    ),
+                    participants=[document.artifact.mod_name],
+                    evidence=[
+                        {
+                            "path": str(document.artifact.absolute_path),
+                            "line": customization_line,
+                        }
+                    ],
+                )
+            )
+        else:
+            for raw_gender, value in customizations.items():
+                gender_line = _mapping_line(customizations, raw_gender, customization_line)
+                gender = str(raw_gender)
+                if gender not in {"female", "male"}:
+                    findings.append(
+                        Finding(
+                            rule_id="AXL-CUSTOMIZATION-UNKNOWN-GENDER",
+                            severity="error",
+                            confidence="high",
+                            summary=f"Unknown ArchiveXL customization gender: {gender}",
+                            explanation=(
+                                "ArchiveXL accepts only the exact customizations keys "
+                                "female and male."
+                            ),
+                            participants=[document.artifact.mod_name],
+                            evidence=[
+                                {
+                                    "path": str(document.artifact.absolute_path),
+                                    "line": gender_line,
+                                }
+                            ],
+                        )
+                    )
+                    continue
+                paths = _as_paths(value, gender_line)
+                if not paths:
+                    findings.append(
+                        Finding(
+                            rule_id="AXL-CUSTOMIZATION-SHAPE",
+                            severity="error",
+                            confidence="high",
+                            summary=f"Invalid ArchiveXL {gender} customization declaration",
+                            explanation=(
+                                "A customization gender must contain a resource path "
+                                "or a sequence of resource paths."
+                            ),
+                            participants=[document.artifact.mod_name],
+                            evidence=[
+                                {
+                                    "path": str(document.artifact.absolute_path),
+                                    "line": gender_line,
+                                }
+                            ],
+                        )
+                    )
+                    continue
+                for item, line in paths:
+                    refs.append(
+                        _reference(
+                            document,
+                            "customization",
+                            item,
+                            line,
+                            gender=gender,
+                        )
+                    )
+
     resource = data.get("resource")
     if isinstance(resource, dict):
         refs.extend(_extract_resource_references(document, resource, findings))
@@ -1849,6 +1930,7 @@ def resolve_archive_references(
             loose_global[candidate].add(artifact.mod_name)
 
     resolvable_kinds = {
+        "customization",
         "factory",
         "journal",
         "localization.onscreens",

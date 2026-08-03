@@ -117,7 +117,10 @@ python -m unittest discover -s tests -v
   resource patch sources are serialized and compared through stable named
   objects, scalar properties, and C2dArray row identities. Journal resources
   are reconstructed into effective entry paths and compared using ArchiveXL's
-  container, leaf, and final-`*` property-edit semantics.
+  container, leaf, and final-`*` property-edit semantics. Character
+  customization resources are compared by gender, body part, group entry,
+  named option, anonymous slot/link selector, native type, and type-specific
+  choice identity.
 - `src/cp77compat/archivexl.py`
   Parses YAML and JSON `.xl` files, rejects duplicate YAML keys, tolerates the
   tab variants present in the frozen corpus, extracts ArchiveXL references,
@@ -130,7 +133,8 @@ python -m unittest discover -s tests -v
   chronological order, pairs root-cause and consequence messages, attributes
   localization/streaming events through semantic references, and maps missing
   quest phases through exact child or parent references. Journal resource and
-  merge failures are also attributed to their static declarations.
+  merge failures are also attributed to their static declarations, and
+  customization native-type mismatch warnings are mapped to option names.
 - `src/cp77compat/tweakxl.py`
   Parses deployed `.yaml` and `.yml` files under `r6/tweaks`, preserves YAML
   anchors, aliases, duplicate template roots, and TweakXL tags, expands
@@ -185,7 +189,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.12.0 scan on 2026-08-03 reported:
+The successful v0.13.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -193,10 +197,13 @@ The successful v0.12.0 scan on 2026-08-03 reported:
   framework bundle placeholder.
 - 78 ArchiveXL-related archives indexed.
 - 5,458 indexed archive members.
-- 49,209 extracted ArchiveXL references, including 596 child/parent references
+- 58,749 extracted ArchiveXL references, including 596 child/parent references
   from 298 quest phase merges, 4,124 serialized localization entries, 14
   factory entity rows, 232 serialized journal entries, and 8,302 target-scoped
   resource patch inner identities.
+- Thirty male/female customization declarations resolved to 29 unique archive
+  payloads. All serialized successfully into 720 group entries, 335 options,
+  and 8,455 choices (9,510 merge identities total).
 - 216 deployed TweakXL YAML files: 214 non-empty configs parsed and two empty
   configs reported informationally.
 - 57,455 concrete TweakXL references after `$instances` expansion.
@@ -232,20 +239,22 @@ The successful v0.12.0 scan on 2026-08-03 reported:
   bytes, and 472,639 lines. Its two errors and six warnings were fully
   attributed and consolidated into four findings; all four quest events have
   exact static missing-target confirmations.
-- 58 consolidated findings overall:
+- 59 consolidated findings overall:
   - 6 conflict candidates.
   - 9 errors.
   - 9 warnings.
   - 16 review groups.
-  - 18 informational findings.
+  - 19 informational findings.
 - Zero WolvenKit indexing failures.
-- Sixty automated tests passing.
+- Sixty-five automated tests passing.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
   seconds. The v0.7 dependency-enabled fully cached scan completes in about
-  17.8 seconds, including indexing the local official TweakDB sources.
-- All 106,664 ArchiveXL and TweakXL references have one-based declaration/source
+  17.8 seconds, including indexing the local official TweakDB sources. The first
+  customization payload pass completed in 110.9 seconds; the fully cached
+  v0.13 normal scan completed in 19.7 seconds.
+- All 116,204 ArchiveXL and TweakXL references have one-based declaration/source
   lines in the generated reports. Serialized localization, factory, and journal
   entries additionally carry their zero-based payload `entry_index` or
   `row_index`. For minified one-line
@@ -307,6 +316,10 @@ Important current findings:
 20. HG Enemies, NCEE Enemies, and NCEE NPC reference three absent New Game Plus
     quest parents. They Will Remember separately references an absent
     retaliation phase at lines 63 and 65.
+21. The Beautiful Eyebrows 01 and 02 packs intentionally extend the same
+    female and male `eyebrows` switcher options with disjoint choice names.
+    ArchiveXL composes both overlaps; there are no customization conflicts,
+    duplicate choices, or review findings in the frozen collection.
 
 Analyzer coverage is embedded in all primary reports. It currently records 45
 ArchiveXL documents with `resource` sections and marks all five installed
@@ -336,6 +349,11 @@ finding count.
 The four installed `overrides.tags` documents are fully analyzed using
 ArchiveXL-equivalent effective component masks and whole-definition last-wins
 semantics. Their 12 tag names are all distinct.
+All 19 installed `customizations` documents are analyzed at declaration and
+payload level. Coverage includes exact resource resolution, ArchiveXL's
+anonymous appearance inheritance, named linked-option behavior, wildcard slot
+matching, group append semantics, native option types, and appearance/morph/
+switcher choice replacement identities.
 
 ## Generated reports
 

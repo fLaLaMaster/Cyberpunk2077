@@ -47,6 +47,10 @@ JOURNAL_ISSUE_PATTERN = re.compile(
     r"^(?P<identity>.+): (?P<reason>Cannot modify entry, (?:path not fould|type mismatch)|Path not fould)\.$"
 )
 JOURNAL_SUMMARY_PATTERN = re.compile(r"^Journal entries merged with issues\.$")
+CUSTOMIZATION_OPTION_PATTERN = re.compile(
+    r'^Option "(?P<identity>.*)" can\'t be merged: expected '
+    r'(?P<expected>[^,]+), got (?P<actual>.+)\.$'
+)
 
 
 @dataclass(slots=True)
@@ -186,6 +190,13 @@ def parse_archivexl_runtime_logs(
                         details["consequence"] = True
                     else:
                         rule_id = "AXL-RUNTIME-WARNING"
+                elif component == "CharacterCustomization" and (
+                    specific := CUSTOMIZATION_OPTION_PATTERN.match(message)
+                ):
+                    rule_id = "AXL-RUNTIME-CUSTOMIZATION-TYPE-MISMATCH"
+                    identity = specific.group("identity")
+                    details["expected_type"] = specific.group("expected")
+                    details["actual_type"] = specific.group("actual")
                 else:
                     rule_id = (
                         "AXL-RUNTIME-ERROR" if level == "error" else "AXL-RUNTIME-WARNING"
@@ -295,6 +306,40 @@ def _reference_sources(
     return result
 
 
+def _customization_option_sources(
+    identity: str,
+    references: list[Reference],
+    active_paths: set[str],
+) -> list[dict[str, Any]]:
+    matched = [
+        reference
+        for reference in references
+        if reference.kind == "customization.option"
+        and str(reference.details.get("name") or "") == identity
+        and reference.source_path.casefold() in active_paths
+    ]
+    sources: dict[tuple[str, str], dict[str, Any]] = {}
+    for reference in matched:
+        key = (reference.mod_name, reference.source_path.casefold())
+        source = sources.setdefault(
+            key,
+            {
+                "mod_name": reference.mod_name,
+                "source_path": reference.source_path,
+                "line": reference.line,
+                "lines": [],
+                "reference_kinds": [reference.kind],
+                "match": "customization option name",
+            },
+        )
+        if reference.line is not None:
+            source["lines"].append(reference.line)
+    return sorted(
+        sources.values(),
+        key=lambda item: (item["mod_name"].casefold(), item["source_path"].casefold()),
+    )
+
+
 def _config_sources(
     config_name: str | None,
     artifact_by_name: dict[str, list[Artifact]],
@@ -355,6 +400,11 @@ def _static_correlations(
             "AXL-JOURNAL-ENTRY-CONFLICT",
             "AXL-JOURNAL-PAYLOAD-SHAPE",
         }
+    elif event.rule_id == "AXL-RUNTIME-CUSTOMIZATION-TYPE-MISMATCH":
+        allowed = {
+            "AXL-CUSTOMIZATION-OPTION-TYPE-CONFLICT",
+            "AXL-CUSTOMIZATION-PAYLOAD-SHAPE",
+        }
     else:
         return []
     normalized = normalize_game_path(event.identity)
@@ -414,6 +464,14 @@ def analyze_archivexl_runtime_logs(
             if event.identity
             else []
         )
+        if (
+            not sources
+            and event.identity is not None
+            and event.rule_id == "AXL-RUNTIME-CUSTOMIZATION-TYPE-MISMATCH"
+        ):
+            sources = _customization_option_sources(
+                event.identity, reference_list, active_paths
+            )
         if not sources and event.rule_id == "AXL-RUNTIME-QUEST-PHASE-MISSING":
             sources = text_sources.get(event.identity or "", [])
         if not sources and event.config_name:
@@ -481,6 +539,12 @@ def analyze_archivexl_runtime_logs(
             "high",
             "journal entries failed to merge",
             "ArchiveXL could not resolve or safely edit a journal entry path. The affected entry operation was skipped.",
+        ),
+        "AXL-RUNTIME-CUSTOMIZATION-TYPE-MISMATCH": (
+            "warning",
+            "high",
+            "customization options failed to merge",
+            "ArchiveXL matched a character-customization option but refused to merge it because the source and target native option types differ.",
         ),
         "AXL-RUNTIME-ERROR": (
             "error",

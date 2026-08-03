@@ -1,6 +1,6 @@
 # Codex TODO
 
-Last reviewed: 2026-08-02
+Last reviewed: 2026-08-03
 
 This list describes planned scanner work. Reorder it when user priorities
 change. Check an item only after implementation, relevant tests, and a real
@@ -51,7 +51,7 @@ frozen-corpus validation pass are complete.
   and fix rewrites across mods.
 - [x] Inspect identities inside serialized resource patch payloads when two or
   more mods patch the same target.
-- [ ] Add `customizations` identity and slot/group collision checks.
+- [x] Add `customizations` identity and slot/group collision checks.
 - [ ] Determine whether duplicate streaming node deletions are always unsafe,
   idempotent, or rule-dependent; adjust confidence/severity accordingly.
 - [x] Correlate the newest rotated ArchiveXL log session with semantic

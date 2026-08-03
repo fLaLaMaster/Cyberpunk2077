@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+from copy import deepcopy
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Iterable
@@ -619,6 +620,563 @@ def inspect_factory_payloads(
         "extraction_cache_hits": extraction_cache_hits,
         "serialization_cache_hits": serialization_cache_hits,
         **target_stats,
+    }
+    return payload_references, findings, stats
+
+
+_CUSTOMIZATION_PARTS = ("arms", "body", "head")
+_CUSTOMIZATION_CHOICE_FIELDS = {
+    "gameuiAppearanceInfo": ("definitions", "name"),
+    "gameuiMorphInfo": ("morphNames", "localizedName"),
+    "gameuiSwitcherInfo": ("options", "localizedName"),
+}
+
+
+def _customization_shape_finding(
+    declaration: Reference, explanation: str, archive_path: str
+) -> Finding:
+    return Finding(
+        rule_id="AXL-CUSTOMIZATION-PAYLOAD-SHAPE",
+        severity="error",
+        confidence="high",
+        summary=f"Invalid customization payload: {declaration.identity}",
+        explanation=explanation,
+        participants=[declaration.mod_name],
+        evidence=[{**declaration.to_dict(), "archive_path": archive_path}],
+    )
+
+
+def _customization_option_identity(
+    gender: str, part: str, option: dict[str, Any]
+) -> tuple[str | None, dict[str, Any]]:
+    def cname(key: str) -> str:
+        value = str(_scalar(option.get(key)) or "").strip()
+        return "" if value == "None" else value
+
+    name = cname("name")
+    ui_slot = cname("uiSlot")
+    link = cname("link")
+    if name:
+        return f"{gender}/{part}/name/{name}", {
+            "named": True,
+            "name": name,
+            "ui_slot": ui_slot,
+            "link": link,
+        }
+    selectors = []
+    if ui_slot:
+        selectors.append(f"slot={ui_slot}")
+    if link:
+        selectors.append(f"link={link}")
+    if not selectors:
+        return None, {"named": False, "ui_slot": ui_slot, "link": link}
+    return f"{gender}/{part}/selector/{'|'.join(selectors)}", {
+        "named": False,
+        "ui_slot": ui_slot,
+        "link": link,
+    }
+
+
+def _expanded_customization_options(values: Any) -> list[dict[str, Any]]:
+    """Apply ArchiveXL's inheritance for consecutive anonymous appearance options."""
+    if not isinstance(values, list):
+        return []
+    expanded: list[dict[str, Any]] = []
+    previous_appearance: dict[str, Any] | None = None
+    for wrapped in values:
+        value = _journal_handle_data(wrapped)
+        if not isinstance(value, dict):
+            continue
+        option = deepcopy(value)
+        option_type = str(option.get("$type") or "")
+        name = str(_scalar(option.get("name")) or "").strip()
+        if option_type == "gameuiAppearanceInfo" and (not name or name == "None"):
+            if previous_appearance is not None:
+                if not option.get("definitions"):
+                    option["definitions"] = deepcopy(
+                        previous_appearance.get("definitions") or []
+                    )
+                if not option.get("resource"):
+                    option["resource"] = deepcopy(previous_appearance.get("resource"))
+            previous_appearance = option
+        expanded.append(option)
+    return expanded
+
+
+def parse_customization_payload(
+    declaration: Reference, serialized: Any, archive_path: str
+) -> tuple[list[Reference], list[Finding]]:
+    try:
+        resource = serialized["Data"]["RootChunk"]
+    except (KeyError, TypeError):
+        resource = None
+    if (
+        not isinstance(resource, dict)
+        or resource.get("$type") != "gameuiCharacterCustomizationInfoResource"
+    ):
+        return [], [
+            _customization_shape_finding(
+                declaration,
+                "WolvenKit JSON has no gameuiCharacterCustomizationInfoResource RootChunk.",
+                archive_path,
+            )
+        ]
+
+    gender = str(declaration.details.get("gender") or "unknown")
+    payload_source = f"{archive_path}::{declaration.identity}"
+    common = {
+        "gender": gender,
+        "resource_path": declaration.identity,
+        "payload_source": payload_source,
+        "declaration_source_path": declaration.source_path,
+        "declaration_line": declaration.line,
+    }
+    references: list[Reference] = []
+    findings: list[Finding] = []
+    for part in _CUSTOMIZATION_PARTS:
+        groups = resource.get(f"{part}Groups") or []
+        if not isinstance(groups, list):
+            findings.append(
+                _customization_shape_finding(
+                    declaration, f"{part}Groups must be an array.", archive_path
+                )
+            )
+            groups = []
+        for group_index, group in enumerate(groups):
+            if not isinstance(group, dict):
+                continue
+            group_name = str(_scalar(group.get("name")) or "").strip()
+            entries = group.get("options") or []
+            if not group_name or not isinstance(entries, list):
+                continue
+            for entry_index, entry in enumerate(entries):
+                entry_name = str(_scalar(entry) or "").strip()
+                if not entry_name:
+                    continue
+                references.append(
+                    Reference(
+                        ecosystem="archivexl",
+                        kind="customization.group.entry",
+                        identity=f"{gender}/{part}/group/{group_name}/{entry_name}",
+                        mod_name=declaration.mod_name,
+                        source_path=declaration.source_path,
+                        line=declaration.line,
+                        details={
+                            **common,
+                            "part": part,
+                            "group_name": group_name,
+                            "entry_name": entry_name,
+                            "group_index": group_index,
+                            "entry_index": entry_index,
+                            "fingerprint": _patch_fingerprint(entry),
+                        },
+                    )
+                )
+
+        raw_options = resource.get(f"{part}CustomizationOptions") or []
+        if not isinstance(raw_options, list):
+            findings.append(
+                _customization_shape_finding(
+                    declaration,
+                    f"{part}CustomizationOptions must be an array.",
+                    archive_path,
+                )
+            )
+            continue
+        expanded_options = _expanded_customization_options(raw_options)
+        named_options = {
+            str(_scalar(item.get("name")) or "").strip(): item
+            for item in expanded_options
+            if str(_scalar(item.get("name")) or "").strip() not in {"", "None"}
+        }
+        for option_index, option in enumerate(expanded_options):
+            declared_option_type = str(option.get("$type") or "")
+            identity, selectors = _customization_option_identity(
+                gender, part, option
+            )
+            if identity is None:
+                findings.append(
+                    _customization_shape_finding(
+                        declaration,
+                        f"{part} option {option_index} has no name, uiSlot, or link selector.",
+                        archive_path,
+                    )
+                )
+                continue
+            content_option = option
+            if selectors.get("named") and selectors.get("link"):
+                content_option = named_options.get(
+                    str(selectors["link"]), option
+                )
+            option_type = str(content_option.get("$type") or "")
+            choice_field, choice_key = _CUSTOMIZATION_CHOICE_FIELDS.get(
+                option_type, (None, None)
+            )
+            metadata = {
+                key: value
+                for key, value in option.items()
+                if key not in {choice_field, "index", "defaultIndex"}
+            }
+            option_details = {
+                **common,
+                **selectors,
+                "part": part,
+                "option_type": option_type,
+                "declared_option_type": declared_option_type,
+                "option_index": option_index,
+                "choice_field": choice_field,
+                "metadata_fingerprint": _patch_fingerprint(metadata),
+            }
+            references.append(
+                Reference(
+                    ecosystem="archivexl",
+                    kind="customization.option",
+                    identity=identity,
+                    mod_name=declaration.mod_name,
+                    source_path=declaration.source_path,
+                    line=declaration.line,
+                    details=option_details,
+                )
+            )
+            choices = content_option.get(choice_field) if choice_field else None
+            if not isinstance(choices, list) or choice_key is None:
+                continue
+            for choice_index, choice in enumerate(choices):
+                choice_data = _journal_handle_data(choice)
+                if not isinstance(choice_data, dict):
+                    continue
+                choice_identity = str(
+                    _scalar(choice_data.get(choice_key)) or ""
+                ).strip()
+                if not choice_identity:
+                    continue
+                references.append(
+                    Reference(
+                        ecosystem="archivexl",
+                        kind="customization.choice",
+                        identity=f"{identity}/choice/{choice_identity}",
+                        mod_name=declaration.mod_name,
+                        source_path=declaration.source_path,
+                        line=declaration.line,
+                        details={
+                            **option_details,
+                            "option_identity": identity,
+                            "choice_identity": choice_identity,
+                            "choice_key": choice_key,
+                            "choice_index": choice_index,
+                            "fingerprint": _patch_fingerprint(choice_data),
+                        },
+                    )
+                )
+    return references, findings
+
+
+def _selector_overlaps(left: Reference, right: Reference) -> bool:
+    if left.details.get("named") or right.details.get("named"):
+        return False
+    if left.details.get("gender") != right.details.get("gender"):
+        return False
+    if left.details.get("part") != right.details.get("part"):
+        return False
+    def matches(source: Reference, target: Reference) -> bool:
+        source_slot = str(source.details.get("ui_slot") or "")
+        target_slot = str(target.details.get("ui_slot") or "")
+        source_link = str(source.details.get("link") or "")
+        target_link = str(target.details.get("link") or "")
+        if not source_slot and not source_link:
+            return False
+        if source_slot:
+            if source_slot.endswith("*"):
+                if not target_slot.startswith(source_slot[:-1]):
+                    return False
+            elif source_slot != target_slot:
+                return False
+        # ArchiveXL 1.26.0 checks link values exactly. Its current source computes
+        # the link-wildcard flag from the already-trimmed slot string.
+        if source_link and source_link != target_link:
+            return False
+        return True
+
+    return matches(left, right) or matches(right, left)
+
+
+def _consolidate_customization_findings(
+    raw: Iterable[Finding], stats: dict[str, int]
+) -> list[Finding]:
+    grouped: dict[tuple[str, tuple[str, ...]], list[Finding]] = defaultdict(list)
+    for finding in raw:
+        grouped[(finding.rule_id, tuple(finding.participants))].append(finding)
+        if finding.rule_id.endswith("COMPOSABLE"):
+            stats["composable_entries"] += 1
+        elif finding.rule_id.endswith("DUPLICATE"):
+            stats["duplicate_entries"] += 1
+        elif finding.rule_id.endswith("CONFLICT"):
+            stats["conflicting_entries"] += 1
+        elif finding.severity == "review":
+            stats["review_entries"] += 1
+    result: list[Finding] = []
+    for (_rule, participants), items in grouped.items():
+        first = items[0]
+        result.append(
+            Finding(
+                rule_id=first.rule_id,
+                severity=first.severity,
+                confidence=first.confidence,
+                summary=(first.summary if len(items) == 1 else f"{len(items)} {first.summary}"),
+                explanation=first.explanation,
+                participants=list(participants),
+                evidence=[evidence for item in items for evidence in item.evidence],
+            )
+        )
+    return sorted(result, key=lambda item: item.sort_key())
+
+
+def compare_customization_entries(
+    references: Iterable[Reference],
+) -> tuple[list[Finding], dict[str, int]]:
+    refs = list(references)
+    raw: list[Finding] = []
+    by_kind_identity: dict[tuple[str, str], list[Reference]] = defaultdict(list)
+    for reference in refs:
+        if reference.kind.startswith("customization."):
+            # ArchiveXL compares CName and localized-name identities case-sensitively.
+            by_kind_identity[(reference.kind, reference.identity)].append(reference)
+
+    for (kind, _identity), group in by_kind_identity.items():
+        mods = sorted({item.mod_name for item in group}, key=str.casefold)
+        if len(mods) < 2:
+            continue
+        first = group[0]
+        if kind == "customization.group.entry":
+            raw.append(
+                Finding(
+                    rule_id="AXL-CUSTOMIZATION-GROUP-ENTRY-DUPLICATE",
+                    severity="info",
+                    confidence="high",
+                    summary="duplicate customization group entries",
+                    explanation=(
+                        "ArchiveXL appends group entries without deduplicating them; "
+                        "the same entry is therefore registered more than once."
+                    ),
+                    participants=mods,
+                    evidence=[item.to_dict() for item in group],
+                )
+            )
+        elif kind == "customization.option":
+            types = {str(item.details.get("option_type") or "") for item in group}
+            metadata = {
+                str(item.details.get("metadata_fingerprint") or "") for item in group
+            }
+            if len(types) > 1:
+                raw.append(
+                    Finding(
+                        rule_id="AXL-CUSTOMIZATION-OPTION-TYPE-CONFLICT",
+                        severity="conflict",
+                        confidence="high",
+                        summary="customization options with incompatible native types",
+                        explanation=(
+                            "ArchiveXL refuses to merge a matching option when its "
+                            "native option type differs."
+                        ),
+                        participants=mods,
+                        evidence=[item.to_dict() for item in group],
+                    )
+                )
+            elif len(metadata) > 1:
+                raw.append(
+                    Finding(
+                        rule_id="AXL-CUSTOMIZATION-OPTION-METADATA-REVIEW",
+                        severity="review",
+                        confidence="medium",
+                        summary="customization options with differing non-choice metadata",
+                        explanation=(
+                            "The options share a merge identity but differ outside their "
+                            "choice arrays. The first-created option supplies that metadata, "
+                            "so the result can depend on archive load order."
+                        ),
+                        participants=mods,
+                        evidence=[item.to_dict() for item in group],
+                    )
+                )
+            else:
+                raw.append(
+                    Finding(
+                        rule_id="AXL-CUSTOMIZATION-OPTION-COMPOSABLE",
+                        severity="info",
+                        confidence="high",
+                        summary="composable customization option overlaps",
+                        explanation=(
+                            "The mods extend the same compatible option. ArchiveXL merges "
+                            "their choice arrays by the type-specific choice identity."
+                        ),
+                        participants=mods,
+                        evidence=[item.to_dict() for item in group],
+                    )
+                )
+        elif kind == "customization.choice":
+            fingerprints = {str(item.details.get("fingerprint") or "") for item in group}
+            conflict = len(fingerprints) > 1
+            raw.append(
+                Finding(
+                    rule_id=(
+                        "AXL-CUSTOMIZATION-CHOICE-CONFLICT"
+                        if conflict
+                        else "AXL-CUSTOMIZATION-CHOICE-DUPLICATE"
+                    ),
+                    severity="conflict" if conflict else "info",
+                    confidence="high",
+                    summary=(
+                        "competing customization choice definitions"
+                        if conflict
+                        else "duplicate customization choice definitions"
+                    ),
+                    explanation=(
+                        "ArchiveXL replaces an existing matching choice; the later archive "
+                        + (
+                            "wins because these definitions differ."
+                            if conflict
+                            else "wins, although these definitions are identical."
+                        )
+                    ),
+                    participants=mods,
+                    evidence=[item.to_dict() for item in group],
+                )
+            )
+
+    options = [item for item in refs if item.kind == "customization.option"]
+    seen_selector_pairs: set[tuple[str, str, str, str]] = set()
+    for index, left in enumerate(options):
+        for right in options[index + 1 :]:
+            if left.mod_name == right.mod_name or left.identity == right.identity:
+                continue
+            if not _selector_overlaps(left, right):
+                continue
+            participants = tuple(sorted({left.mod_name, right.mod_name}, key=str.casefold))
+            key = (participants[0], participants[1], left.identity, right.identity)
+            if key in seen_selector_pairs:
+                continue
+            seen_selector_pairs.add(key)
+            raw.append(
+                Finding(
+                    rule_id="AXL-CUSTOMIZATION-SELECTOR-OVERLAP",
+                    severity="review",
+                    confidence="medium",
+                    summary="prefix-overlapping anonymous customization selectors",
+                    explanation=(
+                        "ArchiveXL matches anonymous options by exact or prefix-overlapping "
+                        "uiSlot/link selectors. Direction and archive order can affect which "
+                        "option receives the merge."
+                    ),
+                    participants=list(participants),
+                    evidence=[left.to_dict(), right.to_dict()],
+                )
+            )
+
+    stats = {
+        "composable_entries": 0,
+        "duplicate_entries": 0,
+        "conflicting_entries": 0,
+        "review_entries": 0,
+    }
+    return _consolidate_customization_findings(raw, stats), stats
+
+
+def inspect_customization_payloads(
+    declarations: Iterable[Reference],
+    manifests: Iterable[ArchiveManifest],
+    provider: ArchivePayloadProvider,
+    workers: int = 4,
+) -> tuple[list[Reference], list[Finding], dict[str, int]]:
+    by_mod_member: dict[tuple[str, str], ArchiveManifest] = {}
+    for manifest in manifests:
+        for member in manifest.members:
+            if member.resolved:
+                by_mod_member.setdefault(
+                    (manifest.mod_name, member.normalized_path), manifest
+                )
+
+    contexts: dict[tuple[str, str], list[Reference]] = defaultdict(list)
+    selected: dict[tuple[str, str], tuple[Reference, ArchiveManifest]] = {}
+    skipped = 0
+    requested = 0
+    for declaration in declarations:
+        if declaration.kind != "customization":
+            continue
+        requested += 1
+        key = (declaration.mod_name, declaration.normalized_identity)
+        manifest = by_mod_member.get(key)
+        if manifest is None:
+            skipped += 1
+            continue
+        contexts[key].append(declaration)
+        selected.setdefault(key, (declaration, manifest))
+
+    results: dict[tuple[str, str], SerializedPayloadResult] = {}
+    findings: list[Finding] = []
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        futures = {
+            pool.submit(provider.serialize_json, manifest, declaration.identity): key
+            for key, (declaration, manifest) in selected.items()
+        }
+        for future in as_completed(futures):
+            key = futures[future]
+            try:
+                results[key] = future.result()
+            except Exception as exc:  # provider boundary
+                declaration = selected[key][0]
+                findings.append(
+                    Finding(
+                        rule_id="AXL-PAYLOAD-FAILED",
+                        severity="error",
+                        confidence="high",
+                        summary=f"Could not inspect ArchiveXL payload: {declaration.identity}",
+                        explanation=str(exc),
+                        participants=[declaration.mod_name],
+                        evidence=[declaration.to_dict()],
+                    )
+                )
+
+    payload_references: list[Reference] = []
+    serialized = 0
+    extraction_cache_hits = 0
+    serialization_cache_hits = 0
+    for key, result in results.items():
+        if not result.ok:
+            findings.append(payload_failure_finding(result))
+            continue
+        serialized += 1
+        extraction_cache_hits += int(result.payload.from_cache)
+        serialization_cache_hits += int(result.from_cache)
+        for declaration in contexts[key]:
+            parsed, parse_findings = parse_customization_payload(
+                declaration, result.data, result.payload.archive_path
+            )
+            payload_references.extend(parsed)
+            findings.extend(parse_findings)
+
+    comparison_findings, comparison_stats = compare_customization_entries(
+        payload_references
+    )
+    findings.extend(comparison_findings)
+    stats = {
+        "declarations": requested,
+        "unique_archive_payloads": len(selected),
+        "skipped_without_own_archive": skipped,
+        "serialized": serialized,
+        "failed": len(selected) - serialized,
+        "entry_references": len(payload_references),
+        "group_entries": sum(
+            item.kind == "customization.group.entry" for item in payload_references
+        ),
+        "option_references": sum(
+            item.kind == "customization.option" for item in payload_references
+        ),
+        "choice_references": sum(
+            item.kind == "customization.choice" for item in payload_references
+        ),
+        "extraction_cache_hits": extraction_cache_hits,
+        "serialization_cache_hits": serialization_cache_hits,
+        **comparison_stats,
     }
     return payload_references, findings, stats
 

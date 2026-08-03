@@ -21,6 +21,7 @@ from .archivexl import (
     resolve_quest_references,
 )
 from .archivexl_payload_analysis import (
+    inspect_customization_payloads,
     inspect_factory_payloads,
     inspect_journal_payloads,
     inspect_localization_payloads,
@@ -50,7 +51,15 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--archive-scope", choices=("none", "xl", "all"))
     scan.add_argument(
         "--payload-scope",
-        choices=("none", "localization", "factories", "journals", "patches", "all"),
+        choices=(
+            "none",
+            "customizations",
+            "localization",
+            "factories",
+            "journals",
+            "patches",
+            "all",
+        ),
     )
     scan.add_argument("--hash-mode", choices=("none", "archives", "all"))
     scan.add_argument("--workers", type=int)
@@ -204,6 +213,32 @@ def run_scan(args: argparse.Namespace) -> int:
                     wolvenkit_version,
                     refresh_cache=args.refresh_cache,
                     timeout_seconds=args.wolvenkit_timeout,
+                )
+            if args.payload_scope in {"customizations", "all"}:
+                print("Inspecting ArchiveXL customization payloads")
+                payload_references, payload_findings, payload_stats = (
+                    inspect_customization_payloads(
+                        references,
+                        manifests,
+                        provider,
+                        workers=args.workers,
+                    )
+                )
+                references.extend(payload_references)
+                findings.extend(payload_findings)
+                payload_coverage["customizations"] = payload_stats
+                for section in coverage["archivexl"]["sections"]:
+                    if section["name"] == "customizations":
+                        section["status"] = "analyzed"
+                        section["note"] = (
+                            "Male and female customization resources are resolved; "
+                            "serialized group, option, selector, and choice identities "
+                            "are compared using ArchiveXL merge semantics."
+                        )
+                        break
+                print(
+                    f"Serialized {payload_stats['serialized']} customization payloads; "
+                    f"extracted {payload_stats['entry_references']} merge identities"
                 )
             if args.payload_scope in {"localization", "all"}:
                 print("Inspecting ArchiveXL localization payloads")
