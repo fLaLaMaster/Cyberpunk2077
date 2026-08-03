@@ -43,7 +43,7 @@ frozen-corpus validation pass are complete.
 - [x] Verify factory target resources exist in the declaring mod or document an
   implicit cross-mod dependency.
 - [x] Parse and analyze `quest.phases` operations and parent targets.
-- [ ] Parse and analyze `journal` resources.
+- [x] Parse and analyze `journal` resources.
 - [ ] Parse and analyze `overrides` operations.
 - [x] Parse `resource.patch`, `copy`, `link`, `scope`, and `fix`, preserving
   custom tags and source lines.

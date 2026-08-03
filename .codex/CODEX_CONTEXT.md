@@ -115,7 +115,9 @@ python -m unittest discover -s tests -v
   also parses factory C2dArray rows, compares entity names and targets, and
   validates target resources against indexed archives and loose files. Shared
   resource patch sources are serialized and compared through stable named
-  objects, scalar properties, and C2dArray row identities.
+  objects, scalar properties, and C2dArray row identities. Journal resources
+  are reconstructed into effective entry paths and compared using ArchiveXL's
+  container, leaf, and final-`*` property-edit semantics.
 - `src/cp77compat/archivexl.py`
   Parses YAML and JSON `.xl` files, rejects duplicate YAML keys, tolerates the
   tab variants present in the frozen corpus, extracts ArchiveXL references,
@@ -126,7 +128,8 @@ python -m unittest discover -s tests -v
   Selects the newest ArchiveXL session, streams all rotated chunks in
   chronological order, pairs root-cause and consequence messages, attributes
   localization/streaming events through semantic references, and maps missing
-  quest phases through exact child or parent references.
+  quest phases through exact child or parent references. Journal resource and
+  merge failures are also attributed to their static declarations.
 - `src/cp77compat/tweakxl.py`
   Parses deployed `.yaml` and `.yml` files under `r6/tweaks`, preserves YAML
   anchors, aliases, duplicate template roots, and TweakXL tags, expands
@@ -181,7 +184,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.10.0 scan on 2026-08-03 reported:
+The successful v0.11.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -189,9 +192,10 @@ The successful v0.10.0 scan on 2026-08-03 reported:
   framework bundle placeholder.
 - 78 ArchiveXL-related archives indexed.
 - 5,458 indexed archive members.
-- 48,962 extracted ArchiveXL references, including 596 child/parent references
+- 49,197 extracted ArchiveXL references, including 596 child/parent references
   from 298 quest phase merges, 4,124 serialized localization entries, 14
-  factory entity rows, and 8,302 target-scoped resource patch inner identities.
+  factory entity rows, 232 serialized journal entries, and 8,302 target-scoped
+  resource patch inner identities.
 - 216 deployed TweakXL YAML files: 214 non-empty configs parsed and two empty
   configs reported informationally.
 - 57,455 concrete TweakXL references after `$instances` expansion.
@@ -204,6 +208,9 @@ The successful v0.10.0 scan on 2026-08-03 reported:
 - Twenty-three compatibility-relevant patch sources serialized for all 43
   targets shared across mods. Every shared target uses disjoint stable inner
   identities; none remained uninspected or produced a conflict.
+- Three journal payloads serialized successfully into 232 entry references.
+  Their only shared identity is the composable `contacts` container; no journal
+  leaf or property-edit duplicate, conflict, or review finding was produced.
 - TweakXL dependency analysis indexed 74,829 named records from 2,684 official
   REDmod `.tweak` files and verified generated `_inlineN` IDs against both
   local TweakDB binaries.
@@ -221,14 +228,14 @@ The successful v0.10.0 scan on 2026-08-03 reported:
   bytes, and 472,639 lines. Its two errors and six warnings were fully
   attributed and consolidated into four findings; all four quest events have
   exact static missing-target confirmations.
-- 57 consolidated findings overall:
+- 58 consolidated findings overall:
   - 6 conflict candidates.
   - 9 errors.
   - 9 warnings.
   - 16 review groups.
-  - 17 informational findings.
+  - 18 informational findings.
 - Zero WolvenKit indexing failures.
-- Fifty-three automated tests passing.
+- Fifty-seven automated tests passing.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
@@ -305,8 +312,11 @@ archive-owned on-screen resources and its extraction/serialization cache counts
 are embedded in report coverage. Factory declarations are also marked analyzed,
 with row counts, cache counts, and target-resolution results in the same panel.
 Shared-target resource patch payload counts and disjoint/duplicate/conflict/
-uninspected outcomes are recorded there as well. ArchiveXL runtime coverage
-records the selected session, rotated files, byte/line counts, event
+uninspected outcomes are recorded there as well. Journal coverage is analyzed
+for all three installed resources, including 232 effective entry identities and
+ArchiveXL's container/leaf/edit merge semantics. The current runtime session
+confirms that all three journal resources merged successfully. ArchiveXL
+runtime coverage records the selected session, rotated files, byte/line counts, event
 attribution, static correlations, and consolidated findings. Quest coverage is
 analyzed for all 298 installed `quest.phases` merges: child resources and custom
 parents are resolved, attachment identities are compared, official parents are

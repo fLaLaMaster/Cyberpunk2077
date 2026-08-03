@@ -26,6 +26,24 @@ def artifact(path: Path, mod: str, relative_path: str) -> Artifact:
 
 
 class ArchiveXLRuntimeTests(unittest.TestCase):
+    def test_parser_pairs_journal_issue_and_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "ArchiveXL-2026-01-01-00-00-00.log"
+            path.write_text(
+                """[2026-01-01 00:00:00.000] [1] [warning] [Journal] contacts/judy: Cannot modify entry, type mismatch.
+[2026-01-01 00:00:00.001] [1] [warning] [Journal] Journal entries merged with issues.
+""",
+                encoding="utf-8",
+            )
+            events, lines = parse_archivexl_runtime_logs([path])
+            self.assertEqual(2, lines)
+            self.assertEqual(2, len(events))
+            self.assertTrue(
+                all(event.rule_id == "AXL-RUNTIME-JOURNAL-MERGE-ISSUE" for event in events)
+            )
+            self.assertEqual("contacts/judy", events[0].identity)
+            self.assertTrue(events[1].details["consequence"])
+
     def test_latest_session_includes_rotated_chunks_in_chronological_order(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             game = Path(temp)

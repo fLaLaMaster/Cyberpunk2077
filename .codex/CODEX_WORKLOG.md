@@ -6,14 +6,49 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.10.0`
+- Scanner version: `0.11.0`
 - Implemented ecosystems: ArchiveXL and TweakXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 53 passing
+- Automated tests: 57 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — ArchiveXL journal analysis
+
+Completed static journal-resource inspection and runtime correlation against
+the frozen collection.
+
+Changes:
+
+- Added structural extraction and validation of scalar/list `journal`
+  declarations, including one-based source lines and archive/loose-resource
+  resolution.
+- Selectively serialized `gameJournalResource` payloads and reconstructed
+  effective slash-delimited entry paths, final `*` edit markers, entry types,
+  properties, and stable payload fingerprints.
+- Added case-sensitive comparison rules for composable shared containers,
+  duplicate/conflicting leaf entries, and duplicate, overlapping, or
+  incompatible property edits.
+- Added `journals` as a payload scope, journal payload statistics to Markdown
+  and HTML coverage, and ArchiveXL journal runtime error attribution.
+- Bumped the scanner to version 0.11.0.
+
+Validation:
+
+- All 57 automated tests pass.
+- A full cached frozen-corpus scan completed successfully in 19.8 seconds;
+  staging and game inputs were not modified.
+- All three declared journal resources serialized successfully into 232 entry
+  references. The only shared identity is the `contacts` folder, which is a
+  composable container across NCEE NPC, Shard Audio Framework, and They Will
+  Remember.
+- No journal duplicate, conflicting, or review-worthy leaf/edit identity was
+  found. The current ArchiveXL runtime session also reports that all three
+  journal resources merged successfully.
+- Reports now contain 58 findings: 6 conflicts, 9 errors, 9 warnings, 16
+  reviews, and 18 infos.
 
 ### 2026-08-03 — ArchiveXL quest phase analysis
 

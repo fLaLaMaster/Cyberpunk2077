@@ -42,8 +42,8 @@ SECTION_COVERAGE = {
         "Factory resources are resolved; CSV entity definitions are not inspected yet.",
     ),
     "journal": (
-        "unsupported",
-        "Journal declarations are not interpreted yet.",
+        "partial",
+        "Journal resources are resolved; entry-tree identities require selective payload inspection.",
     ),
     "localization": (
         "partial",
@@ -750,6 +750,29 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                         )
                     )
 
+    journal = data.get("journal")
+    if journal is not None:
+        journal_paths = _as_paths(journal, _mapping_line(data, "journal"))
+        if not journal_paths:
+            findings.append(
+                Finding(
+                    rule_id="AXL-JOURNAL-SHAPE",
+                    severity="error",
+                    confidence="high",
+                    summary="Invalid ArchiveXL journal declaration",
+                    explanation="journal must be a resource path or a sequence of resource paths.",
+                    participants=[document.artifact.mod_name],
+                    evidence=[
+                        {
+                            "path": str(document.artifact.absolute_path),
+                            "line": _mapping_line(data, "journal"),
+                        }
+                    ],
+                )
+            )
+        for item, line in journal_paths:
+            refs.append(_reference(document, "journal", item, line))
+
     for item, line in _as_paths(
         data.get("factories"), _mapping_line(data, "factories")
     ):
@@ -1380,7 +1403,12 @@ def resolve_archive_references(
             loose_by_mod[artifact.mod_name].add(candidate)
             loose_global[candidate].add(artifact.mod_name)
 
-    resolvable_kinds = {"factory", "localization.onscreens", "streaming.block"}
+    resolvable_kinds = {
+        "factory",
+        "journal",
+        "localization.onscreens",
+        "streaming.block",
+    }
     for ref in references:
         if ref.kind not in resolvable_kinds:
             continue

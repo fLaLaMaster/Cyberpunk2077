@@ -24,6 +24,9 @@ Implemented analysis includes:
 - ArchiveXL `quest.phases` parsing with structural source lines, child/parent
   resource resolution, attachment-point comparison, and compact missing-target
   findings;
+- ArchiveXL journal resource resolution and payload-tree comparison using
+  case-sensitive entry paths, recursive container semantics, and `*` property
+  edit markers;
 - newest-session ArchiveXL runtime parsing across rotated log chunks, with
   localization, quest-phase, and streaming-sector source attribution plus
   static quest-target confirmation;
@@ -47,6 +50,10 @@ Quest phase analysis treats multiple mods attaching different children to the
 same parent as normal composition. It reports only duplicated child/parent
 merges or competing attachment points, and resolves custom child and parent
 resources against indexed mod archives and loose files.
+Journal analysis selectively serializes declared `.journal` resources and
+compares the effective entry paths used by ArchiveXL itself. Shared containers
+are composable; incompatible leaf definitions, competing edits, and mixed
+edit/merge operations receive distinct findings.
 
 The TweakXL parser preserves YAML anchors, aliases, repeated template roots,
 and the `!append`, `!append-once`, `!append-from`, `!prepend`,
@@ -131,8 +138,9 @@ Archive modes:
 - `--no-refresh-cache` overrides a YAML `refresh_cache: true` value.
 - `--payload-scope all` inspects every implemented ArchiveXL payload type
   (default).
-- `--payload-scope localization`, `--payload-scope factories`, or
-  `--payload-scope patches` limits inspection to that payload type.
+- `--payload-scope localization`, `--payload-scope factories`,
+  `--payload-scope journals`, or `--payload-scope patches` limits inspection to
+  that payload type.
 - `--payload-scope none` keeps the scan declaration-only and does not
   materialize payloads.
 

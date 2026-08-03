@@ -21,6 +21,7 @@ from .archivexl import (
 )
 from .archivexl_payload_analysis import (
     inspect_factory_payloads,
+    inspect_journal_payloads,
     inspect_localization_payloads,
     inspect_resource_patch_payloads,
 )
@@ -48,7 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--archive-scope", choices=("none", "xl", "all"))
     scan.add_argument(
         "--payload-scope",
-        choices=("none", "localization", "factories", "patches", "all"),
+        choices=("none", "localization", "factories", "journals", "patches", "all"),
     )
     scan.add_argument("--hash-mode", choices=("none", "archives", "all"))
     scan.add_argument("--workers", type=int)
@@ -252,6 +253,31 @@ def run_scan(args: argparse.Namespace) -> int:
                 print(
                     f"Serialized {payload_stats['serialized']} factory payloads; "
                     f"extracted {payload_stats['entry_references']} entity rows"
+                )
+            if args.payload_scope in {"journals", "all"}:
+                print("Inspecting ArchiveXL journal payloads")
+                payload_references, payload_findings, payload_stats = (
+                    inspect_journal_payloads(
+                        references,
+                        manifests,
+                        provider,
+                        workers=args.workers,
+                    )
+                )
+                references.extend(payload_references)
+                findings.extend(payload_findings)
+                payload_coverage["journals"] = payload_stats
+                for section in coverage["archivexl"]["sections"]:
+                    if section["name"] == "journal":
+                        section["status"] = "analyzed"
+                        section["note"] = (
+                            "Journal resources are resolved and serialized entry trees "
+                            "are compared using ArchiveXL's effective slash-delimited paths."
+                        )
+                        break
+                print(
+                    f"Serialized {payload_stats['serialized']} journal payloads; "
+                    f"extracted {payload_stats['entry_references']} entry identities"
                 )
             if args.payload_scope in {"patches", "all"}:
                 print("Inspecting shared ArchiveXL resource patch payloads")

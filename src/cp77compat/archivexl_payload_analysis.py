@@ -685,6 +685,361 @@ def _patch_fingerprint(value: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _journal_handle_data(value: Any) -> Any:
+    if isinstance(value, dict) and isinstance(value.get("Data"), dict):
+        return value["Data"]
+    return value
+
+
+def _journal_shape_finding(
+    declaration: Reference, explanation: str, archive_path: str
+) -> Finding:
+    return Finding(
+        rule_id="AXL-JOURNAL-PAYLOAD-SHAPE",
+        severity="error",
+        confidence="high",
+        summary=f"Invalid journal payload: {declaration.identity}",
+        explanation=explanation,
+        participants=[declaration.mod_name],
+        evidence=[
+            {
+                **declaration.to_dict(),
+                "archive_path": archive_path,
+            }
+        ],
+    )
+
+
+def parse_journal_payload(
+    declaration: Reference, serialized: Any, archive_path: str
+) -> tuple[list[Reference], list[Finding]]:
+    """Extract ArchiveXL's effective slash-delimited journal entry paths."""
+    try:
+        resource = serialized["Data"]["RootChunk"]
+    except (KeyError, TypeError):
+        resource = None
+    if not isinstance(resource, dict) or resource.get("$type") != "gameJournalResource":
+        return [], [
+            _journal_shape_finding(
+                declaration,
+                "WolvenKit JSON has no gameJournalResource RootChunk.",
+                archive_path,
+            )
+        ]
+    root = _journal_handle_data(resource.get("entry"))
+    if (
+        not isinstance(root, dict)
+        or root.get("$type") != "gameJournalRootFolderEntry"
+    ):
+        return [], [
+            _journal_shape_finding(
+                declaration,
+                "The journal resource entry must be gameJournalRootFolderEntry.",
+                archive_path,
+            )
+        ]
+    root_id = str(_scalar(root.get("id")) or "")
+    if root_id:
+        return [], [
+            _journal_shape_finding(
+                declaration,
+                "The journal root ID is non-empty and will not merge with the game's root.",
+                archive_path,
+            )
+        ]
+    root_entries = root.get("entries")
+    if not isinstance(root_entries, list):
+        return [], [
+            _journal_shape_finding(
+                declaration,
+                "The journal root has no entries sequence.",
+                archive_path,
+            )
+        ]
+
+    payload_source = f"{archive_path}::{declaration.identity}"
+    references: list[Reference] = []
+    findings: list[Finding] = []
+    entry_index = 0
+
+    def visit(handle: Any, parent_path: str) -> None:
+        nonlocal entry_index
+        node = _journal_handle_data(handle)
+        if not isinstance(node, dict):
+            findings.append(
+                _journal_shape_finding(
+                    declaration,
+                    "A journal entry handle has no object data.",
+                    archive_path,
+                )
+            )
+            return
+        raw_id_value = _scalar(node.get("id"))
+        if not isinstance(raw_id_value, str) or not raw_id_value:
+            findings.append(
+                _journal_shape_finding(
+                    declaration,
+                    "Every journal entry requires a non-empty string ID.",
+                    archive_path,
+                )
+            )
+            return
+        raw_id = raw_id_value
+        segments = raw_id.split("/")
+        marked_for_edit = segments[-1].endswith("*")
+        if marked_for_edit:
+            segments[-1] = segments[-1][:-1]
+        if any(not segment for segment in segments):
+            findings.append(
+                _journal_shape_finding(
+                    declaration,
+                    f"Journal entry ID contains an empty path segment: {raw_id}",
+                    archive_path,
+                )
+            )
+            return
+        identity = "/".join([part for part in (parent_path, *segments) if part])
+        children = node.get("entries")
+        is_container = isinstance(children, list)
+        if "entries" in node and not is_container:
+            findings.append(
+                _journal_shape_finding(
+                    declaration,
+                    f"Journal container entries must be a sequence: {identity}",
+                    archive_path,
+                )
+            )
+        references.append(
+            Reference(
+                ecosystem="archivexl",
+                kind="journal.entry",
+                identity=identity,
+                mod_name=declaration.mod_name,
+                source_path=declaration.source_path,
+                line=declaration.line,
+                details={
+                    "resource_path": declaration.identity,
+                    "payload_source": payload_source,
+                    "entry_index": entry_index,
+                    "raw_id": raw_id,
+                    "entry_type": str(node.get("$type") or "unknown"),
+                    "is_container": is_container,
+                    "marked_for_edit": marked_for_edit,
+                    "fingerprint": _patch_fingerprint(node),
+                },
+            )
+        )
+        entry_index += 1
+        if is_container:
+            for child in children:
+                visit(child, identity)
+
+    for entry in root_entries:
+        visit(entry, "")
+    return references, findings
+
+
+def compare_journal_entries(
+    references: Iterable[Reference],
+) -> tuple[list[Finding], dict[str, int]]:
+    grouped: dict[str, list[Reference]] = defaultdict(list)
+    for reference in references:
+        if reference.kind == "journal.entry":
+            # ArchiveXL compares journal IDs with strcmp, so case is significant.
+            grouped[reference.identity].append(reference)
+
+    raw: list[tuple[str, str, str, list[Reference]]] = []
+    shared_identities = 0
+    for identity, refs in grouped.items():
+        participants = {reference.mod_name for reference in refs}
+        if len(participants) < 2:
+            continue
+        shared_identities += 1
+        edits = [bool(reference.details.get("marked_for_edit")) for reference in refs]
+        containers = [bool(reference.details.get("is_container")) for reference in refs]
+        types = {str(reference.details.get("entry_type")) for reference in refs}
+        fingerprints = {str(reference.details.get("fingerprint")) for reference in refs}
+        if any(edits) and not all(edits):
+            raw.append(
+                (
+                    "AXL-JOURNAL-EDIT-OVERLAP",
+                    "review",
+                    "One mod edits an existing journal entry while another merges or adds the same identity. Load order can change which properties and children survive.",
+                    refs,
+                )
+            )
+        elif all(edits):
+            conflict = len(types) > 1 or len(fingerprints) > 1
+            raw.append(
+                (
+                    "AXL-JOURNAL-EDIT-CONFLICT" if conflict else "AXL-JOURNAL-EDIT-DUPLICATE",
+                    "conflict" if conflict else "info",
+                    (
+                        "Multiple mods edit the same journal path with different types or serialized content. ArchiveXL applies these property replacements in load order."
+                        if conflict
+                        else "Multiple mods apply the same serialized edit to the same journal path."
+                    ),
+                    refs,
+                )
+            )
+        elif all(containers):
+            raw.append(
+                (
+                    "AXL-JOURNAL-CONTAINER-COMPOSABLE",
+                    "info",
+                    "These mods share a journal container path but add or merge child entries below it. ArchiveXL recursively composes container children.",
+                    refs,
+                )
+            )
+        else:
+            duplicate = len(types) == 1 and len(fingerprints) == 1
+            raw.append(
+                (
+                    "AXL-JOURNAL-ENTRY-DUPLICATE" if duplicate else "AXL-JOURNAL-ENTRY-CONFLICT",
+                    "info" if duplicate else "conflict",
+                    (
+                        "Multiple mods define identical non-container journal entries; only the already-present identity is retained."
+                        if duplicate
+                        else "Multiple mods define the same journal path with incompatible entry types or content. The first loaded non-container entry wins."
+                    ),
+                    refs,
+                )
+            )
+
+    consolidated: dict[tuple[str, str, str, tuple[str, ...]], list[tuple[str, list[Reference]]]] = defaultdict(list)
+    for rule, severity, explanation, refs in raw:
+        participants = tuple(
+            sorted({reference.mod_name for reference in refs}, key=str.casefold)
+        )
+        consolidated[(rule, severity, explanation, participants)].append(
+            (refs[0].identity, refs)
+        )
+    labels = {
+        "AXL-JOURNAL-CONTAINER-COMPOSABLE": "composable journal container overlaps",
+        "AXL-JOURNAL-EDIT-CONFLICT": "conflicting journal edits",
+        "AXL-JOURNAL-EDIT-DUPLICATE": "duplicate journal edits",
+        "AXL-JOURNAL-EDIT-OVERLAP": "journal edit/merge overlaps",
+        "AXL-JOURNAL-ENTRY-CONFLICT": "conflicting journal entries",
+        "AXL-JOURNAL-ENTRY-DUPLICATE": "duplicate journal entries",
+    }
+    findings = [
+        Finding(
+            rule_id=rule,
+            severity=severity,
+            confidence="high" if severity in {"conflict", "info"} else "medium",
+            summary=f"{len(items)} {labels[rule]}",
+            explanation=explanation,
+            participants=list(participants),
+            evidence=[
+                {
+                    "identity": identity,
+                    "references": [reference.to_dict() for reference in refs],
+                }
+                for identity, refs in items
+            ],
+        )
+        for (rule, severity, explanation, participants), items in consolidated.items()
+    ]
+    rules = [item[0] for item in raw]
+    return sorted(findings, key=lambda item: item.sort_key()), {
+        "shared_identities": shared_identities,
+        "composable_entries": rules.count("AXL-JOURNAL-CONTAINER-COMPOSABLE"),
+        "duplicate_entries": sum("DUPLICATE" in rule for rule in rules),
+        "conflicting_entries": sum("CONFLICT" in rule for rule in rules),
+        "review_entries": rules.count("AXL-JOURNAL-EDIT-OVERLAP"),
+    }
+
+
+def inspect_journal_payloads(
+    declarations: Iterable[Reference],
+    manifests: Iterable[ArchiveManifest],
+    provider: ArchivePayloadProvider,
+    workers: int = 4,
+) -> tuple[list[Reference], list[Finding], dict[str, int]]:
+    by_mod_member: dict[tuple[str, str], ArchiveManifest] = {}
+    for manifest in manifests:
+        for member in manifest.members:
+            if member.resolved:
+                by_mod_member.setdefault(
+                    (manifest.mod_name, member.normalized_path), manifest
+                )
+
+    unique: dict[tuple[str, str], tuple[Reference, ArchiveManifest]] = {}
+    skipped = 0
+    requested = 0
+    for declaration in declarations:
+        if declaration.kind != "journal":
+            continue
+        requested += 1
+        manifest = by_mod_member.get(
+            (declaration.mod_name, declaration.normalized_identity)
+        )
+        if manifest is None:
+            skipped += 1
+            continue
+        unique.setdefault(
+            (declaration.mod_name, declaration.normalized_identity),
+            (declaration, manifest),
+        )
+
+    payload_references: list[Reference] = []
+    findings: list[Finding] = []
+    results: list[tuple[Reference, SerializedPayloadResult]] = []
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        futures = {
+            pool.submit(provider.serialize_json, manifest, declaration.identity): declaration
+            for declaration, manifest in unique.values()
+        }
+        for future in as_completed(futures):
+            declaration = futures[future]
+            try:
+                results.append((declaration, future.result()))
+            except Exception as exc:  # provider boundary
+                findings.append(
+                    Finding(
+                        rule_id="AXL-PAYLOAD-FAILED",
+                        severity="error",
+                        confidence="high",
+                        summary=f"Could not inspect ArchiveXL payload: {declaration.identity}",
+                        explanation=str(exc),
+                        participants=[declaration.mod_name],
+                        evidence=[declaration.to_dict()],
+                    )
+                )
+
+    serialized = 0
+    extraction_cache_hits = 0
+    serialization_cache_hits = 0
+    for declaration, result in results:
+        if not result.ok:
+            findings.append(payload_failure_finding(result))
+            continue
+        serialized += 1
+        extraction_cache_hits += int(result.payload.from_cache)
+        serialization_cache_hits += int(result.from_cache)
+        parsed, parse_findings = parse_journal_payload(
+            declaration, result.data, result.payload.archive_path
+        )
+        payload_references.extend(parsed)
+        findings.extend(parse_findings)
+
+    comparison_findings, comparison_stats = compare_journal_entries(
+        payload_references
+    )
+    findings.extend(comparison_findings)
+    return payload_references, findings, {
+        "declarations": requested,
+        "unique_archive_payloads": len(unique),
+        "skipped_without_own_archive": skipped,
+        "serialized": serialized,
+        "failed": len(unique) - serialized,
+        "entry_references": len(payload_references),
+        "extraction_cache_hits": extraction_cache_hits,
+        "serialization_cache_hits": serialization_cache_hits,
+        **comparison_stats,
+    }
+
+
 def _object_identity(value: dict[str, Any]) -> tuple[str, str] | None:
     for key in _PATCH_ID_KEYS:
         if key not in value:

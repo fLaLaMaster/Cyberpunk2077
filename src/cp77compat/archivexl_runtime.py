@@ -40,6 +40,13 @@ WORLD_EXPECTATION_PATTERN = re.compile(
 WORLD_SKIPPED_PATTERN = re.compile(
     r'^No patches have been applied to "(?P<identity>.+)"\.$'
 )
+JOURNAL_RESOURCE_FAILED_PATTERN = re.compile(
+    r'^Resource "(?P<identity>.+)" failed to load\.$'
+)
+JOURNAL_ISSUE_PATTERN = re.compile(
+    r"^(?P<identity>.+): (?P<reason>Cannot modify entry, (?:path not fould|type mismatch)|Path not fould)\.$"
+)
+JOURNAL_SUMMARY_PATTERN = re.compile(r"^Journal entries merged with issues\.$")
 
 
 @dataclass(slots=True)
@@ -83,6 +90,7 @@ def parse_archivexl_runtime_logs(
     current_config: dict[str, str] = {}
     pending_localization: dict[str, int] = {}
     pending_world: dict[str, int] = {}
+    pending_journal: dict[str, int] = {}
     line_count = 0
 
     for path in paths:
@@ -153,6 +161,31 @@ def parse_archivexl_runtime_logs(
                         config_name = pending.config_name or config_name
                         details["related_log_path"] = pending.log_path
                         details["related_log_line"] = pending.log_line
+                elif component == "Journal" and (
+                    specific := JOURNAL_RESOURCE_FAILED_PATTERN.match(message)
+                ):
+                    rule_id = "AXL-RUNTIME-JOURNAL-RESOURCE-FAILED"
+                    identity = specific.group("identity")
+                    pending_journal[thread] = len(events)
+                elif component == "Journal" and (
+                    specific := JOURNAL_ISSUE_PATTERN.match(message)
+                ):
+                    rule_id = "AXL-RUNTIME-JOURNAL-MERGE-ISSUE"
+                    identity = specific.group("identity")
+                    details["reason"] = specific.group("reason")
+                    pending_journal[thread] = len(events)
+                elif component == "Journal" and JOURNAL_SUMMARY_PATTERN.match(message):
+                    pending_index = pending_journal.get(thread)
+                    if pending_index is not None:
+                        pending = events[pending_index]
+                        rule_id = pending.rule_id
+                        identity = pending.identity
+                        config_name = pending.config_name
+                        details["related_log_path"] = pending.log_path
+                        details["related_log_line"] = pending.log_line
+                        details["consequence"] = True
+                    else:
+                        rule_id = "AXL-RUNTIME-WARNING"
                 else:
                     rule_id = (
                         "AXL-RUNTIME-ERROR" if level == "error" else "AXL-RUNTIME-WARNING"
@@ -308,6 +341,20 @@ def _static_correlations(
             "AXL-QUEST-CROSS-MOD-PHASE",
             "AXL-QUEST-CROSS-MOD-PARENT",
         }
+    elif event.rule_id == "AXL-RUNTIME-JOURNAL-RESOURCE-FAILED":
+        allowed = {
+            "AXL-RESOURCE-NOT-INDEXED",
+            "AXL-CROSS-MOD-RESOURCE",
+            "AXL-PAYLOAD-FAILED",
+            "AXL-JOURNAL-PAYLOAD-SHAPE",
+        }
+    elif event.rule_id == "AXL-RUNTIME-JOURNAL-MERGE-ISSUE":
+        allowed = {
+            "AXL-JOURNAL-EDIT-CONFLICT",
+            "AXL-JOURNAL-EDIT-OVERLAP",
+            "AXL-JOURNAL-ENTRY-CONFLICT",
+            "AXL-JOURNAL-PAYLOAD-SHAPE",
+        }
     else:
         return []
     normalized = normalize_game_path(event.identity)
@@ -422,6 +469,18 @@ def analyze_archivexl_runtime_logs(
             "streaming sector patches were rejected",
             "ArchiveXL rejected a world-streaming patch because the live sector node count "
             "did not equal the config's expectedNodes guard. The related patch was not applied.",
+        ),
+        "AXL-RUNTIME-JOURNAL-RESOURCE-FAILED": (
+            "error",
+            "high",
+            "journal resources failed to load",
+            "ArchiveXL could not load a declared journal resource, so its entry tree was not merged.",
+        ),
+        "AXL-RUNTIME-JOURNAL-MERGE-ISSUE": (
+            "warning",
+            "high",
+            "journal entries failed to merge",
+            "ArchiveXL could not resolve or safely edit a journal entry path. The affected entry operation was skipped.",
         ),
         "AXL-RUNTIME-ERROR": (
             "error",

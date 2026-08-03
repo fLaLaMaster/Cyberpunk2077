@@ -15,10 +15,12 @@ from cp77compat.archivexl import (
     resolve_quest_references,
 )
 from cp77compat.archivexl_payload_analysis import (
+    compare_journal_entries,
     compare_factory_entries,
     compare_localization_entries,
     compare_patch_target_entries,
     parse_factory_payload,
+    parse_journal_payload,
     parse_localization_payload,
     parse_resource_patch_payload,
     validate_factory_targets,
@@ -39,6 +41,114 @@ def artifact(path: Path, mod: str) -> Artifact:
 
 
 class ArchiveXLTests(unittest.TestCase):
+    def test_extracts_journal_declaration_with_structural_line(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "journal.xl"
+            path.write_text(
+                "journal:\n  - mod\\example\\entries.journal\n",
+                encoding="utf-8",
+            )
+            _documents, references, findings = parse_documents(
+                [artifact(path, "Example")]
+            )
+            self.assertEqual([], findings)
+            self.assertEqual("journal", references[0].kind)
+            self.assertEqual(2, references[0].line)
+
+    def test_parses_effective_journal_paths_and_edit_markers(self) -> None:
+        declaration = Reference(
+            "archivexl", "journal", r"mod\example.journal", "A", "a.xl", 7
+        )
+        serialized = {
+            "Data": {
+                "RootChunk": {
+                    "$type": "gameJournalResource",
+                    "entry": {
+                        "HandleId": "0",
+                        "Data": {
+                            "$type": "gameJournalRootFolderEntry",
+                            "id": "",
+                            "entries": [
+                                {
+                                    "Data": {
+                                        "$type": "gameJournalFolderEntry",
+                                        "id": "contacts",
+                                        "entries": [
+                                            {
+                                                "Data": {
+                                                    "$type": "gameJournalContact",
+                                                    "id": "judy/thread*",
+                                                    "name": "Example",
+                                                }
+                                            }
+                                        ],
+                                    }
+                                }
+                            ],
+                        },
+                    },
+                }
+            }
+        }
+        references, findings = parse_journal_payload(
+            declaration, serialized, "a.archive"
+        )
+        self.assertEqual([], findings)
+        self.assertEqual(2, len(references))
+        self.assertEqual("contacts/judy/thread", references[1].identity)
+        self.assertTrue(references[1].details["marked_for_edit"])
+        self.assertEqual(7, references[1].line)
+
+    def test_journal_comparison_distinguishes_containers_conflicts_and_edits(self) -> None:
+        references = [
+            Reference(
+                "archivexl", "journal.entry", "contacts", mod, f"{mod}.xl",
+                details={"is_container": True, "marked_for_edit": False,
+                         "entry_type": "folder", "fingerprint": mod},
+            )
+            for mod in ("A", "B")
+        ]
+        references.extend(
+            [
+                Reference(
+                    "archivexl", "journal.entry", "contacts/shared", mod,
+                    f"{mod}.xl", details={
+                        "is_container": False,
+                        "marked_for_edit": False,
+                        "entry_type": "message",
+                        "fingerprint": mod,
+                    },
+                )
+                for mod in ("A", "B")
+            ]
+        )
+        references.extend(
+            [
+                Reference(
+                    "archivexl", "journal.entry", "contacts/edit", mod,
+                    f"{mod}.xl", details={
+                        "is_container": False,
+                        "marked_for_edit": mod == "A",
+                        "entry_type": "message",
+                        "fingerprint": mod,
+                    },
+                )
+                for mod in ("A", "B")
+            ]
+        )
+        findings, stats = compare_journal_entries(references)
+        self.assertEqual(
+            {
+                "AXL-JOURNAL-CONTAINER-COMPOSABLE",
+                "AXL-JOURNAL-EDIT-OVERLAP",
+                "AXL-JOURNAL-ENTRY-CONFLICT",
+            },
+            {finding.rule_id for finding in findings},
+        )
+        self.assertEqual(1, stats["composable_entries"])
+        self.assertEqual(1, stats["conflicting_entries"])
+        self.assertEqual(1, stats["review_entries"])
+
     def test_extracts_quest_phase_parent_and_attachment_lines(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "quest.xl"

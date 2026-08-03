@@ -363,9 +363,10 @@ _HTML_TEMPLATE = r'''<!doctype html>
             verified: payload.verified_targets,
             crossMod: payload.cross_mod_targets,
             missing: payload.missing_targets,
-            disjoint: payload.disjoint_targets,
-            duplicate: payload.duplicate_targets,
-            conflicting: payload.conflicting_targets,
+            disjoint: payload.composable_entries ?? payload.disjoint_targets,
+            duplicate: payload.duplicate_entries ?? payload.duplicate_targets,
+            conflicting: payload.conflicting_entries ?? payload.conflicting_targets,
+            review: payload.review_entries,
             uninspected: payload.uninspected_targets
           });
         }
@@ -376,9 +377,9 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "references", label: "References"}, {key: "extractionHits", label: "Extraction hits"},
           {key: "serializationHits", label: "Serialization hits"},
           {key: "verified", label: "Targets verified"}, {key: "crossMod", label: "Cross-mod targets"},
-          {key: "missing", label: "Missing targets"}, {key: "disjoint", label: "Disjoint patches"},
-          {key: "duplicate", label: "Duplicate patches"}, {key: "conflicting", label: "Conflicting patches"},
-          {key: "uninspected", label: "Uninspected patches"}
+          {key: "missing", label: "Missing targets"}, {key: "disjoint", label: "Composable identities"},
+          {key: "duplicate", label: "Duplicate identities"}, {key: "conflicting", label: "Conflicting identities"},
+          {key: "review", label: "Review identities"}, {key: "uninspected", label: "Uninspected identities"}
         ]));
       }
       coverageElement.append(group);
