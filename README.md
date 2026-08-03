@@ -61,6 +61,9 @@ Implemented analysis includes:
   comparison, and Native Settings path analysis;
 - current CET framework, scripting, and per-mod log parsing with load-state,
   missing-hook, registration, module, and Lua error attribution;
+- cross-ecosystem CET hook versus REDscript method comparison, including
+  additive observers, wrapped override chains, uncertain callbacks, terminating
+  overrides, full NativeDB signatures, and overload-ambiguous short names;
 - JSON, TOML, INI, and XML ownership inventory with strict structural parsing,
   encoding/duplicate-key diagnostics, semantic fingerprints, exact-path
   provider comparison, and shared CET/framework scope attribution;
@@ -187,6 +190,18 @@ callback visibly invokes its final wrapped/next parameter; dynamic or terminatin
 chains remain review findings. Native Settings tab/subcategory sharing is
 informational, while duplicate leaf control paths remain review findings.
 
+After both language analyzers finish, the cross-ecosystem pass compares active
+literal CET `Observe`/`ObserveBefore`/`ObserveAfter`/`Override` targets with
+active REDscript `@wrapMethod` and `@replaceMethod` targets. CET observers and
+overrides that visibly invoke the wrapped callback preserve the compiled
+REDscript method and are informational. An indirect callback is a review;
+an inline CET override that visibly omits the wrapped callback is a warning
+because it can bypass the REDscript behavior. NativeDB full method names are
+matched against REDscript parameter signatures when present. Short CET method
+names are retained as medium-confidence, overload-ambiguous matches, while
+dynamic targets are counted but never guessed. Same-package CET and REDscript
+components are counted as intentional integration and do not create findings.
+
 Each scan also reads the current `cyber_engine_tweaks.log`, `scripting.log`, and
 canonical `<mod-root>.log` files. Loaded, ignored, and failed roots are counted;
 missing RTTI hook targets and Lua source errors are mapped to Vortex artifacts
@@ -259,6 +274,7 @@ paths:
   wolvenkit: 'C:\Games\Programs\WolvenKit-Console\WolvenKit.CLI.exe'
   output: 'reports\current'
   cache: '.cache\archives'
+  acknowledgements: 'acknowledgements.yaml'
 
 scan:
   archive_scope: xl
@@ -267,6 +283,7 @@ scan:
   workers: 4
   refresh_cache: false
   wolvenkit_timeout_seconds: 120
+
 ```
 
 Relative paths are resolved from the YAML file's directory. Command-line
@@ -274,7 +291,26 @@ options override YAML values, so temporary changes do not require editing the
 configuration. A different file can be selected with `--config <path>`.
 
 The loader rejects duplicate keys, unknown settings, unsupported schema
-versions, invalid choices, and non-positive worker/timeout values.
+versions, invalid choices, non-positive worker/timeout values, duplicate
+acknowledgements, and malformed fingerprints.
+
+Acknowledgements live in the separate, versioned `acknowledgements.yaml` file:
+
+```yaml
+version: 1
+
+acknowledgements:
+  - fingerprint: <64-character fingerprint copied from a report>
+    note: Why this exact finding is expected
+```
+
+Every finding receives a stable SHA-256 fingerprint based on its rule,
+participants, summary shape, and semantic evidence identities. An
+acknowledgement changes its report status without removing the finding or its
+evidence. If the provider set or target identities change, the old entry becomes
+stale so acceptance is never inherited silently. The tracked acknowledgement
+file currently contains the four exact-path findings covered by the selected
+Damage Scaling Extended and Classic Drinks Vortex winners.
 
 Archive modes:
 
@@ -318,9 +354,20 @@ different payloads are load-order conflicts.
   source lines, cache validation, and startup-log findings.
 - `reports/current/native-findings.json`: DLL/ASI providers, hashes, versions,
   PE imports, deployed state, runtime plugin state, and native findings.
+- `reports/current/cross-ecosystem-findings.json`: CET-to-REDscript method
+  overlap classifications with both source references.
 - `reports/current/compatibility-findings.json`: combined machine-readable findings.
+- `reports/current/compatibility-diff.json`: new, changed, resolved, and
+  unchanged findings compared with the preceding report in the same output
+  directory.
 - `reports/current/compatibility-report.html`: searchable, filterable offline report.
 - `reports/current/compatibility-report.md`: concise human-readable report.
 
-The HTML report supports free-text search, severity/rule/mod filters, pagination,
-and expandable evidence. It is self-contained and does not require a web server.
+The HTML report supports free-text search; severity, ecosystem, status, change,
+rule, and mod filters; pagination; and expandable evidence. Filter state is
+stored in the URL hash so a view can be bookmarked or shared. Acknowledged and
+stale entries remain inspectable. Expanding a finding exposes an acknowledgement
+checkbox and editable note. `Save acknowledgements` uses a Chromium file picker
+to write the separate YAML file after explicit user approval; browsers without
+that API download a replacement file instead. The report is self-contained and
+does not require a web server.

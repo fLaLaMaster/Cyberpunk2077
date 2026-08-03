@@ -22,12 +22,14 @@ def write_html_report(
     summary: dict[str, Any],
     findings: Iterable[Finding],
     metadata: dict[str, Any],
+    stale_acknowledgements: Iterable[dict[str, str]] = (),
 ) -> None:
     payload = _safe_json(
         {
             "summary": summary,
             "metadata": metadata,
             "findings": [finding.to_dict() for finding in findings],
+            "stale_acknowledgements": list(stale_acknowledgements),
         }
     )
     path.write_text(_HTML_TEMPLATE.replace("__REPORT_DATA__", payload), encoding="utf-8")
@@ -64,8 +66,8 @@ _HTML_TEMPLATE = r'''<!doctype html>
       font-family: Inter, "Segoe UI", system-ui, sans-serif;
       line-height: 1.45;
     }
-    button, input, select { font: inherit; }
-    .shell { width: min(1500px, calc(100% - 32px)); margin: 0 auto; }
+    button, input, select, textarea { font: inherit; }
+    .shell { width: min(1740px, calc(100% - 24px)); margin: 0 auto; }
     header { padding: 34px 0 22px; }
     .eyebrow { color: var(--accent); font: 700 12px/1.2 Consolas, monospace; letter-spacing: .14em; text-transform: uppercase; }
     h1 { margin: 7px 0 5px; font-size: clamp(27px, 4vw, 44px); letter-spacing: -.035em; }
@@ -75,13 +77,14 @@ _HTML_TEMPLATE = r'''<!doctype html>
     .stat-value { display: block; font-size: 24px; font-weight: 750; }
     .stat-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
     .coverage-shell { margin-bottom: 18px; }
-    .coverage-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); }
+    .coverage-panel { min-width: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); }
     .coverage-panel > summary { cursor: pointer; padding: 13px 16px; color: var(--accent); font-weight: 750; }
+    .coverage-content, .coverage-group { min-width: 0; }
     .coverage-content { display: grid; gap: 18px; padding: 0 16px 16px; }
     .coverage-group h2 { margin: 4px 0 10px; font-size: 17px; }
     .coverage-group h3 { margin: 14px 0 7px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
-    .coverage-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; }
-    .coverage-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .coverage-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; }
+    .coverage-table { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 12px; }
     .coverage-table th, .coverage-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
     .coverage-table tr:last-child td { border-bottom: 0; }
     .coverage-table th { color: var(--muted); background: var(--panel-2); text-transform: uppercase; letter-spacing: .06em; font-size: 10px; }
@@ -89,14 +92,23 @@ _HTML_TEMPLATE = r'''<!doctype html>
     .coverage-status[data-status="analyzed"] { color: #59d185; border-color: #326b48; }
     .coverage-status[data-status="partial"] { color: var(--warning); border-color: #79612f; }
     .coverage-status[data-status="unsupported"] { color: var(--muted); }
+    .coverage-card-list { display: grid; gap: 10px; }
+    .coverage-card { min-width: 0; padding: 13px; background: #101318; border: 1px solid var(--border); border-radius: 6px; }
+    .coverage-card h4 { margin: 0 0 11px; color: var(--text); font-size: 14px; }
+    .coverage-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+    .coverage-metric { min-width: 0; padding: 8px 9px; background: var(--panel-2); border-radius: 4px; }
+    .coverage-metric.wide { grid-column: 1 / -1; }
+    .coverage-metric-label { display: block; margin-bottom: 3px; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+    .coverage-metric-value { display: block; overflow-wrap: anywhere; font-size: 12px; }
     .toolbar-wrap { position: sticky; top: 0; z-index: 10; padding: 10px 0; background: rgba(11, 13, 16, .93); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(48, 54, 65, .75); }
-    .toolbar { display: grid; grid-template-columns: minmax(260px, 2fr) repeat(4, minmax(135px, 1fr)) auto; gap: 9px; align-items: end; }
+    .toolbar { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 9px; align-items: end; }
+    .search-field { grid-column: span 2; }
     label { display: block; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
-    input, select, button {
+    input, select, button, textarea {
       width: 100%; min-height: 40px; margin-top: 5px; padding: 8px 10px;
       color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
     }
-    input:focus, select:focus, button:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    input:focus, select:focus, button:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
     button { width: auto; cursor: pointer; font-weight: 650; }
     button:hover { border-color: #657080; }
     main { padding: 18px 0 50px; }
@@ -119,6 +131,17 @@ _HTML_TEMPLATE = r'''<!doctype html>
     .finding[open] > summary::after { content: "-"; }
     .finding-title { display: flex; align-items: center; gap: 9px; padding-right: 24px; }
     .badge { color: var(--severity-color); border: 1px solid color-mix(in srgb, var(--severity-color) 65%, transparent); border-radius: 999px; padding: 2px 7px; font: 700 11px/1.4 Consolas, monospace; text-transform: uppercase; }
+    .state-badge { color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 2px 7px; font: 700 10px/1.4 Consolas, monospace; text-transform: uppercase; }
+    .state-badge[data-status="acknowledged"] { color: #59d185; border-color: #326b48; }
+    .state-badge[data-status="stale"] { color: var(--warning); border-color: #79612f; }
+    .fingerprint { color: var(--muted); font: 11px/1.45 Consolas, monospace; overflow-wrap: anywhere; }
+    .ack-editor { margin-top: 14px; padding: 11px; background: #101318; border: 1px solid var(--border); border-radius: 5px; }
+    .ack-editor-row { display: flex; align-items: center; gap: 9px; }
+    .ack-editor-row label { display: flex; align-items: center; gap: 7px; color: var(--text); font-size: 12px; letter-spacing: 0; text-transform: none; }
+    .ack-toggle { width: 17px; min-height: 17px; margin: 0; padding: 0; accent-color: var(--accent); }
+    .ack-note { min-height: 58px; margin-top: 9px; resize: vertical; font-size: 12px; }
+    .ack-help { margin-top: 7px; color: var(--muted); font-size: 11px; }
+    .toast { position: fixed; right: 18px; bottom: 18px; z-index: 30; max-width: min(420px, calc(100% - 36px)); padding: 11px 14px; color: var(--text); background: #20252d; border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); }
     .rule { color: var(--muted); font: 600 12px/1.4 Consolas, monospace; }
     .summary { font-weight: 720; }
     .finding-body { padding: 0 16px 16px; border-top: 1px solid var(--border); }
@@ -137,7 +160,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
       .search-field { grid-column: 1 / -1; }
     }
     @media (max-width: 560px) {
-      .shell { width: min(100% - 18px, 1500px); }
+      .shell { width: min(100% - 18px, 1740px); }
       .toolbar { grid-template-columns: 1fr; }
       .search-field { grid-column: auto; }
       .finding-title { align-items: flex-start; flex-wrap: wrap; }
@@ -170,6 +193,12 @@ _HTML_TEMPLATE = r'''<!doctype html>
       <label>Ecosystem
         <select id="ecosystem"><option value="">All ecosystems</option></select>
       </label>
+      <label>Status
+        <select id="status"><option value="">All statuses</option></select>
+      </label>
+      <label>Change
+        <select id="change"><option value="">All changes</option></select>
+      </label>
       <label>Rule
         <select id="rule"><option value="">All rules</option></select>
       </label>
@@ -177,6 +206,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
         <select id="mod"><option value="">All mods</option></select>
       </label>
       <button id="clear" type="button">Clear</button>
+      <button id="save-acknowledgements" type="button">Save acknowledgements</button>
     </div>
   </div>
 
@@ -196,16 +226,33 @@ _HTML_TEMPLATE = r'''<!doctype html>
       <button type="button" id="next">Next</button>
     </div>
   </main>
+  <div class="toast" id="toast" hidden></div>
 
   <script id="report-data" type="application/json">__REPORT_DATA__</script>
   <script>
     "use strict";
     const report = JSON.parse(document.getElementById("report-data").textContent);
+    const acknowledgementsPath = report.metadata.acknowledgements_file || "acknowledgements.yaml";
     const findings = report.findings;
+    const staleAcknowledgements = report.stale_acknowledgements || [];
+    const staleItems = staleAcknowledgements.map(item => ({
+      rule_id: "ACK-STALE", severity: "info", confidence: "high",
+      summary: `Stale acknowledgement: ${String(item.fingerprint || "").slice(0, 16)}`,
+      explanation: item.note || "This configured fingerprint no longer matches a current finding.",
+      participants: [], evidence: [], fingerprint: item.fingerprint,
+      status: "stale", acknowledgement: item.note, change: "stale", _stale: true
+    }));
+    const reportItems = findings.concat(staleItems);
+    const acknowledgementNotes = new Map();
+    for (const finding of findings) {
+      if (finding.status === "acknowledged") acknowledgementNotes.set(finding.fingerprint, finding.acknowledgement || "Acknowledged from HTML report.");
+    }
+    for (const item of staleItems) acknowledgementNotes.set(item.fingerprint, item.acknowledgement || "Stale acknowledgement.");
     const severityOrder = ["error", "conflict", "warning", "review", "info"];
     const controls = {
       search: document.getElementById("search"), severity: document.getElementById("severity"),
       ecosystem: document.getElementById("ecosystem"),
+      status: document.getElementById("status"), change: document.getElementById("change"),
       rule: document.getElementById("rule"), mod: document.getElementById("mod"),
       pageSize: document.getElementById("page-size")
     };
@@ -231,9 +278,9 @@ _HTML_TEMPLATE = r'''<!doctype html>
       return values.join(" ");
     }
 
-    for (const finding of findings) {
+    for (const finding of reportItems) {
       const prefix = String(finding.rule_id || "").split("-", 1)[0];
-      finding._ecosystem = ({AXL: "ArchiveXL", TXL: "TweakXL", RS: "REDscript", CET: "CET", CFG: "Configuration", INPUT: "Input mappings", NATIVE: "Native frameworks", CORE: "Core", WOLVENKIT: "WolvenKit"})[prefix] || "Other";
+      finding._ecosystem = ({AXL: "ArchiveXL", TXL: "TweakXL", RS: "REDscript", CET: "CET", XEC: "Cross-ecosystem", CFG: "Configuration", INPUT: "Input mappings", NATIVE: "Native frameworks", ACK: "Acknowledgements", CORE: "Core", WOLVENKIT: "WolvenKit"})[prefix] || "Other";
       finding._search = [finding.rule_id, finding.severity, finding.confidence, finding.summary,
         finding.explanation, ...(finding.participants || []), evidenceText(finding.evidence)]
         .join(" ").toLocaleLowerCase();
@@ -248,15 +295,19 @@ _HTML_TEMPLATE = r'''<!doctype html>
       }
     }
 
-    const severityCounts = new Map(), ecosystemCounts = new Map(), ruleCounts = new Map(), modCounts = new Map();
-    for (const finding of findings) {
+    const severityCounts = new Map(), ecosystemCounts = new Map(), statusCounts = new Map(), changeCounts = new Map(), ruleCounts = new Map(), modCounts = new Map();
+    for (const finding of reportItems) {
       severityCounts.set(finding.severity, (severityCounts.get(finding.severity) || 0) + 1);
       ecosystemCounts.set(finding._ecosystem, (ecosystemCounts.get(finding._ecosystem) || 0) + 1);
+      statusCounts.set(finding.status || "active", (statusCounts.get(finding.status || "active") || 0) + 1);
+      changeCounts.set(finding.change || "baseline", (changeCounts.get(finding.change || "baseline") || 0) + 1);
       ruleCounts.set(finding.rule_id, (ruleCounts.get(finding.rule_id) || 0) + 1);
       for (const mod of finding.participants || []) modCounts.set(mod, (modCounts.get(mod) || 0) + 1);
     }
     addOptions(controls.severity, severityOrder.filter(value => severityCounts.has(value)), severityCounts);
     addOptions(controls.ecosystem, [...ecosystemCounts.keys()].sort(), ecosystemCounts);
+    addOptions(controls.status, [...statusCounts.keys()].sort(), statusCounts);
+    addOptions(controls.change, [...changeCounts.keys()].sort(), changeCounts);
     addOptions(controls.rule, [...ruleCounts.keys()].sort(), ruleCounts);
     addOptions(controls.mod, [...modCounts.keys()].sort((a, b) => a.localeCompare(b)), modCounts);
 
@@ -264,6 +315,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
     const coverage = summary.coverage || {};
     const coverageShell = document.getElementById("coverage-shell");
     const coverageElement = document.getElementById("coverage");
+    const coveragePanel = document.querySelector(".coverage-panel");
 
     function coverageTable(rows, columns) {
       const wrap = document.createElement("div"); wrap.className = "coverage-table-wrap";
@@ -289,6 +341,36 @@ _HTML_TEMPLATE = r'''<!doctype html>
         body.append(tr);
       }
       table.append(body); wrap.append(table); return wrap;
+    }
+
+    function coverageCards(rows, columns) {
+      const list = document.createElement("div"); list.className = "coverage-card-list";
+      for (const row of rows) {
+        const card = document.createElement("article"); card.className = "coverage-card";
+        const nameColumn = columns.find(column => column.key === "name");
+        if (nameColumn && row.name != null) {
+          const heading = document.createElement("h4"); heading.textContent = String(row.name); card.append(heading);
+        }
+        const metrics = document.createElement("div"); metrics.className = "coverage-metrics";
+        for (const column of columns) {
+          if (column.key === "name") continue;
+          const value = row[column.key];
+          if (value == null || value === "") continue;
+          const metric = document.createElement("div"); metric.className = "coverage-metric";
+          if (column.wide) metric.classList.add("wide");
+          const label = document.createElement("span"); label.className = "coverage-metric-label"; label.textContent = column.label;
+          const content = document.createElement("span"); content.className = "coverage-metric-value";
+          if (column.key === "status") {
+            const status = document.createElement("span"); status.className = "coverage-status";
+            status.dataset.status = value; status.textContent = value; content.append(status);
+          } else {
+            content.textContent = String(value);
+          }
+          metric.append(label, content); metrics.append(metric);
+        }
+        card.append(metrics); list.append(card);
+      }
+      return list;
     }
 
     for (const [ecosystem, analyzer] of Object.entries(coverage)) {
@@ -364,7 +446,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
       }
       if ((analyzer.registration_operations || []).length) {
         const label = document.createElement("h3"); label.textContent = "CET Lua registrations"; group.append(label);
-        group.append(coverageTable(analyzer.registration_operations, [
+        group.append(coverageCards(analyzer.registration_operations, [
           {key: "name", label: "Analyzer"}, {key: "status", label: "Status"},
           {key: "documents", label: "Lua files"}, {key: "mod_roots", label: "Mod roots"},
           {key: "entrypoints", label: "Entrypoints"}, {key: "events", label: "Events"},
@@ -376,7 +458,30 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "dynamic_globals", label: "Dynamic globals"}, {key: "dynamic_calls", label: "Dynamic calls"},
           {key: "unresolved_modules", label: "Missing modules"},
           {key: "shared_hook_targets", label: "Shared hooks"},
-          {key: "inactive_references", label: "Inactive refs"}, {key: "note", label: "Notes"}
+          {key: "inactive_references", label: "Inactive refs"}, {key: "note", label: "Notes", wide: true}
+        ]));
+      }
+      if ((analyzer.cross_ecosystem_operations || []).length) {
+        const label = document.createElement("h3"); label.textContent = "Cross-ecosystem method hooks"; group.append(label);
+        group.append(coverageCards(analyzer.cross_ecosystem_operations, [
+          {key: "name", label: "Analyzer"}, {key: "status", label: "Status"},
+          {key: "documents", label: "Documents"},
+          {key: "cet_hook_targets", label: "CET targets"},
+          {key: "redscript_method_targets", label: "REDscript targets"},
+          {key: "candidate_targets", label: "Candidates"},
+          {key: "matched_targets", label: "Matched"},
+          {key: "cross_package_targets", label: "Cross-package"},
+          {key: "same_package_targets", label: "Same package"},
+          {key: "exact_signature_targets", label: "Full signature"},
+          {key: "ambiguous_targets", label: "Short-name ambiguous"},
+          {key: "signature_mismatches", label: "Signature mismatches"},
+          {key: "observer_targets", label: "Observer targets"},
+          {key: "chained_override_targets", label: "Chained overrides"},
+          {key: "uncertain_override_targets", label: "Uncertain overrides"},
+          {key: "terminating_override_targets", label: "Terminating overrides"},
+          {key: "dynamic_hooks", label: "Dynamic hooks"},
+          {key: "findings", label: "Findings"},
+          {key: "note", label: "Coverage note", wide: true}
         ]));
       }
       if ((analyzer.configuration_formats || []).length) {
@@ -479,7 +584,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
       }
       if ((analyzer.runtime_logs || []).length) {
         const label = document.createElement("h3"); label.textContent = "Runtime log correlation"; group.append(label);
-        group.append(coverageTable(analyzer.runtime_logs, [
+        group.append(coverageCards(analyzer.runtime_logs, [
           {key: "name", label: "Log analyzer"}, {key: "status", label: "Status"},
           {key: "session", label: "Session"}, {key: "files", label: "Files"},
           {key: "compiled_files", label: "Compiled files"},
@@ -488,8 +593,8 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "warnings", label: "Warnings"}, {key: "events", label: "Events"},
           {key: "correlated_events", label: "Source-attributed"},
           {key: "static_confirmations", label: "Static confirmations"},
-          {key: "findings", label: "Findings"}, {key: "log_path", label: "Selected log"},
-          {key: "note", label: "Coverage note"}
+          {key: "findings", label: "Findings"}, {key: "log_path", label: "Selected log", wide: true},
+          {key: "note", label: "Coverage note", wide: true}
         ]));
       }
       if (analyzer.payloads) {
@@ -541,11 +646,16 @@ _HTML_TEMPLATE = r'''<!doctype html>
       [summary.cet_references, "CET references"],
       [summary.config_references, "Configuration files"],
       [summary.input_references, "Input references"],
-      [summary.native_references, "Native references"], [findings.length, "Findings"]
+      [summary.native_references, "Native references"],
+      [summary.cross_ecosystem_findings, "Cross-ecosystem"],
+      [summary.finding_states?.active, "Active findings", "active"],
+      [summary.finding_states?.acknowledged, "Acknowledged", "acknowledged"],
+      [findings.length, "Findings"]
     ];
     const statsElement = document.getElementById("stats");
-    for (const [value, label] of stats) {
+    for (const [value, label, stateKey] of stats) {
       const card = document.createElement("div"); card.className = "stat";
+      if (stateKey) card.dataset.stateCount = stateKey;
       const number = document.createElement("span"); number.className = "stat-value";
       number.textContent = Number(value || 0).toLocaleString();
       const caption = document.createElement("span"); caption.className = "stat-label"; caption.textContent = label;
@@ -556,10 +666,12 @@ _HTML_TEMPLATE = r'''<!doctype html>
 
     function filteredFindings() {
       const query = controls.search.value.trim().toLocaleLowerCase();
-      return findings.filter(finding =>
+      return reportItems.filter(finding => !finding._removed &&
         (!query || finding._search.includes(query)) &&
         (!controls.severity.value || finding.severity === controls.severity.value) &&
         (!controls.ecosystem.value || finding._ecosystem === controls.ecosystem.value) &&
+        (!controls.status.value || (finding.status || "active") === controls.status.value) &&
+        (!controls.change.value || (finding.change || "baseline") === controls.change.value) &&
         (!controls.rule.value || finding.rule_id === controls.rule.value) &&
         (!controls.mod.value || (finding.participants || []).includes(controls.mod.value))
       );
@@ -568,15 +680,75 @@ _HTML_TEMPLATE = r'''<!doctype html>
     function findingElement(finding) {
       const details = document.createElement("details"); details.className = "finding";
       details.dataset.severity = finding.severity;
+      details.dataset.status = finding.status || "active";
       const heading = document.createElement("summary");
       const title = document.createElement("div"); title.className = "finding-title";
       const badge = document.createElement("span"); badge.className = "badge"; badge.textContent = finding.severity;
       const rule = document.createElement("span"); rule.className = "rule"; rule.textContent = finding.rule_id;
+      const state = document.createElement("span"); state.className = "state-badge";
+      state.dataset.status = finding.status || "active";
+      state.textContent = `${finding.status || "active"} · ${finding.change || "baseline"}`;
       const summary = document.createElement("span"); summary.className = "summary"; summary.textContent = finding.summary;
-      title.append(badge, rule, summary); heading.append(title);
+      title.append(badge, rule, state, summary); heading.append(title);
       const body = document.createElement("div"); body.className = "finding-body";
       const explanation = document.createElement("div"); explanation.className = "explanation"; explanation.textContent = finding.explanation;
       body.append(explanation);
+      if (finding.acknowledgement) {
+        const label = document.createElement("div"); label.className = "section-label"; label.textContent = "Acknowledgement";
+        const note = document.createElement("div"); note.textContent = finding.acknowledgement;
+        body.append(label, note);
+      }
+      if (finding.fingerprint) {
+        const label = document.createElement("div"); label.className = "section-label"; label.textContent = "Fingerprint";
+        const fingerprint = document.createElement("div"); fingerprint.className = "fingerprint"; fingerprint.textContent = finding.fingerprint;
+        body.append(label, fingerprint);
+      }
+      if (finding.fingerprint) {
+        const editor = document.createElement("div"); editor.className = "ack-editor";
+        const row = document.createElement("div"); row.className = "ack-editor-row";
+        const toggleLabel = document.createElement("label");
+        const toggle = document.createElement("input"); toggle.type = "checkbox"; toggle.className = "ack-toggle";
+        toggle.checked = acknowledgementNotes.has(finding.fingerprint);
+        const toggleText = document.createElement("span");
+        toggleText.textContent = finding._stale ? "Keep this stale acknowledgement" : "Acknowledge this finding";
+        toggleLabel.append(toggle, toggleText); row.append(toggleLabel);
+        const note = document.createElement("textarea"); note.className = "ack-note"; note.rows = 2;
+        note.placeholder = "Why is this finding expected?";
+        note.value = acknowledgementNotes.get(finding.fingerprint) || "";
+        note.disabled = !toggle.checked;
+        const help = document.createElement("div"); help.className = "ack-help";
+        help.textContent = `Changes apply immediately. Save the YAML to the configured path: ${acknowledgementsPath}`;
+        toggle.addEventListener("change", () => {
+          if (toggle.checked) {
+            const value = note.value.trim() || "Acknowledged from HTML report.";
+            acknowledgementNotes.set(finding.fingerprint, value);
+            finding.acknowledgement = value;
+            finding.status = finding._stale ? "stale" : "acknowledged";
+            note.value = value; note.disabled = false;
+          } else {
+            acknowledgementNotes.delete(finding.fingerprint);
+            finding.acknowledgement = null;
+            if (finding._stale) finding._removed = true;
+            else finding.status = "active";
+          }
+          page = 1; updateStateCounts(); render();
+        });
+        note.addEventListener("input", () => {
+          if (!toggle.checked) return;
+          const value = note.value.trim();
+          if (value) {
+            acknowledgementNotes.set(finding.fingerprint, value);
+            finding.acknowledgement = value;
+          }
+        });
+        note.addEventListener("blur", () => {
+          if (!toggle.checked || note.value.trim()) return;
+          note.value = "Acknowledged from HTML report.";
+          acknowledgementNotes.set(finding.fingerprint, note.value);
+          finding.acknowledgement = note.value;
+        });
+        editor.append(row, note, help); body.append(editor);
+      }
       if ((finding.participants || []).length) {
         const label = document.createElement("div"); label.className = "section-label"; label.textContent = "Mods";
         const chips = document.createElement("div"); chips.className = "chips";
@@ -618,17 +790,97 @@ _HTML_TEMPLATE = r'''<!doctype html>
         for (const finding of visible) fragment.append(findingElement(finding));
         list.append(fragment);
       }
-      document.getElementById("result-count").textContent = `${filtered.length.toLocaleString()} of ${findings.length.toLocaleString()} findings`;
+      document.getElementById("result-count").textContent = `${filtered.length.toLocaleString()} of ${reportItems.length.toLocaleString()} report items (${findings.length.toLocaleString()} current findings)`;
       document.getElementById("page-label").textContent = `Page ${page} of ${pageCount}`;
       document.getElementById("previous").disabled = page <= 1;
       document.getElementById("next").disabled = page >= pageCount;
       document.getElementById("pager").hidden = filtered.length <= pageSize;
     }
 
-    for (const control of Object.values(controls)) control.addEventListener("input", () => { page = 1; render(); });
+    function updateStateCounts() {
+      const active = findings.filter(finding => finding.status === "active").length;
+      const acknowledged = findings.filter(finding => finding.status === "acknowledged").length;
+      const counts = {active, acknowledged, stale: staleItems.filter(item => !item._removed).length};
+      for (const card of document.querySelectorAll("[data-state-count]")) {
+        card.querySelector(".stat-value").textContent = Number(counts[card.dataset.stateCount] || 0).toLocaleString();
+      }
+      for (const option of controls.status.options) {
+        if (!option.value || counts[option.value] == null) continue;
+        option.textContent = `${option.value} (${counts[option.value]})`;
+      }
+    }
+
+    function acknowledgementsYaml() {
+      const entries = [...acknowledgementNotes.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      if (!entries.length) return "version: 1\n\nacknowledgements: []\n";
+      const lines = ["version: 1", "", "acknowledgements:"];
+      for (const [fingerprint, note] of entries) {
+        lines.push(`  - fingerprint: ${fingerprint}`, `    note: ${JSON.stringify(note)}`);
+      }
+      return lines.join("\n") + "\n";
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast"); toast.textContent = message; toast.hidden = false;
+      clearTimeout(showToast.timer); showToast.timer = setTimeout(() => { toast.hidden = true; }, 5000);
+    }
+
+    function downloadAcknowledgements(yaml) {
+      const blob = new Blob([yaml], {type: "application/yaml;charset=utf-8"});
+      const url = URL.createObjectURL(blob), anchor = document.createElement("a");
+      anchor.href = url; anchor.download = "acknowledgements.yaml"; anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast("Downloaded acknowledgements.yaml. Replace the configured file before the next scan.");
+    }
+
+    async function saveAcknowledgements() {
+      const yaml = acknowledgementsYaml();
+      if (window.showSaveFilePicker) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: "acknowledgements.yaml",
+            types: [{description: "YAML acknowledgements", accept: {"application/yaml": [".yaml", ".yml"]}}]
+          });
+          const writable = await handle.createWritable(); await writable.write(yaml); await writable.close();
+          showToast(`Acknowledgements saved. Configured scanner path: ${acknowledgementsPath}`);
+          return;
+        } catch (error) {
+          if (error && error.name === "AbortError") return;
+        }
+      }
+      downloadAcknowledgements(yaml);
+    }
+
+    const hashKeys = ["search", "severity", "ecosystem", "status", "change", "rule", "mod", "pageSize"];
+    function readHash() {
+      const values = new URLSearchParams(location.hash.slice(1));
+      for (const key of hashKeys) {
+        if (!values.has(key)) continue;
+        const value = values.get(key);
+        if (key === "search" || [...controls[key].options].some(option => option.value === value)) controls[key].value = value;
+      }
+      coveragePanel.open = values.get("coverage") === "open";
+    }
+    function writeHash() {
+      const values = new URLSearchParams();
+      for (const key of hashKeys) {
+        const value = controls[key].value;
+        if (value && !(key === "pageSize" && value === "50")) values.set(key, value);
+      }
+      if (coveragePanel.open) values.set("coverage", "open");
+      const next = values.toString();
+      const base = location.href.split("#", 1)[0];
+      history.replaceState(null, "", base + (next ? `#${next}` : ""));
+    }
+    readHash();
+    coveragePanel.addEventListener("toggle", writeHash);
+    for (const control of Object.values(controls)) control.addEventListener("input", () => { page = 1; writeHash(); render(); });
     document.getElementById("clear").addEventListener("click", () => {
-      controls.search.value = ""; controls.severity.value = ""; controls.rule.value = ""; controls.mod.value = ""; page = 1; render();
+      controls.search.value = ""; controls.severity.value = ""; controls.ecosystem.value = "";
+      controls.status.value = ""; controls.change.value = ""; controls.rule.value = "";
+      controls.mod.value = ""; page = 1; writeHash(); render();
     });
+    document.getElementById("save-acknowledgements").addEventListener("click", saveAcknowledgements);
     document.getElementById("previous").addEventListener("click", () => { page--; render(); scrollTo({top: 0, behavior: "smooth"}); });
     document.getElementById("next").addEventListener("click", () => { page++; render(); scrollTo({top: 0, behavior: "smooth"}); });
     document.addEventListener("keydown", event => {

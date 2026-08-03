@@ -36,6 +36,8 @@ scan:
             self.assertEqual("none", config.payload_scope)
             self.assertTrue(config.refresh_cache)
             self.assertEqual(45, config.wolvenkit_timeout_seconds)
+            self.assertEqual(root / "acknowledgements.yaml", config.acknowledgements_file)
+            self.assertEqual((), config.acknowledgements)
 
     def test_duplicate_and_unknown_keys_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -49,6 +51,41 @@ scan:
             unknown.write_text("version: 1\nscan:\n  mystery: true\n", encoding="utf-8")
             with self.assertRaises(ConfigError):
                 load_config(unknown)
+
+            invalid_acknowledgement = root / "invalid-acknowledgement.yaml"
+            invalid_acknowledgement.write_text(
+                "version: 1\nacknowledgements:\n  - fingerprint: short\n    note: Expected\n",
+                encoding="utf-8",
+            )
+            invalid_acknowledgement_config = root / "invalid-acknowledgement-config.yaml"
+            invalid_acknowledgement_config.write_text(
+                "version: 1\npaths:\n  acknowledgements: invalid-acknowledgement.yaml\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(ConfigError):
+                load_config(invalid_acknowledgement_config)
+
+    def test_loads_strict_acknowledgements(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / "scanner.yaml"
+            acknowledgements = root / "accepted.yaml"
+            fingerprint = "a" * 64
+            acknowledgements.write_text(
+                "version: 1\nacknowledgements:\n"
+                f"  - fingerprint: {fingerprint}\n"
+                "    note: Known Vortex winner\n",
+                encoding="utf-8",
+            )
+            path.write_text(
+                "version: 1\npaths:\n  acknowledgements: accepted.yaml\n",
+                encoding="utf-8",
+            )
+            config = load_config(path)
+            self.assertEqual(acknowledgements, config.acknowledgements_file)
+            self.assertEqual(1, len(config.acknowledgements))
+            self.assertEqual(fingerprint, config.acknowledgements[0].fingerprint)
+            self.assertEqual("Known Vortex winner", config.acknowledgements[0].note)
 
     def test_cli_values_override_yaml_values(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

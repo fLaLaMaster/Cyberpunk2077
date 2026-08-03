@@ -77,6 +77,10 @@ class Finding:
     explanation: str
     participants: list[str] = field(default_factory=list)
     evidence: list[dict[str, Any]] = field(default_factory=list)
+    fingerprint: str = ""
+    status: str = "active"
+    acknowledgement: str | None = None
+    change: str = "baseline"
 
     def sort_key(self) -> tuple[Any, ...]:
         return (
@@ -123,4 +127,3 @@ class ArchiveManifest:
             "from_cache": self.from_cache,
             "members": [member.to_dict() for member in self.members],
         }
-

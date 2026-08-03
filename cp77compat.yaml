@@ -11,6 +11,7 @@ paths:
   wolvenkit: 'C:\Games\Programs\WolvenKit-Console\WolvenKit.CLI.exe'
   output: 'reports\current'
   cache: '.cache\archives'
+  acknowledgements: 'acknowledgements.yaml'
 
 scan:
   # none: no archive indexing; xl: archives owned by mods with .xl files;

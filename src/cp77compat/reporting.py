@@ -5,12 +5,26 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable
 
+from .finding_state import Acknowledgement, classify_findings
 from .html_report import write_html_report
 from .models import ArchiveManifest, Artifact, Finding, ModSource, Reference
 
 
 def _write_json(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _previous_findings(path: Path) -> tuple[list[dict[str, Any]] | None, str | None]:
+    if not path.is_file():
+        return None, None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+        findings = payload.get("findings")
+        if not isinstance(findings, list) or not all(isinstance(item, dict) for item in findings):
+            return None, "Previous compatibility-findings.json has no valid findings list."
+        return findings, None
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        return None, f"Could not read previous compatibility-findings.json: {exc}"
 
 
 def write_reports(
@@ -29,8 +43,19 @@ def write_reports(
     findings: list[Finding],
     metadata: dict[str, Any],
     coverage: dict[str, Any] | None = None,
+    acknowledgements: Iterable[Acknowledgement] = (),
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
+    previous, previous_error = _previous_findings(
+        output_dir / "compatibility-findings.json"
+    )
+    finding_states, diff, stale_acknowledgements = classify_findings(
+        findings,
+        acknowledgements,
+        previous,
+    )
+    if previous_error:
+        diff["baseline_error"] = previous_error
     ordered_findings = sorted(findings, key=lambda item: item.sort_key())
     summary = {
         "mods": len(mods),
@@ -44,7 +69,12 @@ def write_reports(
         "config_references": len(config_references),
         "input_references": len(input_references),
         "native_references": len(native_references),
+        "cross_ecosystem_findings": sum(
+            item.rule_id.startswith("XEC-") for item in ordered_findings
+        ),
         "findings": dict(sorted(Counter(item.severity for item in ordered_findings).items())),
+        "finding_states": finding_states,
+        "diff": diff["summary"],
         "coverage": coverage or {},
     }
     _write_json(
@@ -156,11 +186,32 @@ def write_reports(
         },
     )
     _write_json(
+        output_dir / "cross-ecosystem-findings.json",
+        {
+            "metadata": metadata,
+            "summary": summary,
+            "findings": [
+                finding.to_dict()
+                for finding in ordered_findings
+                if finding.rule_id.startswith("XEC-")
+            ],
+        },
+    )
+    _write_json(
         output_dir / "compatibility-findings.json",
         {
             "metadata": metadata,
             "summary": summary,
+            "stale_acknowledgements": stale_acknowledgements,
             "findings": [finding.to_dict() for finding in ordered_findings],
+        },
+    )
+    _write_json(
+        output_dir / "compatibility-diff.json",
+        {
+            "metadata": metadata,
+            "report_summary": summary,
+            "diff": diff,
         },
     )
 
@@ -180,7 +231,14 @@ def write_reports(
         f"- Configuration references: {summary['config_references']}",
         f"- Input mapping references: {summary['input_references']}",
         f"- Native binary references: {summary['native_references']}",
+        f"- Cross-ecosystem findings: {summary['cross_ecosystem_findings']}",
         "- Findings: " + ", ".join(f"{key}={value}" for key, value in summary["findings"].items()),
+        "- Finding states: " + ", ".join(
+            f"{key}={value}" for key, value in summary["finding_states"].items()
+        ),
+        "- Changes from previous scan: " + ", ".join(
+            f"{key}={value}" for key, value in summary["diff"].items()
+        ),
         "",
     ]
     if summary["coverage"]:
@@ -280,6 +338,27 @@ def write_reports(
                         f"dynamic globals/API calls={operation['dynamic_globals']}/{operation['dynamic_calls']}; "
                         f"missing modules={operation['unresolved_modules']}; "
                         f"shared hooks={operation['shared_hook_targets']} - {operation['note']}"
+                    )
+            cross_ecosystem_operations = analyzer.get("cross_ecosystem_operations", [])
+            if cross_ecosystem_operations:
+                lines.extend(["", "#### Cross-ecosystem method hooks", ""])
+                for operation in cross_ecosystem_operations:
+                    lines.append(
+                        f"- `{operation['name']}`: {operation['status']}; "
+                        f"documents={operation['documents']}; "
+                        f"CET/REDscript targets={operation['cet_hook_targets']}/"
+                        f"{operation['redscript_method_targets']}; "
+                        f"candidates/matched/cross-package="
+                        f"{operation['candidate_targets']}/{operation['matched_targets']}/"
+                        f"{operation['cross_package_targets']}; "
+                        f"full-signature/ambiguous={operation['exact_signature_targets']}/"
+                        f"{operation['ambiguous_targets']}; "
+                        f"observer/chained/uncertain/terminating="
+                        f"{operation['observer_targets']}/{operation['chained_override_targets']}/"
+                        f"{operation['uncertain_override_targets']}/"
+                        f"{operation['terminating_override_targets']}; "
+                        f"dynamic hooks={operation['dynamic_hooks']}; "
+                        f"findings={operation['findings']} - {operation['note']}"
                     )
             configuration_formats = analyzer.get("configuration_formats", [])
             if configuration_formats:
@@ -423,9 +502,13 @@ def write_reports(
                 finding.explanation,
                 "",
                 "Mods: " + (", ".join(finding.participants) or "n/a"),
+                f"Fingerprint: `{finding.fingerprint}`",
+                f"Status: {finding.status}; change: {finding.change}",
                 "",
             ]
         )
+        if finding.acknowledgement:
+            lines.extend([f"Acknowledgement: {finding.acknowledgement}", ""])
         displayed_evidence = finding.evidence[:10]
         for evidence in displayed_evidence:
             source = evidence.get("source_path") or evidence.get("path") or evidence.get("archive")
@@ -455,4 +538,5 @@ def write_reports(
         summary,
         ordered_findings,
         metadata,
+        stale_acknowledgements,
     )

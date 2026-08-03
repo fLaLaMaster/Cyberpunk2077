@@ -8,6 +8,8 @@ from typing import Any
 import yaml
 from yaml.constructor import ConstructorError
 
+from .finding_state import Acknowledgement, FINGERPRINT_PATTERN
+
 
 CONFIG_VERSION = 1
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -63,6 +65,8 @@ class ScannerConfig:
     workers: int
     refresh_cache: bool
     wolvenkit_timeout_seconds: int
+    acknowledgements_file: Path
+    acknowledgements: tuple[Acknowledgement, ...]
 
 
 def _mapping(value: Any, label: str) -> dict[str, Any]:
@@ -105,6 +109,49 @@ def _positive_int(value: Any, default: int, label: str) -> int:
     return selected
 
 
+def _acknowledgements(value: Any) -> tuple[Acknowledgement, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise ConfigError("acknowledgements must be a YAML list")
+    results: list[Acknowledgement] = []
+    seen: set[str] = set()
+    for index, raw in enumerate(value, 1):
+        item = _mapping(raw, f"acknowledgements[{index}]")
+        _reject_unknown(item, {"fingerprint", "note"}, f"acknowledgements[{index}]")
+        fingerprint = item.get("fingerprint")
+        note = item.get("note")
+        if not isinstance(fingerprint, str) or not FINGERPRINT_PATTERN.fullmatch(fingerprint):
+            raise ConfigError(
+                f"acknowledgements[{index}].fingerprint must be 64 lowercase hexadecimal characters"
+            )
+        if fingerprint in seen:
+            raise ConfigError(f"duplicate acknowledgement fingerprint: {fingerprint}")
+        if not isinstance(note, str) or not note.strip():
+            raise ConfigError(f"acknowledgements[{index}].note must be a non-empty string")
+        seen.add(fingerprint)
+        results.append(Acknowledgement(fingerprint=fingerprint, note=note.strip()))
+    return tuple(results)
+
+
+def _load_acknowledgements(path: Path) -> tuple[Acknowledgement, ...]:
+    if not path.is_file():
+        return ()
+    try:
+        loaded = yaml.load(
+            path.read_text(encoding="utf-8-sig"),
+            Loader=StrictConfigLoader,
+        )
+    except yaml.YAMLError as exc:
+        raise ConfigError(f"cannot parse acknowledgements {path}: {exc}") from exc
+    root = _mapping(loaded, "acknowledgements root")
+    _reject_unknown(root, {"version", "acknowledgements"}, "acknowledgements top-level")
+    version = root.get("version", 1)
+    if isinstance(version, bool) or version != 1:
+        raise ConfigError(f"unsupported acknowledgements version {version}; expected 1")
+    return _acknowledgements(root.get("acknowledgements"))
+
+
 def load_config(path: Path) -> ScannerConfig:
     source_path = path.expanduser().resolve(strict=False)
     if not source_path.is_file():
@@ -131,7 +178,7 @@ def load_config(path: Path) -> ScannerConfig:
     scan = _mapping(root.get("scan"), "scan")
     _reject_unknown(
         paths,
-        {"staging", "game", "wolvenkit", "output", "cache"},
+        {"staging", "game", "wolvenkit", "output", "cache", "acknowledgements"},
         "paths",
     )
     _reject_unknown(
@@ -152,6 +199,12 @@ def load_config(path: Path) -> ScannerConfig:
         raise ConfigError("scan.refresh_cache must be true or false")
 
     base = source_path.parent
+    acknowledgements_file = _path_value(
+        paths.get("acknowledgements"),
+        base / "acknowledgements.yaml",
+        base,
+        "paths.acknowledgements",
+    )
     return ScannerConfig(
         source_path=source_path,
         version=version,
@@ -183,4 +236,6 @@ def load_config(path: Path) -> ScannerConfig:
             120,
             "scan.wolvenkit_timeout_seconds",
         ),
+        acknowledgements_file=acknowledgements_file,
+        acknowledgements=_load_acknowledgements(acknowledgements_file),
     )

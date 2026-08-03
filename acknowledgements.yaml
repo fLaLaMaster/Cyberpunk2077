@@ -1,0 +1,11 @@
+version: 1
+
+acknowledgements:
+  - fingerprint: 623a760b16fe49963fe8d585e949c2bd1bd1f57b9a9a2e8fe2b8cc9e4a12a028
+    note: "Classic Drinks is the selected Vortex winner over the standalone No Paper Bags package."
+  - fingerprint: b14d026767dd7dc38cba2adc72702eabe43f6cd9df8ae30e36238ad0d5ed8f8b
+    note: "Damage Scaling and Balance - Extended is the selected Vortex winner for the shared localization file."
+  - fingerprint: c315fecc5e6d605124b5c6dd5cb3f82bd49d3a513b09c0c6cf5eb3172a2871cf
+    note: "Damage Scaling and Balance - Extended is the selected Vortex winner for the CET entrypoint."
+  - fingerprint: d49f9fcc67fc35890f2550b67b43c5cccb77ef926986092e2abb7721ccbca82a
+    note: "Damage Scaling and Balance - Extended is the selected Vortex winner for the REDscript file."

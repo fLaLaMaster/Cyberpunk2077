@@ -20,6 +20,7 @@ class HtmlReportTests(unittest.TestCase):
             explanation="Searchable explanation",
             participants=["Example Mod"],
             evidence=[{"identity": r"base\example.streamingsector"}],
+            fingerprint="a" * 64,
         )
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "report.html"
@@ -36,6 +37,9 @@ class HtmlReportTests(unittest.TestCase):
                     "cet_references": 4,
                     "config_references": 5,
                     "input_references": 6,
+                    "native_references": 0,
+                    "cross_ecosystem_findings": 1,
+                    "finding_states": {"active": 1, "acknowledged": 0},
                     "coverage": {
                         "archivexl": {
                             "documents": 1,
@@ -153,6 +157,33 @@ class HtmlReportTests(unittest.TestCase):
                                 }
                             ],
                         },
+                        "cross-ecosystem": {
+                            "documents": 2,
+                            "sections": [],
+                            "cross_ecosystem_operations": [
+                                {
+                                    "name": "CET hooks vs REDscript methods",
+                                    "status": "partial",
+                                    "documents": 2,
+                                    "cet_hook_targets": 1,
+                                    "redscript_method_targets": 1,
+                                    "candidate_targets": 1,
+                                    "matched_targets": 1,
+                                    "cross_package_targets": 1,
+                                    "same_package_targets": 0,
+                                    "exact_signature_targets": 0,
+                                    "ambiguous_targets": 1,
+                                    "signature_mismatches": 0,
+                                    "observer_targets": 1,
+                                    "chained_override_targets": 0,
+                                    "uncertain_override_targets": 0,
+                                    "terminating_override_targets": 0,
+                                    "dynamic_hooks": 0,
+                                    "findings": 1,
+                                    "note": "Example cross-ecosystem coverage",
+                                }
+                            ],
+                        },
                         "config": {
                             "documents": 1,
                             "sections": [],
@@ -202,16 +233,28 @@ class HtmlReportTests(unittest.TestCase):
             self.assertIn('id="search"', html)
             self.assertIn('id="severity"', html)
             self.assertIn('id="ecosystem"', html)
+            self.assertIn('id="status"', html)
+            self.assertIn('id="change"', html)
+            self.assertIn('id="save-acknowledgements"', html)
             self.assertIn('id="coverage"', html)
             self.assertIn("Payload inspection", html)
             self.assertIn("Player body types", html)
             self.assertIn("World streaming operations", html)
             self.assertIn("REDscript annotation operations", html)
             self.assertIn("CET Lua registrations", html)
+            self.assertIn("Cross-ecosystem method hooks", html)
+            self.assertIn('XEC: "Cross-ecosystem"', html)
             self.assertIn("Configuration formats", html)
             self.assertIn("Configuration ownership", html)
             self.assertIn("Input Loader mappings", html)
             self.assertIn("Runtime log correlation", html)
+            self.assertIn(".coverage-content, .coverage-group { min-width: 0; }", html)
+            self.assertIn('controls.ecosystem.value = ""', html)
+            self.assertIn("function readHash()", html)
+            self.assertIn("function coverageCards", html)
+            self.assertIn("function acknowledgementsYaml", html)
+            self.assertIn("showSaveFilePicker", html)
+            self.assertIn("min(1740px", html)
             self.assertNotIn("</script><script>alert(1)</script>", html)
             match = re.search(
                 r'<script id="report-data" type="application/json">(.*?)</script>',

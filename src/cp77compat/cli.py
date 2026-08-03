@@ -32,6 +32,7 @@ from .archivexl_payload_analysis import (
 from .config import DEFAULT_CONFIG_PATH, ScannerConfig, load_config
 from .cet import analyze_cet_references, build_cet_coverage, parse_cet_documents
 from .cet_runtime import analyze_cet_runtime_logs
+from .cross_ecosystem import analyze_cross_ecosystem_methods
 from .deployment import load_deployment
 from .inventory import build_inventory, discover_mods, exact_path_findings
 from .input_mapping import analyze_input_documents, parse_input_documents
@@ -113,6 +114,8 @@ def resolve_scan_args(args: argparse.Namespace, config: ScannerConfig) -> argpar
         raise ValueError("--wolvenkit-timeout must be a positive integer")
     args.config = config.source_path
     args.config_version = config.version
+    args.acknowledgements_file = config.acknowledgements_file
+    args.acknowledgements = config.acknowledgements
     return args
 
 
@@ -251,6 +254,17 @@ def run_scan(args: argparse.Namespace) -> int:
             f"{cet_runtime_coverage['warnings']} warnings, "
             f"{cet_runtime_coverage['findings']} consolidated findings"
         )
+    cross_ecosystem_findings, cross_ecosystem_coverage = (
+        analyze_cross_ecosystem_methods(cet_references, redscript_references)
+    )
+    findings.extend(cross_ecosystem_findings)
+    coverage["cross-ecosystem"] = cross_ecosystem_coverage
+    cross_operation = cross_ecosystem_coverage["cross_ecosystem_operations"][0]
+    print(
+        f"Compared {cross_operation['candidate_targets']} CET/REDscript method "
+        f"candidates; found {cross_operation['cross_package_targets']} cross-package "
+        f"targets in {len(cross_ecosystem_findings)} consolidated findings"
+    )
     config_documents, config_references, config_parse_findings = (
         parse_config_documents(artifacts)
     )
@@ -536,6 +550,8 @@ def run_scan(args: argparse.Namespace) -> int:
         "wolvenkit": str(args.wolvenkit),
         "wolvenkit_version": wolvenkit_version,
         "wolvenkit_timeout_seconds": args.wolvenkit_timeout,
+        "configured_acknowledgements": len(args.acknowledgements),
+        "acknowledgements_file": str(args.acknowledgements_file),
     }
     write_reports(
         args.output,
@@ -553,6 +569,7 @@ def run_scan(args: argparse.Namespace) -> int:
         findings,
         metadata,
         coverage,
+        args.acknowledgements,
     )
     print(f"Wrote reports to {args.output}")
     return 0

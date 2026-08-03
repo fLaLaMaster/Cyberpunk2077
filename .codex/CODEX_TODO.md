@@ -106,6 +106,19 @@ frozen-corpus validation pass are complete.
 - [x] Parse input mapping IDs and identify duplicate or overwritten mappings.
 - [x] Correlate CET findings with CET framework, scripting, and per-mod logs.
 
+## Cross-ecosystem analysis
+
+- [x] Compare active literal CET observers/overrides with REDscript wrappers
+  and replacements by class, method, and available NativeDB signature.
+- [x] Distinguish additive observers, wrapped override chains, uncertain
+  callbacks, and visibly terminating CET overrides.
+- [x] Count same-package integration, overload-ambiguous short names, and
+  dynamic hook targets without promoting them to false conflicts.
+- [ ] Extract literal CET `TweakDB` record/flat writes and compare them with
+  concrete TweakXL operations.
+- [ ] Consider explicit cross-language dependency/detection declarations after
+  method and TweakDB effect coverage is complete.
+
 ## RED4ext and framework validation
 
 - [x] Inventory native plugin versions and declared dependencies.
@@ -122,12 +135,16 @@ frozen-corpus validation pass are complete.
   resource operations, including analyzed/partial/unsupported status.
 - [x] Attach structural source lines to all current ArchiveXL and TweakXL
   references instead of relying on synthesized-identity text searches.
-- [ ] Add URL/hash-backed HTML filter state so a filtered finding view can be
+- [x] Add URL/hash-backed HTML filter state so a filtered finding view can be
   bookmarked or shared.
 - [ ] Add export of the currently filtered HTML findings to JSON/CSV.
-- [ ] Add optional finding suppression/acknowledgement configuration without
+- [x] Add optional finding suppression/acknowledgement configuration without
   changing source mods.
-- [ ] Add scan-to-scan diff reporting for new, resolved, and changed findings.
+- [x] Add scan-to-scan diff reporting for new, resolved, and changed findings.
+- [x] Store acknowledgements separately and allow checkbox/note editing plus
+  user-approved YAML saving from the HTML report.
+- [x] Replace overly wide ArchiveXL runtime and CET registration coverage rows
+  with responsive metric cards.
 - [ ] Avoid re-hashing unchanged archives by caching a verified
   size/mtime/file-identity fingerprint before SHA-256 fallback.
 - [ ] Separate the large ArchiveXL reference list from the primary findings JSON

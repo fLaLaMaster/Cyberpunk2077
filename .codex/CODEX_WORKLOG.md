@@ -6,14 +6,116 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.22.0`
-- Implemented ecosystems: ArchiveXL, TweakXL, REDscript, CET Lua, Input Loader XML, and RED4ext/native frameworks
+- Scanner version: `0.25.0`
+- Implemented ecosystems: ArchiveXL, TweakXL, REDscript, CET Lua, Input Loader XML, RED4ext/native frameworks, and CET-to-REDscript method-hook cross-analysis
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 97 passing
+- Automated tests: 106 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — CET-to-REDscript cross-ecosystem method analysis
+
+Added the first operation-aware cross-ecosystem compatibility pass.
+
+Changes:
+
+- Added `cross_ecosystem.py` to compare active literal CET observers and
+  overrides with active REDscript wrappers and replacements by class/method.
+- Added NativeDB full-signature matching when supplied, medium-confidence
+  short-name matching for overload-ambiguous hooks, and explicit counts for
+  dynamic targets that are not guessed.
+- Classified additive observers, visibly wrapped CET override chains, unknown
+  chains, and visibly terminating overrides with distinct rule IDs and
+  severities. Same-package dual-language components are counted without
+  creating findings.
+- Added Cross-ecosystem coverage/filter support, a summary card, Markdown
+  coverage, and `cross-ecosystem-findings.json` with both source references.
+- Updated README/TODO documentation and scanner version 0.25.0.
+
+Validation:
+
+- All 106 tests pass with warnings promoted to errors.
+- A complete frozen-corpus scan completed in 28.4 seconds.
+- The pass compared 518 active literal CET hook targets with 678 active
+  REDscript method targets. It matched 33 shared cross-package targets:
+  30 have additive observers and three have wrapped CET override chains.
+- The 33 targets produced 30 consolidated informational findings, with no
+  uncertain or terminating cross-ecosystem override in the current corpus.
+- The report contains 211 active and four acknowledged findings, with no stale
+  acknowledgements. The scan diff records the 30 new cross-ecosystem findings
+  and all 185 prior findings unchanged.
+- HTML structure, cross-ecosystem filter mapping, coverage card data, and
+  dedicated JSON output were verified. Local headless browser processes could
+  not render under their isolated sandbox; all temporary QA files were removed.
+- Frozen Vortex and game inputs were not modified.
+
+### 2026-08-03 — Responsive coverage and browser acknowledgement editor
+
+Improved dense coverage presentation and made acknowledgement maintenance
+interactive without granting the report silent filesystem access.
+
+Changes:
+
+- Widened the report shell to 1,740 pixels while retaining narrow-screen
+  margins and responsive toolbar behavior.
+- Replaced the dense CET registration and per-framework runtime rows with
+  responsive metric cards. Long log paths and notes now receive full-width
+  fields instead of compressing neighboring columns.
+- Moved acknowledgements out of `cp77compat.yaml` into the strict, versioned
+  `acknowledgements.yaml` file referenced through `paths.acknowledgements`.
+- Added an acknowledgement checkbox and editable note to every expanded
+  finding. Changes update status filters and summary counts immediately.
+- Added Save acknowledgements using Chromium's explicit file picker, with a
+  YAML download fallback when direct user-approved writing is unavailable.
+- Updated documentation and scanner version 0.24.0.
+
+Validation:
+
+- All 102 tests pass with warnings promoted to errors.
+- The project configuration resolves the separate acknowledgement file and
+  strictly loads all four known Vortex winner entries.
+- A complete frozen-corpus scan completed in about 28 seconds and regenerated
+  the v0.24.0 reports with 181 active findings, four acknowledged findings,
+  no stale acknowledgements, and all 185 findings unchanged.
+- A 1920x1200 headless Edge render confirmed the wider coverage layout; the
+  two dense analyzer rows render as seven responsive cards and the temporary
+  screenshot was removed afterward.
+- Frozen Vortex and game inputs were not modified.
+
+### 2026-08-03 — Finding acknowledgements, report diffs, and HTML fixes
+
+Added persistent finding state management and corrected two report UI defects.
+
+Changes:
+
+- Prevented analyzer coverage tables from exceeding their panel by allowing
+  grid/table wrappers to shrink and scroll within the available width.
+- Corrected Clear so it resets Ecosystem together with every other finding
+  filter, and made the expanded toolbar responsive.
+- Added stable SHA-256 finding fingerprints and strict YAML acknowledgements.
+  Acknowledgements preserve evidence and become stale if their fingerprint no
+  longer matches a current finding.
+- Recorded the four exact-path findings covered by the established Damage
+  Scaling Extended and Classic Drinks Vortex winner decisions.
+- Added active/acknowledged/stale and baseline/new/changed/unchanged HTML
+  filtering, visible state/fingerprint details, URL-hash filter persistence,
+  and state summary cards.
+- Added `compatibility-diff.json`, comparing each scan with the preceding
+  combined report while ignoring irrelevant evidence ordering.
+- Updated README/configuration documentation and scanner version 0.23.0.
+
+Validation:
+
+- All 102 tests pass with warnings promoted to errors.
+- Two consecutive frozen-corpus scans completed in about 28 seconds each.
+- The current state is 181 active findings, four acknowledged findings, and no
+  stale acknowledgements. All 185 findings are unchanged from the prior scan;
+  no entry is new, changed, or resolved.
+- A 1600x1200 headless Edge render confirmed the responsive toolbar and report
+  layout; the temporary screenshot was removed afterward.
+- Frozen Vortex and game inputs were not modified.
 
 ### 2026-08-03 — RED4ext and native-framework analyzer
 

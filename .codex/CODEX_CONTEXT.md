@@ -12,8 +12,8 @@ ecosystem-specific semantic compatibility checks.
 
 The scanner is being developed incrementally. ArchiveXL, TweakXL, REDscript,
 CET Lua, Input Loader XML, and RED4ext/native plugins are supported, including
-their relevant runtime/compiler logs. Shared JSON/TOML/INI/XML ownership is also
-supported.
+their relevant runtime/compiler logs. Shared JSON/TOML/INI/XML ownership and
+CET-to-REDscript method-hook cross-ecosystem analysis are also supported.
 
 ## Workspace paths
 
@@ -26,6 +26,8 @@ supported.
   `C:\Games\Programs\WolvenKit-Console\WolvenKit.CLI.exe`
 - Scanner configuration:
   `C:\Games\Programs\Mods\cyberpunk2077\cp77compat.yaml`
+- Finding acknowledgements:
+  `C:\Games\Programs\Mods\cyberpunk2077\acknowledgements.yaml`
 - Vortex deployment manifest:
   `C:\Games\Steam\steamapps\common\Cyberpunk 2077\vortex.deployment.json`
 
@@ -174,6 +176,12 @@ python -m unittest discover -s tests -v
   loaded/ignored/failed roots; and attributes missing hooks, rejected
   registrations, module failures, and Lua errors to staging sources where
   possible.
+- `src/cp77compat/cross_ecosystem.py`
+  Compares active literal CET observers and overrides with active REDscript
+  wrappers and replacements by class, method, and available NativeDB full
+  signature. It distinguishes additive observers, wrapped chains, uncertain
+  callbacks, terminating overrides, same-package integration, overload-
+  ambiguous short names, and unguessable dynamic hooks.
 - `src/cp77compat/shared_config.py`
   Inventories JSON, TOML, INI, and XML ownership; parses each format strictly;
   tracks encoding and duplicate JSON keys; computes format-normalized semantic
@@ -190,17 +198,23 @@ python -m unittest discover -s tests -v
   imports; resolves native dependencies; correlates RED4ext plugin load states,
   framework/game versions, and structured plugin logs; and delegates
   ArchiveXL, TweakXL, and Input Loader diagnostics to dedicated analyzers.
+- `src/cp77compat/finding_state.py`
+  Computes stable finding fingerprints, applies strict YAML acknowledgements,
+  detects stale acknowledgements, and classifies scan-to-scan new, changed,
+  resolved, and unchanged state while ignoring evidence ordering noise.
 - `src/cp77compat/reporting.py`
   Writes inventory, archive manifest, per-ecosystem reference/finding JSON,
   combined findings JSON, Markdown, and HTML reports.
 - `src/cp77compat/html_report.py`
-  Generates a self-contained offline HTML report with search, severity/rule/mod
-  and ecosystem filters, analyzer-coverage tables, pagination, and lazily
-  expanded evidence.
+  Generates a self-contained offline HTML report with search, status/change and
+  ecosystem filters, responsive coverage tables/cards, pagination, lazily
+  expanded evidence, inline acknowledgement controls, and user-approved YAML
+  saving with a download fallback.
 - `src/cp77compat/cli.py`
   Orchestrates the scan and exposes CLI options.
 - `tests/`
-  Unit tests for ArchiveXL, TweakXL, REDscript, CET, and shared configuration parsing/comparison; archive
+  Unit tests for ArchiveXL, TweakXL, REDscript, CET, cross-ecosystem method
+  comparison, and shared configuration parsing/comparison; archive
   output parsing; loose resource resolution; runtime/compiler-log correlation;
   configuration; and safe HTML embedding.
 
@@ -233,7 +247,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.22.0 scan on 2026-08-03 reported:
+The successful v0.25.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -262,6 +276,13 @@ The successful v0.22.0 scan on 2026-08-03 reported:
   hotkey/input bindings, 182 literal module imports, 47 `GetMod` dependencies,
   806 observers, 239 overrides, and 495 Native Settings paths. Another 271
   dynamically constructed calls are inventoried but intentionally not guessed.
+- Cross-ecosystem comparison found 33 class-and-method targets shared by active
+  CET hooks and REDscript wrappers/replacements. Thirty targets include
+  additive CET observers and three include overrides that visibly call their
+  wrapped/next callback. No uncertain or terminating override was found. All
+  installed CET names are short-name, overload-ambiguous matches; 129 dynamic
+  hook calls are counted but intentionally not guessed. The 33 targets are
+  consolidated into 30 informational findings.
 - Definite global-symbol extraction found 492 reachable writes plus two
   computed-name writes across 64 files. `DamageScaling` is the only active root
   assembled from multiple Vortex packages, and it has zero shared exact globals.
@@ -313,14 +334,14 @@ The successful v0.22.0 scan on 2026-08-03 reported:
 - The 1,277-line current REDscript compiler log successfully compiled 1,234
   deployed files and saved the modded output. Its zero errors and eight
   warnings were all source-attributed and statically confirmed.
-- 183 consolidated findings overall:
+- 215 consolidated findings overall:
   - 2 conflict candidates.
   - 11 errors.
   - 18 warnings.
   - 13 review groups.
-  - 139 informational findings.
+  - 171 informational findings.
 - Zero WolvenKit indexing failures.
-- Ninety-one automated tests passing with warnings promoted to errors.
+- 106 automated tests passing with warnings promoted to errors.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
@@ -515,6 +536,11 @@ missing targets, generated-cache mismatches, and current startup-log results.
 Native coverage records DLL/ASI hashes and deployed equality, PE imports,
 fixed file versions, RED4ext runtime names/versions/authors, companion-library
 classification, framework/game versions, and direct/delegated plugin-log state.
+All findings carry fingerprints plus active/acknowledged and scan-change state.
+The four known Vortex exact-path winners are acknowledged in
+`acknowledgements.yaml`,
+leaving 181 active and four acknowledged findings. The current diff baseline
+contains 185 unchanged findings and no new, changed, or resolved entries.
 The four installed `overrides.tags` documents are fully analyzed using
 ArchiveXL-equivalent effective component masks and whole-definition last-wins
 semantics. Their 12 tag names are all distinct.
@@ -574,8 +600,14 @@ current compiler log confirms all eight active replacement-overwrite warnings.
 - `reports/current/native-findings.json`
   Native DLL/ASI references, hashes, versions, PE dependencies,
   deployed/runtime state, and native framework findings.
+- `reports/current/cross-ecosystem-findings.json`
+  CET-to-REDscript method overlaps with operation-aware classifications and
+  both ecosystems' source references.
 - `reports/current/compatibility-findings.json`
   Combined machine-readable findings without the full reference inventories.
+- `reports/current/compatibility-diff.json`
+  New, changed, resolved, and unchanged findings relative to the previous
+  report generated in the same output directory.
 - `reports/current/archive-manifests.json`
   Indexed WolvenKit archive contents.
 - `reports/current/inventory.json`
