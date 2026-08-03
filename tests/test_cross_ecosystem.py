@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import unittest
 
-from cp77compat.cross_ecosystem import analyze_cross_ecosystem_methods
+from cp77compat.cross_ecosystem import (
+    analyze_cross_ecosystem_methods,
+    analyze_cross_ecosystem_tweakdb,
+)
 from cp77compat.models import Reference
 
 
@@ -51,6 +54,54 @@ def redscript_method(
             "condition_state": condition_state,
             "deployed_state": deployed_state,
         },
+    )
+
+
+def cet_flat(mod: str, value: object, *, known: bool = True) -> Reference:
+    return Reference(
+        "cet", "tweakdb.flat.set", "Items.Example.value", mod, f"{mod}.lua", 30,
+        {
+            "target": "Items.Example.value",
+            "value": value,
+            "value_known": known,
+            "value_key": str(value) if known else None,
+            "reachable": True,
+            "deployed_state": "deployed",
+        },
+    )
+
+
+def tweak_flat(mod: str, value: object, *, array: bool = False) -> Reference:
+    return Reference(
+        "tweakxl", "array.append-once" if array else "assignment",
+        "Items.Example.value", mod, f"{mod}.yaml", 40,
+        {
+            "operation": "append-once" if array else "assign",
+            "value": value,
+            "value_key": str(value),
+        },
+    )
+
+
+def cet_record(kind: str, mod: str, value: str | None = None) -> Reference:
+    details = {
+        "target": "Items.NewRecord",
+        "reachable": True,
+        "deployed_state": "deployed",
+    }
+    if kind == "tweakdb.record.clone":
+        details.update({"source_record": value, "source_known": value is not None})
+    elif kind == "tweakdb.record.create":
+        details.update({"record_type": value, "record_type_known": value is not None})
+    return Reference(
+        "cet", kind, "Items.NewRecord", mod, f"{mod}.lua", 50, details
+    )
+
+
+def tweak_record(kind: str, mod: str, value: str) -> Reference:
+    return Reference(
+        "tweakxl", kind, "Items.NewRecord", mod, f"{mod}.yaml", 60,
+        {"operation": kind.rsplit(".", 1)[-1], "value": value, "value_key": f'"{value}"'},
     )
 
 
@@ -146,6 +197,65 @@ class CrossEcosystemTests(unittest.TestCase):
         self.assertEqual(1, operation["matched_targets"])
         self.assertEqual(1, operation["same_package_targets"])
         self.assertEqual(0, operation["cross_package_targets"])
+
+    def test_compares_cet_runtime_flat_writes_with_tweakxl(self) -> None:
+        different, operation = analyze_cross_ecosystem_tweakdb(
+            [cet_flat("CET", -0.01)], [tweak_flat("TweakXL", 1)]
+        )
+        self.assertEqual("XEC-CET-TWEAKDB-FLAT-RUNTIME-OVERRIDE", different[0].rule_id)
+        self.assertEqual("warning", different[0].severity)
+        self.assertEqual(1, operation["cross_package_targets"])
+        self.assertEqual(1, operation["runtime_override_targets"])
+
+        equivalent, operation = analyze_cross_ecosystem_tweakdb(
+            [cet_flat("CET", 1)], [tweak_flat("TweakXL", 1)]
+        )
+        self.assertEqual("XEC-CET-TWEAKDB-FLAT-EQUIVALENT", equivalent[0].rule_id)
+        self.assertEqual("info", equivalent[0].severity)
+        self.assertEqual(1, operation["equivalent_targets"])
+
+    def test_classifies_array_dynamic_and_same_package_tweakdb_targets(self) -> None:
+        array_findings, _operation = analyze_cross_ecosystem_tweakdb(
+            [cet_flat("CET", ["A"])], [tweak_flat("TweakXL", "A", array=True)]
+        )
+        self.assertEqual("XEC-CET-TWEAKDB-ARRAY-RUNTIME-OVERRIDE", array_findings[0].rule_id)
+
+        dynamic, operation = analyze_cross_ecosystem_tweakdb(
+            [cet_flat("CET", None, known=False)], [tweak_flat("TweakXL", 1)]
+        )
+        self.assertEqual("XEC-CET-TWEAKDB-FLAT-DYNAMIC-VALUE", dynamic[0].rule_id)
+        self.assertEqual("partial", operation["status"])
+
+        same_package, operation = analyze_cross_ecosystem_tweakdb(
+            [cet_flat("Combined", 2)], [tweak_flat("Combined", 1)]
+        )
+        self.assertEqual([], same_package)
+        self.assertEqual(1, operation["same_package_targets"])
+
+    def test_compares_record_operations_with_matching_tweakxl_directives(self) -> None:
+        findings, operation = analyze_cross_ecosystem_tweakdb(
+            [
+                cet_record("tweakdb.record.clone", "CET", "Items.Base"),
+                cet_record("tweakdb.record.create", "CET", "gamedataItem_Record"),
+            ],
+            [
+                tweak_record("record.base", "TweakXL", "Items.Base"),
+                tweak_record("record.type", "TweakXL", "gamedataOther_Record"),
+            ],
+        )
+        by_rule = {item.rule_id: item for item in findings}
+        self.assertIn("XEC-CET-TWEAKDB-RECORD-EQUIVALENT", by_rule)
+        self.assertIn("XEC-CET-TWEAKDB-RECORD-RUNTIME-OVERRIDE", by_rule)
+        self.assertEqual(1, operation["record_candidates"])
+
+        deleted, _operation = analyze_cross_ecosystem_tweakdb(
+            [cet_record("tweakdb.record.delete", "CET")],
+            [Reference(
+                "tweakxl", "assignment", "Items.NewRecord.value", "TweakXL",
+                "TweakXL.yaml", 70, {"operation": "assign", "value": 1, "value_key": "1"},
+            )],
+        )
+        self.assertEqual("XEC-CET-TWEAKDB-RECORD-DELETE", deleted[0].rule_id)
 
 
 if __name__ == "__main__":

@@ -456,6 +456,9 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "requires", label: "Requires"}, {key: "getmod_dependencies", label: "GetMod"},
           {key: "observers", label: "Observers"}, {key: "overrides", label: "Overrides"},
           {key: "settings", label: "Settings IDs"}, {key: "global_writes", label: "Global writes"},
+          {key: "tweakdb_flat_writes", label: "TweakDB flats"},
+          {key: "tweakdb_record_writes", label: "TweakDB records"},
+          {key: "dynamic_tweakdb_calls", label: "Dynamic TweakDB"},
           {key: "merged_roots", label: "Merged roots"}, {key: "shared_globals", label: "Shared globals"},
           {key: "dynamic_globals", label: "Dynamic globals"}, {key: "dynamic_calls", label: "Dynamic calls"},
           {key: "unresolved_modules", label: "Missing modules"},
@@ -464,7 +467,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
         ]));
       }
       if ((analyzer.cross_ecosystem_operations || []).length) {
-        const label = document.createElement("h3"); label.textContent = "Cross-ecosystem method hooks"; group.append(label);
+        const label = document.createElement("h3"); label.textContent = "Cross-ecosystem operations"; group.append(label);
         group.append(coverageCards(analyzer.cross_ecosystem_operations, [
           {key: "name", label: "Analyzer"}, {key: "status", label: "Status"},
           {key: "documents", label: "Documents"},
@@ -482,6 +485,16 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "uncertain_override_targets", label: "Uncertain overrides"},
           {key: "terminating_override_targets", label: "Terminating overrides"},
           {key: "dynamic_hooks", label: "Dynamic hooks"},
+          {key: "cet_flat_writes", label: "CET flat writes"},
+          {key: "cet_record_writes", label: "CET record writes"},
+          {key: "tweakxl_flat_operations", label: "TweakXL flats"},
+          {key: "tweakxl_record_operations", label: "TweakXL records"},
+          {key: "flat_candidates", label: "Flat candidates"},
+          {key: "record_candidates", label: "Record candidates"},
+          {key: "equivalent_targets", label: "Equivalent"},
+          {key: "runtime_override_targets", label: "Runtime overrides"},
+          {key: "dynamic_value_targets", label: "Dynamic values"},
+          {key: "dynamic_calls", label: "Dynamic calls"},
           {key: "findings", label: "Findings"},
           {key: "note", label: "Coverage note", wide: true}
         ]));

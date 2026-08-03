@@ -6,14 +6,51 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.26.0`
-- Implemented ecosystems: ArchiveXL, TweakXL, REDscript, CET Lua, Input Loader XML, RED4ext/native frameworks, and CET-to-REDscript method-hook cross-analysis
+- Scanner version: `0.27.0`
+- Implemented ecosystems: ArchiveXL, TweakXL, REDscript, CET Lua, Input Loader XML, RED4ext/native frameworks, CET-to-REDscript hooks, and CET-to-TweakXL TweakDB cross-analysis
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 106 passing
+- Automated tests: 110 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — CET TweakDB-to-TweakXL cross-ecosystem analysis
+
+Completed the remaining concrete cross-ecosystem effect pass before manual
+finding review.
+
+Changes:
+
+- Extended the CET lexer-based analyzer to extract source-lined literal
+  `TweakDB:SetFlat`, `SetFlatNoUpdate`, `CloneRecord`, `CreateRecord`, and
+  `DeleteRecord` calls without executing Lua.
+- Added static decoding for scalar values, simple array tables, and common
+  `TweakDBID`/`CName` constructors; computed targets and values remain explicit
+  partial coverage.
+- Compared active CET flat and record mutations with concrete TweakXL
+  assignments, tagged arrays, `$base`, `$type`, and record descendants.
+- Classified equivalent values, different runtime overwrites, whole-array
+  replacement, dynamic values, record overlaps/deletions, and same-package
+  integration with dedicated `XEC-CET-TWEAKDB-*` rules.
+- Added CET and cross-ecosystem coverage metrics to HTML/Markdown, tests,
+  documentation, and scanner version 0.27.0.
+
+Validation:
+
+- All 110 tests pass with warnings promoted to errors.
+- A complete frozen-corpus scan completed in 28 seconds and regenerated the
+  v0.27.0 reports.
+- The scan extracted 363 active literal CET flat writes, seven record writes,
+  and 15 active computed-target TweakDB calls. It found 22 exact CET/TweakXL
+  flat targets: 21 same-package integrations and one cross-package overlap.
+- The new warning shows Clothing Improved writing
+  `Items.IntrinsicFabricEnhancer10_inline2.value = -0.01` at runtime over Quickhack
+  Fixes' TweakXL assignment of `1`, with both exact source paths and lines.
+- Reports now contain 212 active and four acknowledged findings. The first
+  validation scan identified one new finding; the final stability scan records
+  all 216 unchanged, with no stale acknowledgements.
+- Frozen Vortex and game inputs were not modified.
 
 ### 2026-08-03 — Clickable source folders in HTML evidence
 

@@ -248,7 +248,7 @@ class HtmlReportTests(unittest.TestCase):
             self.assertIn("World streaming operations", html)
             self.assertIn("REDscript annotation operations", html)
             self.assertIn("CET Lua registrations", html)
-            self.assertIn("Cross-ecosystem method hooks", html)
+            self.assertIn("Cross-ecosystem operations", html)
             self.assertIn('XEC: "Cross-ecosystem"', html)
             self.assertIn("Configuration formats", html)
             self.assertIn("Configuration ownership", html)

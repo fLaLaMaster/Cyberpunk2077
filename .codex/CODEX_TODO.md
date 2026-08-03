@@ -114,7 +114,7 @@ frozen-corpus validation pass are complete.
   callbacks, and visibly terminating CET overrides.
 - [x] Count same-package integration, overload-ambiguous short names, and
   dynamic hook targets without promoting them to false conflicts.
-- [ ] Extract literal CET `TweakDB` record/flat writes and compare them with
+- [x] Extract literal CET `TweakDB` record/flat writes and compare them with
   concrete TweakXL operations.
 - [ ] Consider explicit cross-language dependency/detection declarations after
   method and TweakDB effect coverage is complete.

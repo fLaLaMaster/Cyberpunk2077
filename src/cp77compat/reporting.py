@@ -334,6 +334,10 @@ def write_reports(
                         f"requires/GetMod={operation['requires']}/{operation['getmod_dependencies']}; "
                         f"observers/overrides={operation['observers']}/{operation['overrides']}; "
                         f"settings={operation['settings']}; globals={operation['global_writes']}; "
+                        f"TweakDB flat/record/dynamic="
+                        f"{operation.get('tweakdb_flat_writes', 0)}/"
+                        f"{operation.get('tweakdb_record_writes', 0)}/"
+                        f"{operation.get('dynamic_tweakdb_calls', 0)}; "
                         f"merged roots/shared globals={operation['merged_roots']}/{operation['shared_globals']}; "
                         f"dynamic globals/API calls={operation['dynamic_globals']}/{operation['dynamic_calls']}; "
                         f"missing modules={operation['unresolved_modules']}; "
@@ -341,25 +345,47 @@ def write_reports(
                     )
             cross_ecosystem_operations = analyzer.get("cross_ecosystem_operations", [])
             if cross_ecosystem_operations:
-                lines.extend(["", "#### Cross-ecosystem method hooks", ""])
+                lines.extend(["", "#### Cross-ecosystem operations", ""])
                 for operation in cross_ecosystem_operations:
-                    lines.append(
-                        f"- `{operation['name']}`: {operation['status']}; "
-                        f"documents={operation['documents']}; "
-                        f"CET/REDscript targets={operation['cet_hook_targets']}/"
-                        f"{operation['redscript_method_targets']}; "
-                        f"candidates/matched/cross-package="
-                        f"{operation['candidate_targets']}/{operation['matched_targets']}/"
-                        f"{operation['cross_package_targets']}; "
-                        f"full-signature/ambiguous={operation['exact_signature_targets']}/"
-                        f"{operation['ambiguous_targets']}; "
-                        f"observer/chained/uncertain/terminating="
-                        f"{operation['observer_targets']}/{operation['chained_override_targets']}/"
-                        f"{operation['uncertain_override_targets']}/"
-                        f"{operation['terminating_override_targets']}; "
-                        f"dynamic hooks={operation['dynamic_hooks']}; "
-                        f"findings={operation['findings']} - {operation['note']}"
-                    )
+                    if "cet_hook_targets" in operation:
+                        lines.append(
+                            f"- `{operation['name']}`: {operation['status']}; "
+                            f"documents={operation['documents']}; "
+                            f"CET/REDscript targets={operation['cet_hook_targets']}/"
+                            f"{operation['redscript_method_targets']}; "
+                            f"candidates/matched/cross-package="
+                            f"{operation['candidate_targets']}/{operation['matched_targets']}/"
+                            f"{operation['cross_package_targets']}; "
+                            f"full-signature/ambiguous={operation['exact_signature_targets']}/"
+                            f"{operation['ambiguous_targets']}; "
+                            f"observer/chained/uncertain/terminating="
+                            f"{operation['observer_targets']}/{operation['chained_override_targets']}/"
+                            f"{operation['uncertain_override_targets']}/"
+                            f"{operation['terminating_override_targets']}; "
+                            f"dynamic hooks={operation['dynamic_hooks']}; "
+                            f"findings={operation['findings']} - {operation['note']}"
+                        )
+                    else:
+                        lines.append(
+                            f"- `{operation['name']}`: {operation['status']}; "
+                            f"documents={operation['documents']}; "
+                            f"CET flat/record writes={operation['cet_flat_writes']}/"
+                            f"{operation['cet_record_writes']}; "
+                            f"TweakXL flat/record operations="
+                            f"{operation['tweakxl_flat_operations']}/"
+                            f"{operation['tweakxl_record_operations']}; "
+                            f"flat/record candidates={operation['flat_candidates']}/"
+                            f"{operation['record_candidates']}; "
+                            f"cross-package/same-package="
+                            f"{operation['cross_package_targets']}/"
+                            f"{operation['same_package_targets']}; "
+                            f"equivalent/runtime override/dynamic="
+                            f"{operation['equivalent_targets']}/"
+                            f"{operation['runtime_override_targets']}/"
+                            f"{operation['dynamic_value_targets']}; "
+                            f"dynamic calls={operation['dynamic_calls']}; "
+                            f"findings={operation['findings']} - {operation['note']}"
+                        )
             configuration_formats = analyzer.get("configuration_formats", [])
             if configuration_formats:
                 lines.extend(["", "#### Configuration formats", ""])

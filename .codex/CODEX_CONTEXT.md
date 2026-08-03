@@ -12,8 +12,9 @@ ecosystem-specific semantic compatibility checks.
 
 The scanner is being developed incrementally. ArchiveXL, TweakXL, REDscript,
 CET Lua, Input Loader XML, and RED4ext/native plugins are supported, including
-their relevant runtime/compiler logs. Shared JSON/TOML/INI/XML ownership and
-CET-to-REDscript method-hook cross-ecosystem analysis are also supported.
+their relevant runtime/compiler logs. Shared JSON/TOML/INI/XML ownership,
+CET-to-REDscript method-hook analysis, and CET runtime TweakDB-to-TweakXL
+cross-ecosystem analysis are also supported.
 
 ## Workspace paths
 
@@ -169,8 +170,9 @@ python -m unittest discover -s tests -v
 - `src/cp77compat/cet.py`
   Lexically parses CET Lua without executing it; resolves per-root entrypoints
   and literal modules; extracts lifecycle events, hotkeys, inputs, `GetMod`
-  dependencies, observers, overrides, and Native Settings paths; and compares
-  them using the installed CET sandbox and callback-chain semantics.
+  dependencies, observers, overrides, Native Settings paths, and literal
+  TweakDB flat/record mutations with static scalar/array values; and compares
+  registrations using the installed CET sandbox and callback-chain semantics.
 - `src/cp77compat/cet_runtime.py`
   Parses current CET framework, scripting, and canonical per-mod logs; records
   loaded/ignored/failed roots; and attributes missing hooks, rejected
@@ -181,7 +183,9 @@ python -m unittest discover -s tests -v
   wrappers and replacements by class, method, and available NativeDB full
   signature. It distinguishes additive observers, wrapped chains, uncertain
   callbacks, terminating overrides, same-package integration, overload-
-  ambiguous short names, and unguessable dynamic hooks.
+  ambiguous short names, and unguessable dynamic hooks. It also compares active
+  literal CET `SetFlat`/record mutations with concrete TweakXL assignments,
+  tagged arrays, `$base`, `$type`, and descendant record properties.
 - `src/cp77compat/shared_config.py`
   Inventories JSON, TOML, INI, and XML ownership; parses each format strictly;
   tracks encoding and duplicate JSON keys; computes format-normalized semantic
@@ -214,8 +218,8 @@ python -m unittest discover -s tests -v
 - `src/cp77compat/cli.py`
   Orchestrates the scan and exposes CLI options.
 - `tests/`
-  Unit tests for ArchiveXL, TweakXL, REDscript, CET, cross-ecosystem method
-  comparison, and shared configuration parsing/comparison; archive
+  Unit tests for ArchiveXL, TweakXL, REDscript, CET, cross-ecosystem method and
+  TweakDB comparison, and shared configuration parsing/comparison; archive
   output parsing; loose resource resolution; runtime/compiler-log correlation;
   configuration; and safe HTML embedding.
 
@@ -248,7 +252,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.26.0 scan on 2026-08-03 reported:
+The successful v0.27.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -272,11 +276,13 @@ The successful v0.26.0 scan on 2026-08-03 reported:
   source lines and zero parser failures. The effective installed set contains
   700 wrappers, 139 replacements, 14,024 added methods, and 1,885 added fields;
   27 conditional or Vortex-overridden annotations are inactive.
-- 248 CET Lua files across 61 active CET roots and 3,105 extracted references,
+- 248 CET Lua files across 61 active CET roots and 3,540 extracted references,
   all with source lines. Effective registrations include 161 events, 18
   hotkey/input bindings, 182 literal module imports, 47 `GetMod` dependencies,
-  806 observers, 239 overrides, and 495 Native Settings paths. Another 271
-  dynamically constructed calls are inventoried but intentionally not guessed.
+  806 observers, 239 overrides, 495 Native Settings paths, 363 literal TweakDB
+  flat writes, and seven literal TweakDB record mutations. Another 286
+  dynamically constructed calls are inventoried, including 15 TweakDB calls
+  whose targets are computed and intentionally not guessed.
 - Cross-ecosystem comparison found 33 class-and-method targets shared by active
   CET hooks and REDscript wrappers/replacements. Thirty targets include
   additive CET observers and three include overrides that visibly call their
@@ -284,6 +290,11 @@ The successful v0.26.0 scan on 2026-08-03 reported:
   installed CET names are short-name, overload-ambiguous matches; 129 dynamic
   hook calls are counted but intentionally not guessed. The 33 targets are
   consolidated into 30 informational findings.
+- CET/TweakXL analysis found 22 exact TweakDB flat targets: 21 are intentional
+  same-package integrations and one is cross-package. Clothing Improved writes
+  `Items.IntrinsicFabricEnhancer10_inline2.value` as `-0.01` at runtime while
+  Quickhack Fixes assigns `1` through TweakXL, producing one high-confidence
+  runtime-override warning. No record target overlap was found.
 - Definite global-symbol extraction found 492 reachable writes plus two
   computed-name writes across 64 files. `DamageScaling` is the only active root
   assembled from multiple Vortex packages, and it has zero shared exact globals.
@@ -335,14 +346,14 @@ The successful v0.26.0 scan on 2026-08-03 reported:
 - The 1,277-line current REDscript compiler log successfully compiled 1,234
   deployed files and saved the modded output. Its zero errors and eight
   warnings were all source-attributed and statically confirmed.
-- 215 consolidated findings overall:
+- 216 consolidated findings overall:
   - 2 conflict candidates.
   - 11 errors.
-  - 18 warnings.
+  - 19 warnings.
   - 13 review groups.
   - 171 informational findings.
 - Zero WolvenKit indexing failures.
-- 106 automated tests passing with warnings promoted to errors.
+- 110 automated tests passing with warnings promoted to errors.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
@@ -353,8 +364,9 @@ The successful v0.26.0 scan on 2026-08-03 reported:
   scans complete in about 20 seconds; the REDscript-enabled v0.17 scan completed
   in about 26 seconds, the CET-enabled v0.18 scan completed in 26.9 seconds,
   the global-analysis v0.19 scan completed in 27.5 seconds, and the shared-config
-  v0.20 scan completed in 27.2 seconds.
-- All 137,839 ArchiveXL, TweakXL, REDscript, CET, and configuration references have one-based declaration/source
+  v0.20 scan completed in 27.2 seconds. The fully cached v0.27 scan completed
+  in 28 seconds.
+- All 138,274 ArchiveXL, TweakXL, REDscript, CET, and configuration references have one-based declaration/source
   lines in the generated reports. Serialized localization, factory, and journal
   entries additionally carry their zero-based payload `entry_index` or
   `row_index`. For minified one-line

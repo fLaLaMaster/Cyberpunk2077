@@ -58,12 +58,16 @@ Implemented analysis includes:
   exact static annotation overlaps;
 - CET Lua root/entrypoint discovery, literal `require` and `GetMod` dependency
   resolution, lifecycle event and binding validation, observer/override-chain
-  comparison, and Native Settings path analysis;
+  comparison, Native Settings path analysis, and source-lined literal TweakDB
+  flat/record mutations;
 - current CET framework, scripting, and per-mod log parsing with load-state,
   missing-hook, registration, module, and Lua error attribution;
 - cross-ecosystem CET hook versus REDscript method comparison, including
   additive observers, wrapped override chains, uncertain callbacks, terminating
   overrides, full NativeDB signatures, and overload-ambiguous short names;
+- cross-ecosystem CET runtime TweakDB writes versus concrete TweakXL flat,
+  array, and record operations, with equivalent, destructive, dynamic-value,
+  same-package, and cross-package classifications;
 - JSON, TOML, INI, and XML ownership inventory with strict structural parsing,
   encoding/duplicate-key diagnostics, semantic fingerprints, exact-path
   provider comparison, and shared CET/framework scope attribution;
@@ -183,6 +187,12 @@ review finding because execution/import order determines the effective value.
 Computed keys and assignments whose lexical scope cannot be proven remain
 partial coverage instead of being treated as collisions.
 
+Literal `TweakDB:SetFlat`, `SetFlatNoUpdate`, `CloneRecord`, `CreateRecord`, and
+`DeleteRecord` calls are also inventoried with exact source lines. The parser
+decodes static Lua strings, numbers, booleans, nil values, simple array tables,
+and common `TweakDBID`/`CName` constructors without executing mod code. Computed
+targets and values remain visible as dynamic coverage rather than being guessed.
+
 Lifecycle event registrations and hotkey/input IDs are compared within their
 own root. Shared observers are informational because CET retains each callback.
 Override chains are considered structurally compatible when every inline
@@ -201,6 +211,16 @@ matched against REDscript parameter signatures when present. Short CET method
 names are retained as medium-confidence, overload-ambiguous matches, while
 dynamic targets are counted but never guessed. Same-package CET and REDscript
 components are counted as intentional integration and do not create findings.
+
+The same pass compares active literal CET TweakDB targets with concrete TweakXL
+identities after template expansion. A runtime `SetFlat` with the same value is
+informational; a different value is a warning because CET can replace the
+TweakXL-initialized flat. Replacing a flat that TweakXL mutates as an array is
+also a warning because the complete CET value can discard composed entries.
+Record creation, cloning, and deletion are compared with TweakXL `$type`,
+`$base`, and descendant properties. Same-package dual-ecosystem definitions are
+counted as integration without producing findings. Dynamic Lua expressions are
+reported in coverage but never matched speculatively.
 
 Each scan also reads the current `cyber_engine_tweaks.log`, `scripting.log`, and
 canonical `<mod-root>.log` files. Loaded, ignored, and failed roots are counted;
@@ -354,8 +374,8 @@ different payloads are load-order conflicts.
   source lines, cache validation, and startup-log findings.
 - `reports/current/native-findings.json`: DLL/ASI providers, hashes, versions,
   PE imports, deployed state, runtime plugin state, and native findings.
-- `reports/current/cross-ecosystem-findings.json`: CET-to-REDscript method
-  overlap classifications with both source references.
+- `reports/current/cross-ecosystem-findings.json`: CET-to-REDscript method and
+  CET-to-TweakXL TweakDB overlap classifications with both source references.
 - `reports/current/compatibility-findings.json`: combined machine-readable findings.
 - `reports/current/compatibility-diff.json`: new, changed, resolved, and
   unchanged findings compared with the preceding report in the same output

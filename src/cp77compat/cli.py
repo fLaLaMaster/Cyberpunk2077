@@ -32,7 +32,7 @@ from .archivexl_payload_analysis import (
 from .config import DEFAULT_CONFIG_PATH, ScannerConfig, load_config
 from .cet import analyze_cet_references, build_cet_coverage, parse_cet_documents
 from .cet_runtime import analyze_cet_runtime_logs
-from .cross_ecosystem import analyze_cross_ecosystem_methods
+from .cross_ecosystem import analyze_cross_ecosystem
 from .deployment import load_deployment
 from .inventory import build_inventory, discover_mods, exact_path_findings
 from .input_mapping import analyze_input_documents, parse_input_documents
@@ -255,15 +255,24 @@ def run_scan(args: argparse.Namespace) -> int:
             f"{cet_runtime_coverage['findings']} consolidated findings"
         )
     cross_ecosystem_findings, cross_ecosystem_coverage = (
-        analyze_cross_ecosystem_methods(cet_references, redscript_references)
+        analyze_cross_ecosystem(
+            cet_references, redscript_references, tweak_references
+        )
     )
     findings.extend(cross_ecosystem_findings)
     coverage["cross-ecosystem"] = cross_ecosystem_coverage
-    cross_operation = cross_ecosystem_coverage["cross_ecosystem_operations"][0]
+    cross_operation, tweakdb_cross_operation = (
+        cross_ecosystem_coverage["cross_ecosystem_operations"]
+    )
     print(
         f"Compared {cross_operation['candidate_targets']} CET/REDscript method "
         f"candidates; found {cross_operation['cross_package_targets']} cross-package "
-        f"targets in {len(cross_ecosystem_findings)} consolidated findings"
+        f"targets in {cross_operation['findings']} consolidated findings"
+    )
+    print(
+        f"Compared {tweakdb_cross_operation['candidate_targets']} CET/TweakXL "
+        f"TweakDB targets; found {tweakdb_cross_operation['cross_package_targets']} "
+        f"cross-package targets"
     )
     config_documents, config_references, config_parse_findings = (
         parse_config_documents(artifacts)

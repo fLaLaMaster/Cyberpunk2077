@@ -123,6 +123,50 @@ require('missing/module')
             self.assertEqual("info", by_rule["CET-OVERRIDE-CHAIN-DUPLICATE"].severity)
             self.assertEqual("info", by_rule["CET-SETTINGS-CONTAINER-SHARED"].severity)
 
+    def test_extracts_literal_and_dynamic_tweakdb_mutations(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "init.lua"
+            path.write_text(
+                """registerForEvent('onInit', function()
+  TweakDB:SetFlat('Items.Example.value', -0.01)
+  TweakDB:SetFlatNoUpdate('Items.Example.tags', {'A', 'B'})
+  TweakDB:CloneRecord(TweakDBID.new('Items.Clone'), 'Items.Source')
+  TweakDB:CreateRecord('Items.Created', 'gamedataItem_Record')
+  TweakDB:DeleteRecord('Items.Removed')
+  TweakDB:SetFlat(prefix .. '.value', calculated)
+end)
+""",
+                encoding="utf-8",
+            )
+            documents, references, parse_findings = parse_cet_documents([
+                artifact(path, "Root")
+            ])
+            self.assertEqual([], parse_findings)
+            analyze_cet_references(documents, references)
+            by_kind = {
+                item.kind: item
+                for item in references
+                if item.kind.startswith("tweakdb.") and "dynamic" not in item.kind
+            }
+            flat = by_kind["tweakdb.flat.set"]
+            self.assertEqual("Items.Example.value", flat.identity)
+            self.assertEqual(-0.01, flat.details["value"])
+            self.assertEqual("-0.01", flat.details["value_key"])
+            self.assertEqual(
+                ["A", "B"], by_kind["tweakdb.flat.set-no-update"].details["value"]
+            )
+            clone = by_kind["tweakdb.record.clone"]
+            self.assertEqual("Items.Clone", clone.identity)
+            self.assertEqual("Items.Source", clone.details["source_record"])
+            self.assertEqual(
+                "gamedataItem_Record",
+                by_kind["tweakdb.record.create"].details["record_type"],
+            )
+            self.assertEqual("Items.Removed", by_kind["tweakdb.record.delete"].identity)
+            dynamic = [item for item in references if item.kind == "tweakdb.flat.dynamic"]
+            self.assertEqual(1, len(dynamic))
+            self.assertTrue(all(item.details["reachable"] for item in [*by_kind.values(), *dynamic]))
+
     def test_explicit_globals_collide_only_inside_one_merged_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

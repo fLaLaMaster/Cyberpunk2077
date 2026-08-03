@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
@@ -36,6 +37,13 @@ SETTINGS_CALLS = {
     "addRangeInt",
     "addRangeFloat",
     "addKeyBinding",
+}
+TWEAKDB_MUTATION_CALLS = {
+    "SetFlat",
+    "SetFlatNoUpdate",
+    "CloneRecord",
+    "CreateRecord",
+    "DeleteRecord",
 }
 _BINDING_ID = re.compile(r"^[A-Za-z0-9_.]+$")
 
@@ -249,6 +257,206 @@ def _literal_argument(tokens: list[_Token], starts: list[int], ordinal: int) -> 
         return None
     token = tokens[starts[ordinal]]
     return token.value if token.kind == "string" else None
+
+
+def _argument_range(
+    starts: list[int], close_index: int | None, ordinal: int
+) -> tuple[int, int] | None:
+    if close_index is None or ordinal >= len(starts):
+        return None
+    end = starts[ordinal + 1] - 1 if ordinal + 1 < len(starts) else close_index
+    return starts[ordinal], end
+
+
+def _lua_number(value: str) -> int | float | None:
+    try:
+        if value.casefold().startswith("0x"):
+            return int(value, 16)
+        parsed = float(value)
+        return int(parsed) if parsed.is_integer() and not any(
+            marker in value.casefold() for marker in (".", "e", "p")
+        ) else parsed
+    except ValueError:
+        return None
+
+
+def _static_lua_value(
+    tokens: list[_Token], start: int, end: int
+) -> tuple[Any, bool, str]:
+    """Decode a deliberately small, side-effect-free subset of Lua values."""
+    while end - start >= 2 and tokens[start].value == "(" and _matching(
+        tokens, start, "(", ")"
+    ) == end - 1:
+        start += 1
+        end -= 1
+    if start >= end:
+        return None, False, "empty"
+    span = tokens[start:end]
+    if len(span) == 1:
+        token = span[0]
+        if token.kind == "string":
+            return token.value, True, "string"
+        if token.kind == "number":
+            value = _lua_number(token.value)
+            return value, value is not None, "number"
+        if token.value in {"true", "false"}:
+            return token.value == "true", True, "boolean"
+        if token.value == "nil":
+            return None, True, "nil"
+    if len(span) == 2 and span[0].value in {"-", "+"} and span[1].kind == "number":
+        value = _lua_number(span[1].value)
+        if value is not None:
+            return (-value if span[0].value == "-" else value), True, "number"
+
+    if span[0].value == "{" and _matching(tokens, start, "{", "}") == end - 1:
+        values: list[Any] = []
+        cursor = start + 1
+        item_start = cursor
+        paren = bracket = brace = 0
+        while cursor < end - 1:
+            value = tokens[cursor].value
+            if value == "(":
+                paren += 1
+            elif value == ")":
+                paren -= 1
+            elif value == "[":
+                bracket += 1
+            elif value == "]":
+                bracket -= 1
+            elif value == "{":
+                brace += 1
+            elif value == "}":
+                brace -= 1
+            elif value in {"=", ";"} and paren == bracket == brace == 0:
+                return None, False, "table-expression"
+            elif value == "," and paren == bracket == brace == 0:
+                item, known, _form = _static_lua_value(tokens, item_start, cursor)
+                if not known:
+                    return None, False, "table-expression"
+                values.append(item)
+                item_start = cursor + 1
+            cursor += 1
+        if item_start < end - 1:
+            item, known, _form = _static_lua_value(tokens, item_start, end - 1)
+            if not known:
+                return None, False, "table-expression"
+            values.append(item)
+        return values, True, "array-table"
+
+    # Preserve the type distinction for common immutable constructors without
+    # pretending that their serialized value is a plain YAML scalar.
+    open_index = next(
+        (index for index in range(start, end) if tokens[index].value == "("), None
+    )
+    if open_index is not None and _matching(tokens, open_index, "(", ")") == end - 1:
+        constructor = "".join(token.value for token in tokens[start:open_index])
+        if constructor in {"TweakDBID", "TweakDBID.new", "CName", "CName.new"}:
+            starts, close = _argument_starts(tokens, open_index)
+            argument = _argument_range(starts, close, 0)
+            if argument is not None:
+                value, known, _form = _static_lua_value(tokens, *argument)
+                if known:
+                    return (
+                        {"$type": constructor.split(".", 1)[0], "value": value},
+                        True,
+                        "constructor",
+                    )
+    return None, False, "expression"
+
+
+def _tweakdb_reference(
+    artifact: Artifact,
+    root: str,
+    relative: str,
+    tokens: list[_Token],
+    token: _Token,
+    call: str,
+    starts: list[int],
+    close_index: int | None,
+    top_level: bool,
+) -> Reference:
+    def static_argument(ordinal: int) -> tuple[Any, bool, str]:
+        bounds = _argument_range(starts, close_index, ordinal)
+        return (
+            _static_lua_value(tokens, *bounds)
+            if bounds is not None
+            else (None, False, "missing")
+        )
+
+    def identifier(
+        ordinal: int, constructor_types: tuple[str, ...] = ("TweakDBID",)
+    ) -> tuple[str | None, bool, str]:
+        value, known, form = static_argument(ordinal)
+        if isinstance(value, str):
+            return value, known, form
+        if (
+            isinstance(value, dict)
+            and value.get("$type") in constructor_types
+            and isinstance(value.get("value"), str)
+        ):
+            return value["value"], known, form
+        return None, False, form
+
+    target, target_known, target_form = identifier(0)
+    details = _base_details(artifact, root, relative, top_level)
+    details.update({
+        "call": call,
+        "operation": call,
+        "target": target,
+        "target_known": target_known,
+        "target_form": target_form,
+    })
+    identity = target if target is not None else f"<dynamic>@{root}:{token.line}"
+
+    if call in {"SetFlat", "SetFlatNoUpdate"}:
+        value, value_known, value_form = static_argument(1)
+        details.update({
+            "value": value,
+            "value_known": value_known,
+            "value_form": value_form,
+            "value_key": (
+                json.dumps(
+                    value,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                if value_known
+                else None
+            ),
+            "updates_record": call == "SetFlat",
+        })
+        kind = (
+            "tweakdb.flat.set" if call == "SetFlat" else "tweakdb.flat.set-no-update"
+        ) if target is not None else "tweakdb.flat.dynamic"
+    elif call == "CloneRecord":
+        source, source_known, source_form = identifier(1)
+        details.update({
+            "source_record": source,
+            "source_known": source_known,
+            "source_form": source_form,
+        })
+        kind = "tweakdb.record.clone" if target is not None else "tweakdb.record.dynamic"
+    elif call == "CreateRecord":
+        record_type, type_known, type_form = identifier(1, ("TweakDBID", "CName"))
+        details.update({
+            "record_type": record_type,
+            "record_type_known": type_known,
+            "record_type_form": type_form,
+        })
+        kind = "tweakdb.record.create" if target is not None else "tweakdb.record.dynamic"
+    else:
+        kind = "tweakdb.record.delete" if target is not None else "tweakdb.record.dynamic"
+
+    return Reference(
+        ecosystem="cet",
+        kind=kind,
+        identity=identity,
+        mod_name=artifact.mod_name,
+        source_path=str(artifact.absolute_path),
+        line=token.line,
+        details=details,
+    )
 
 
 def _function_depths(tokens: list[_Token]) -> list[int]:
@@ -553,12 +761,19 @@ def _parse_document(
         if token.kind != "name" or tokens[index + 1].value != "(":
             continue
         call = token.value
+        tweakdb_call = (
+            call in TWEAKDB_MUTATION_CALLS
+            and index >= 2
+            and tokens[index - 1].value in {".", ":"}
+            and tokens[index - 2].value == "TweakDB"
+        )
         supported = (
             call == "registerForEvent"
             or call in BINDING_CALLS
             or call in HOOK_CALLS
             or call in {"require", "GetMod"}
             or call in SETTINGS_CALLS
+            or tweakdb_call
         )
         if not supported:
             continue
@@ -566,6 +781,21 @@ def _parse_document(
         first = _literal_argument(tokens, starts, 0)
         second = _literal_argument(tokens, starts, 1)
         top_level = depths[index] == 0
+        if tweakdb_call:
+            reference = _tweakdb_reference(
+                artifact,
+                root,
+                relative,
+                tokens,
+                token,
+                call,
+                starts,
+                close_index,
+                top_level,
+            )
+            references.append(reference)
+            counts[reference.kind] += 1
+            continue
         details = _base_details(artifact, root, relative, top_level)
         details["call"] = call
         details["literal_arguments"] = sum(value is not None for value in (first, second))
@@ -1057,7 +1287,8 @@ def build_cet_coverage(
     dynamic = sum(
         counts[kind] for kind in (
             "event.dynamic", "binding.dynamic", "hook.dynamic", "module.dynamic",
-            "mod.dependency_dynamic", "settings.dynamic",
+            "mod.dependency_dynamic", "settings.dynamic", "tweakdb.flat.dynamic",
+            "tweakdb.record.dynamic",
         )
     )
     unresolved_modules = sum(
@@ -1115,6 +1346,20 @@ def build_cet_coverage(
                 "status": "partial",
                 "note": "Definite top-level global assignments/functions plus explicit _G/_ENV/rawset writes are inventoried. Cross-package duplicates are compared only inside one merged CET root; computed names and ambiguous lexical writes remain partial.",
             },
+            {
+                "name": "CET TweakDB mutations",
+                "documents": sum(
+                    any(kind.startswith("tweakdb.") for kind in document.call_counts)
+                    for document in document_list
+                ),
+                "status": (
+                    "partial"
+                    if counts["tweakdb.flat.dynamic"]
+                    or counts["tweakdb.record.dynamic"]
+                    else "analyzed"
+                ),
+                "note": "Literal SetFlat, SetFlatNoUpdate, CloneRecord, CreateRecord, and DeleteRecord targets are extracted with source lines. Static scalar and array values are decoded; computed targets and values remain inventoried.",
+            },
         ],
         "registration_operations": [
             {
@@ -1132,6 +1377,19 @@ def build_cet_coverage(
                 "overrides": counts["hook.override"],
                 "settings": sum(value for kind, value in counts.items() if kind.startswith("settings.") and kind != "settings.dynamic"),
                 "global_writes": global_writes,
+                "tweakdb_flat_writes": (
+                    counts["tweakdb.flat.set"]
+                    + counts["tweakdb.flat.set-no-update"]
+                ),
+                "tweakdb_record_writes": (
+                    counts["tweakdb.record.clone"]
+                    + counts["tweakdb.record.create"]
+                    + counts["tweakdb.record.delete"]
+                ),
+                "dynamic_tweakdb_calls": (
+                    counts["tweakdb.flat.dynamic"]
+                    + counts["tweakdb.record.dynamic"]
+                ),
                 "merged_roots": merged_roots,
                 "shared_globals": shared_globals,
                 "dynamic_globals": dynamic_globals,
