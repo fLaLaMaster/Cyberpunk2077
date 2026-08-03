@@ -122,8 +122,9 @@ python -m unittest discover -s tests -v
   Parses YAML and JSON `.xl` files, rejects duplicate YAML keys, tolerates the
   tab variants present in the frozen corpus, extracts ArchiveXL references,
   retains mapping/sequence source locations, compares streaming, resource, and
-  quest phase operations, and resolves resources plus custom quest parents
-  against indexed archives or loose mod files.
+  quest phase operations, resolves resources plus custom quest parents against
+  indexed archives or loose mod files, and compares whole-definition,
+  case-sensitive visual-tag component overrides.
 - `src/cp77compat/archivexl_runtime.py`
   Selects the newest ArchiveXL session, streams all rotated chunks in
   chronological order, pairs root-cause and consequence messages, attributes
@@ -184,7 +185,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.11.0 scan on 2026-08-03 reported:
+The successful v0.12.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -192,7 +193,7 @@ The successful v0.11.0 scan on 2026-08-03 reported:
   framework bundle placeholder.
 - 78 ArchiveXL-related archives indexed.
 - 5,458 indexed archive members.
-- 49,197 extracted ArchiveXL references, including 596 child/parent references
+- 49,209 extracted ArchiveXL references, including 596 child/parent references
   from 298 quest phase merges, 4,124 serialized localization entries, 14
   factory entity rows, 232 serialized journal entries, and 8,302 target-scoped
   resource patch inner identities.
@@ -211,6 +212,9 @@ The successful v0.11.0 scan on 2026-08-03 reported:
 - Three journal payloads serialized successfully into 232 entry references.
   Their only shared identity is the composable `contacts` container; no journal
   leaf or property-edit duplicate, conflict, or review finding was produced.
+- Four override documents define 12 case-sensitive visual tags over 14
+  components and 31 chunk references. No tag name is shared across mods and no
+  installed definition replaces one of ArchiveXL's built-in garment tags.
 - TweakXL dependency analysis indexed 74,829 named records from 2,684 official
   REDmod `.tweak` files and verified generated `_inlineN` IDs against both
   local TweakDB binaries.
@@ -235,15 +239,16 @@ The successful v0.11.0 scan on 2026-08-03 reported:
   - 16 review groups.
   - 18 informational findings.
 - Zero WolvenKit indexing failures.
-- Fifty-seven automated tests passing.
+- Sixty automated tests passing.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
   seconds. The v0.7 dependency-enabled fully cached scan completes in about
   17.8 seconds, including indexing the local official TweakDB sources.
-- All 105,821 ArchiveXL and TweakXL references have one-based declaration/source
-  lines in the generated reports. Serialized localization and factory entries
-  additionally carry their zero-based payload `entry_index` or `row_index`. For minified one-line
+- All 106,664 ArchiveXL and TweakXL references have one-based declaration/source
+  lines in the generated reports. Serialized localization, factory, and journal
+  entries additionally carry their zero-based payload `entry_index` or
+  `row_index`. For minified one-line
   JSON-shaped `.xl` files, line 1 is correctly shared by every declaration on
   that physical source line.
 
@@ -328,6 +333,9 @@ than being guessed without property type metadata. The newest TweakXL runtime
 log is also analyzed automatically; coverage records the selected path, line
 and event counts, source attribution, static confirmations, and consolidated
 finding count.
+The four installed `overrides.tags` documents are fully analyzed using
+ArchiveXL-equivalent effective component masks and whole-definition last-wins
+semantics. Their 12 tag names are all distinct.
 
 ## Generated reports
 

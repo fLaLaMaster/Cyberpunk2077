@@ -6,14 +6,49 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.11.0`
+- Scanner version: `0.12.0`
 - Implemented ecosystems: ArchiveXL and TweakXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 57 passing
+- Automated tests: 60 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — ArchiveXL visual-tag override analysis
+
+Completed static `overrides.tags` parsing and comparison against the frozen
+collection.
+
+Changes:
+
+- Added structural parsing for tag/component definitions using `hide` and
+  `show` chunk lists, shorthand hide lists, and unsigned decimal masks.
+- Converted declarations to ArchiveXL-equivalent 64-bit component masks while
+  retaining tag, component, operation, chunk, and one-based line evidence.
+- Added strict shape checks for invalid operations, mask types, and out-of-range
+  chunk indices.
+- Added case-sensitive, whole-tag comparisons: identical same-name definitions
+  are informational duplicates, while differing definitions are conflicts
+  because ArchiveXL replaces the complete earlier tag in load order.
+- Added review findings for redefinitions of ArchiveXL's built-in garment tags
+  and dedicated override coverage tables in Markdown and HTML.
+- Bumped the scanner to version 0.12.0.
+
+Validation:
+
+- All 60 automated tests pass.
+- A full cached frozen-corpus scan completed successfully in 19.7 seconds;
+  staging and game inputs were not modified.
+- Four documents contain 12 tag definitions, 14 component definitions, and 31
+  chunk references.
+- No tag is shared across mods, no installed definition replaces an ArchiveXL
+  built-in tag, and no override finding was added.
+- Reports remain at 58 findings: 6 conflicts, 9 errors, 9 warnings, 16 reviews,
+  and 18 infos.
+- Semantics were verified against ArchiveXL's official Garment `Config.cpp`,
+  `Extension.cpp`, `Tags.cpp`, and `ChunkMask.hpp` at source revision
+  `55f48569f415b443debba4f4ad4cf241194cd06e`.
 
 ### 2026-08-03 — ArchiveXL journal analysis
 

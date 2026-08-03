@@ -44,7 +44,7 @@ frozen-corpus validation pass are complete.
   implicit cross-mod dependency.
 - [x] Parse and analyze `quest.phases` operations and parent targets.
 - [x] Parse and analyze `journal` resources.
-- [ ] Parse and analyze `overrides` operations.
+- [x] Parse and analyze `overrides` operations.
 - [x] Parse `resource.patch`, `copy`, `link`, `scope`, and `fix`, preserving
   custom tags and source lines.
 - [x] Compare resource patch targets, copy/link destinations, scope members,

@@ -121,6 +121,22 @@ def write_reports(
                         f"documents={operation['documents']}; "
                         f"references={operation['references']} — {operation['note']}"
                     )
+            override_operations = analyzer.get("override_operations", [])
+            if override_operations:
+                lines.extend(["", "#### Visual-tag overrides", ""])
+                for operation in override_operations:
+                    lines.append(
+                        f"- `{operation['name']}`: {operation['status']}; "
+                        f"documents={operation['documents']}; "
+                        f"definitions={operation['definitions']}; "
+                        f"components={operation['components']}; "
+                        f"chunk references={operation['chunk_references']}; "
+                        f"shared/duplicate/conflicting tags="
+                        f"{operation['shared_tags']}/{operation['duplicate_tags']}/"
+                        f"{operation['conflicting_tags']}; "
+                        f"built-in redefinitions={operation['builtin_redefinitions']} - "
+                        f"{operation['note']}"
+                    )
             quest_operations = analyzer.get("quest_operations", [])
             if quest_operations:
                 lines.extend(["", "#### Quest operations", ""])

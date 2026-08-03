@@ -27,6 +27,8 @@ Implemented analysis includes:
 - ArchiveXL journal resource resolution and payload-tree comparison using
   case-sensitive entry paths, recursive container semantics, and `*` property
   edit markers;
+- ArchiveXL `overrides.tags` parsing for hide/show chunk lists, shorthand hide
+  lists, and raw masks, with whole-tag last-wins collision checks;
 - newest-session ArchiveXL runtime parsing across rotated log chunks, with
   localization, quest-phase, and streaming-sector source attribution plus
   static quest-target confirmation;
@@ -54,6 +56,11 @@ Journal analysis selectively serializes declared `.journal` resources and
 compares the effective entry paths used by ArchiveXL itself. Shared containers
 are composable; incompatible leaf definitions, competing edits, and mixed
 edit/merge operations receive distinct findings.
+Visual-tag override analysis compares effective 64-bit component masks. Tag
+names are case-sensitive, and a later same-name tag replaces the entire earlier
+definition. Identical definitions are informational duplicates; different
+definitions are load-order conflicts even when their component lists are
+disjoint.
 
 The TweakXL parser preserves YAML anchors, aliases, repeated template roots,
 and the `!append`, `!append-once`, `!append-from`, `!prepend`,

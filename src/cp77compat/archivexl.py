@@ -50,8 +50,8 @@ SECTION_COVERAGE = {
         "On-screen resources are resolved; localization entries are not inspected yet.",
     ),
     "overrides": (
-        "unsupported",
-        "Override identities and operations are not interpreted yet.",
+        "analyzed",
+        "Visual-tag component overrides are parsed and same-name definitions are compared.",
     ),
     "player": (
         "unsupported",
@@ -614,6 +614,281 @@ def _plain_value(value: Any) -> Any:
     return value
 
 
+OVERRIDE_BUILTIN_TAGS = {
+    "FlatShoes",
+    "HighHeels",
+    "hide_Ankles",
+    "hide_Arms",
+    "hide_Calves",
+    "hide_Chest",
+    "hide_CollarBone",
+    "hide_Feet",
+    "hide_Head",
+    "hide_Legs",
+    "hide_LowerAbdomen",
+    "hide_Thighs",
+    "hide_Torso",
+    "hide_UpperAbdomen",
+}
+_MASK_64 = (1 << 64) - 1
+
+
+def _override_shape_finding(
+    document: ArchiveXLDocument,
+    explanation: str,
+    line: int | None,
+) -> Finding:
+    return Finding(
+        rule_id="AXL-OVERRIDE-SHAPE",
+        severity="error",
+        confidence="high",
+        summary="Invalid ArchiveXL overrides.tags declaration",
+        explanation=explanation,
+        participants=[document.artifact.mod_name],
+        evidence=[{"path": str(document.artifact.absolute_path), "line": line}],
+    )
+
+
+def _override_chunks(
+    document: ArchiveXLDocument,
+    value: Any,
+    line: int | None,
+) -> tuple[list[int] | None, Finding | None]:
+    if not isinstance(value, list):
+        return None, _override_shape_finding(
+            document,
+            "Override hide/show values must be sequences of chunk indices.",
+            line,
+        )
+    chunks: list[int] = []
+    for raw_chunk, chunk_line in _sequence_entries(value):
+        if isinstance(raw_chunk, bool) or not isinstance(raw_chunk, int):
+            return None, _override_shape_finding(
+                document,
+                "Override chunk indices must be integers from 0 through 63.",
+                chunk_line or line,
+            )
+        if not 0 <= raw_chunk <= 63:
+            return None, _override_shape_finding(
+                document,
+                "Override chunk indices must fit the 64-bit component mask (0 through 63).",
+                chunk_line or line,
+            )
+        chunks.append(raw_chunk)
+    return chunks, None
+
+
+def _override_effective_mask(show: bool, chunks: list[int]) -> int:
+    selected = 0
+    for chunk in chunks:
+        selected |= 1 << chunk
+    if show:
+        return selected
+    return (_MASK_64 ^ selected) if selected else 0
+
+
+def _extract_override_references(
+    document: ArchiveXLDocument,
+    overrides: dict[Any, Any],
+    findings: list[Finding],
+) -> list[Reference]:
+    refs: list[Reference] = []
+    overrides_line = _mapping_line(document.data, "overrides")
+    for raw_operation in overrides:
+        if str(raw_operation) != "tags":
+            findings.append(
+                Finding(
+                    rule_id="AXL-OVERRIDE-UNKNOWN-OPERATION",
+                    severity="review",
+                    confidence="high",
+                    summary=f"Unknown ArchiveXL override operation: {raw_operation}",
+                    explanation=(
+                        "Only overrides.tags is implemented by the installed ArchiveXL "
+                        "garment override configuration parser."
+                    ),
+                    participants=[document.artifact.mod_name],
+                    evidence=[{
+                        "path": str(document.artifact.absolute_path),
+                        "line": _mapping_line(overrides, raw_operation, overrides_line),
+                    }],
+                )
+            )
+
+    tags = overrides.get("tags")
+    if tags is None:
+        return refs
+    tags_line = _mapping_line(overrides, "tags", overrides_line)
+    if not isinstance(tags, dict):
+        findings.append(
+            _override_shape_finding(
+                document,
+                "overrides.tags must be a mapping of tag names to component definitions.",
+                tags_line,
+            )
+        )
+        return refs
+
+    for raw_tag, raw_components in tags.items():
+        tag = str(raw_tag)
+        tag_line = _mapping_line(tags, raw_tag, tags_line)
+        if not tag:
+            findings.append(
+                _override_shape_finding(document, "Override tag names cannot be empty.", tag_line)
+            )
+            continue
+        if not isinstance(raw_components, dict):
+            findings.append(
+                _override_shape_finding(
+                    document,
+                    f"Override tag {tag!r} must map component names to masks.",
+                    tag_line,
+                )
+            )
+            continue
+
+        components: list[dict[str, Any]] = []
+        for raw_component, raw_mask in raw_components.items():
+            component = str(raw_component)
+            component_line = _mapping_line(raw_components, raw_component, tag_line)
+            if not component:
+                findings.append(
+                    _override_shape_finding(
+                        document, "Override component names cannot be empty.", component_line
+                    )
+                )
+                continue
+
+            operation = "mask"
+            show = False
+            chunks: list[int] | None = None
+            mask: int | None = None
+            value_line = component_line
+            if isinstance(raw_mask, dict):
+                present = [name for name in ("hide", "show") if name in raw_mask]
+                unknown_keys = [key for key in raw_mask if str(key) not in {"hide", "show"}]
+                if unknown_keys:
+                    unknown = [str(key) for key in unknown_keys]
+                    findings.append(
+                        Finding(
+                            rule_id="AXL-OVERRIDE-UNKNOWN-MASK-OPERATION",
+                            severity="review",
+                            confidence="high",
+                            summary=f"Unknown component override operation for {tag}: {component}",
+                            explanation=(
+                                "ArchiveXL only reads hide or show from a component override mapping."
+                            ),
+                            participants=[document.artifact.mod_name],
+                            evidence=[{
+                                "path": str(document.artifact.absolute_path),
+                                "line": _mapping_line(raw_mask, unknown_keys[0], component_line),
+                                "operations": unknown,
+                            }],
+                        )
+                    )
+                if not present:
+                    findings.append(
+                        _override_shape_finding(
+                            document,
+                            f"Override component {component!r} requires hide or show.",
+                            component_line,
+                        )
+                    )
+                    continue
+                if len(present) > 1:
+                    findings.append(
+                        _override_shape_finding(
+                            document,
+                            (
+                                f"Override component {component!r} declares both hide and show; "
+                                "ArchiveXL only applies hide because it checks that operation first."
+                            ),
+                            _mapping_line(raw_mask, "show", component_line),
+                        )
+                    )
+                operation = present[0]
+                show = operation == "show"
+                value_line = _mapping_line(raw_mask, operation, component_line)
+                chunks, chunk_finding = _override_chunks(
+                    document, raw_mask[operation], value_line
+                )
+                if chunk_finding:
+                    findings.append(chunk_finding)
+                    continue
+                mask = _override_effective_mask(show, chunks or [])
+            elif isinstance(raw_mask, list):
+                operation = "hide"
+                chunks, chunk_finding = _override_chunks(
+                    document, raw_mask, component_line
+                )
+                if chunk_finding:
+                    findings.append(chunk_finding)
+                    continue
+                mask = _override_effective_mask(False, chunks or [])
+            else:
+                if isinstance(raw_mask, bool):
+                    parsed_mask = None
+                elif isinstance(raw_mask, int):
+                    parsed_mask = raw_mask
+                elif isinstance(raw_mask, str) and raw_mask.isdecimal():
+                    parsed_mask = int(raw_mask, 10)
+                else:
+                    parsed_mask = None
+                if parsed_mask is None or not 0 <= parsed_mask <= _MASK_64:
+                    findings.append(
+                        _override_shape_finding(
+                            document,
+                            (
+                                "A scalar component override must be an unsigned decimal "
+                                "64-bit mask."
+                            ),
+                            component_line,
+                        )
+                    )
+                    continue
+                mask = parsed_mask
+
+            components.append(
+                {
+                    "component": component,
+                    "operation": operation,
+                    "show": show,
+                    "mask": mask,
+                    "chunks": chunks,
+                    "line": value_line,
+                }
+            )
+
+        if not components:
+            continue
+        canonical = [
+            {
+                "component": component["component"],
+                "show": component["show"],
+                "mask": component["mask"],
+            }
+            for component in sorted(components, key=lambda item: item["component"])
+        ]
+        fingerprint = json.dumps(
+            canonical, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        refs.append(
+            _reference(
+                document,
+                "override.tag",
+                tag,
+                tag_line,
+                components=components,
+                component_count=len(components),
+                chunk_references=sum(
+                    len(component["chunks"] or []) for component in components
+                ),
+                fingerprint=fingerprint,
+                redefines_builtin=tag in OVERRIDE_BUILTIN_TAGS,
+            )
+        )
+    return refs
+
+
 def _extract_quest_references(
     document: ArchiveXLDocument,
     quest: dict[Any, Any],
@@ -710,6 +985,19 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                     document,
                     "quest must be a mapping containing a phases sequence.",
                     _mapping_line(data, "quest"),
+                )
+            )
+
+    overrides = data.get("overrides")
+    if overrides is not None:
+        if isinstance(overrides, dict):
+            refs.extend(_extract_override_references(document, overrides, findings))
+        else:
+            findings.append(
+                _override_shape_finding(
+                    document,
+                    "overrides must be a mapping containing a tags mapping.",
+                    _mapping_line(data, "overrides"),
                 )
             )
 
@@ -996,6 +1284,116 @@ def compare_quest_references(references: Iterable[Reference]) -> list[Finding]:
     return findings
 
 
+def compare_override_references(references: Iterable[Reference]) -> list[Finding]:
+    """Compare global visual-tag definitions using ArchiveXL's last-wins behavior."""
+    by_tag: dict[str, list[Reference]] = defaultdict(list)
+    findings: list[Finding] = []
+    for reference in references:
+        if reference.kind == "override.tag":
+            # Tag names become REDengine CNames and are case-sensitive.
+            by_tag[reference.identity].append(reference)
+
+    for tag, group in by_tag.items():
+        builtin_refs = [
+            reference
+            for reference in group
+            if reference.details.get("redefines_builtin")
+        ]
+        if builtin_refs:
+            findings.append(
+                Finding(
+                    rule_id="AXL-OVERRIDE-BUILTIN-REDEFINED",
+                    severity="review",
+                    confidence="high",
+                    summary=f"Built-in ArchiveXL visual tag is redefined: {tag}",
+                    explanation=(
+                        "A mod replaces ArchiveXL's built-in definition for this tag. "
+                        "Every installed item using the tag can inherit the replacement, "
+                        "so the change should be intentional."
+                    ),
+                    participants=sorted(
+                        {reference.mod_name for reference in builtin_refs},
+                        key=str.casefold,
+                    ),
+                    evidence=[reference.to_dict() for reference in builtin_refs],
+                )
+            )
+
+    overlaps: list[tuple[str, str, str, str, tuple[str, ...], dict[str, Any]]] = []
+    for group in by_tag.values():
+        participants = tuple(
+            sorted({reference.mod_name for reference in group}, key=str.casefold)
+        )
+        if len(participants) < 2:
+            continue
+        fingerprints = {
+            str(reference.details.get("fingerprint", "")) for reference in group
+        }
+        if len(fingerprints) == 1:
+            rule = "AXL-OVERRIDE-TAG-DUPLICATE"
+            severity = "info"
+            confidence = "high"
+            explanation = (
+                "Multiple mods define the same visual tag with the same effective "
+                "component masks. ArchiveXL keeps the last definition, but its "
+                "behavior is equivalent."
+            )
+        else:
+            rule = "AXL-OVERRIDE-TAG-CONFLICT"
+            severity = "conflict"
+            confidence = "high"
+            explanation = (
+                "Multiple mods define the same visual tag differently. ArchiveXL "
+                "replaces the entire earlier tag definition with the last loaded "
+                "definition, so components from earlier definitions do not compose."
+            )
+        overlaps.append(
+            (
+                rule,
+                severity,
+                confidence,
+                explanation,
+                participants,
+                {
+                    "identity": group[0].identity,
+                    "references": [reference.to_dict() for reference in group],
+                },
+            )
+        )
+
+    aggregate: dict[
+        tuple[str, str, str, str, tuple[str, ...]], list[dict[str, Any]]
+    ] = defaultdict(list)
+    for rule, severity, confidence, explanation, participants, evidence in overlaps:
+        aggregate[(rule, severity, confidence, explanation, participants)].append(
+            evidence
+        )
+
+    nouns = {
+        "AXL-OVERRIDE-TAG-CONFLICT": "conflicting visual-tag definitions",
+        "AXL-OVERRIDE-TAG-DUPLICATE": "duplicate visual-tag definitions",
+    }
+    for (rule, severity, confidence, explanation, participants), evidence in sorted(
+        aggregate.items(),
+        key=lambda item: (
+            item[0][0],
+            tuple(participant.casefold() for participant in item[0][4]),
+        ),
+    ):
+        findings.append(
+            Finding(
+                rule_id=rule,
+                severity=severity,
+                confidence=confidence,
+                summary=f"{len(evidence)} {nouns[rule]}",
+                explanation=explanation,
+                participants=list(participants),
+                evidence=evidence,
+            )
+        )
+    return findings
+
+
 def compare_resource_references(references: Iterable[Reference]) -> list[Finding]:
     resource_refs = [
         reference
@@ -1246,11 +1644,58 @@ def build_archivexl_coverage(
                 ),
             }
         )
+    override_refs = [
+        reference for reference in reference_list if reference.kind == "override.tag"
+    ]
+    override_operations = []
+    if "overrides" in section_documents:
+        by_tag: dict[str, list[Reference]] = defaultdict(list)
+        for reference in override_refs:
+            by_tag[reference.identity].append(reference)
+        shared = [
+            group
+            for group in by_tag.values()
+            if len({reference.mod_name for reference in group}) > 1
+        ]
+        duplicate_tags = sum(
+            1
+            for group in shared
+            if len({reference.details.get("fingerprint") for reference in group}) == 1
+        )
+        conflicting_tags = len(shared) - duplicate_tags
+        override_operations.append(
+            {
+                "name": "overrides.tags",
+                "documents": len(section_documents["overrides"]),
+                "definitions": len(override_refs),
+                "components": sum(
+                    int(reference.details.get("component_count", 0))
+                    for reference in override_refs
+                ),
+                "chunk_references": sum(
+                    int(reference.details.get("chunk_references", 0))
+                    for reference in override_refs
+                ),
+                "shared_tags": len(shared),
+                "duplicate_tags": duplicate_tags,
+                "conflicting_tags": conflicting_tags,
+                "builtin_redefinitions": sum(
+                    bool(reference.details.get("redefines_builtin"))
+                    for reference in override_refs
+                ),
+                "status": "analyzed",
+                "note": (
+                    "Tag names are case-sensitive. Effective component masks are "
+                    "compared using ArchiveXL's whole-definition last-wins behavior."
+                ),
+            }
+        )
     return {
         "documents": len(document_list),
         "sections": sections,
         "resource_operations": resource_operations,
         "quest_operations": quest_operations,
+        "override_operations": override_operations,
     }
 
 

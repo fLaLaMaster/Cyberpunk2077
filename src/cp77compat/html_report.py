@@ -312,6 +312,18 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "note", label: "Coverage note"}
         ]));
       }
+      if ((analyzer.override_operations || []).length) {
+        const label = document.createElement("h3"); label.textContent = "Visual-tag overrides"; group.append(label);
+        group.append(coverageTable(analyzer.override_operations, [
+          {key: "name", label: "Operation"}, {key: "status", label: "Status"},
+          {key: "documents", label: "Documents"}, {key: "definitions", label: "Tag definitions"},
+          {key: "components", label: "Components"}, {key: "chunk_references", label: "Chunk references"},
+          {key: "shared_tags", label: "Shared tags"}, {key: "duplicate_tags", label: "Duplicates"},
+          {key: "conflicting_tags", label: "Conflicts"},
+          {key: "builtin_redefinitions", label: "Built-in redefinitions"},
+          {key: "note", label: "Coverage note"}
+        ]));
+      }
       if ((analyzer.quest_operations || []).length) {
         const label = document.createElement("h3"); label.textContent = "Quest operations"; group.append(label);
         group.append(coverageTable(analyzer.quest_operations, [

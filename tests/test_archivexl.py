@@ -7,6 +7,7 @@ from pathlib import Path
 from cp77compat.archives import parse_archive_list_output
 from cp77compat.archivexl import (
     build_archivexl_coverage,
+    compare_override_references,
     compare_quest_references,
     compare_references,
     compare_resource_references,
@@ -41,6 +42,76 @@ def artifact(path: Path, mod: str) -> Artifact:
 
 
 class ArchiveXLTests(unittest.TestCase):
+    def test_extracts_override_tags_with_effective_masks_and_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "overrides.xl"
+            path.write_text(
+                """overrides:
+  tags:
+    HideChunks:
+      body: {hide: [0, 2]}
+    RawMask:
+      decal: 15
+    HideShorthand:
+      garment: [1, 3]
+""",
+                encoding="utf-8",
+            )
+            documents, references, findings = parse_documents(
+                [artifact(path, "Example")]
+            )
+            self.assertEqual([], findings)
+            self.assertEqual(3, len(references))
+            hide = next(ref for ref in references if ref.identity == "HideChunks")
+            self.assertEqual("override.tag", hide.kind)
+            self.assertEqual(3, hide.line)
+            self.assertEqual((1 << 64) - 1 - 5, hide.details["components"][0]["mask"])
+            self.assertEqual([0, 2], hide.details["components"][0]["chunks"])
+            raw = next(ref for ref in references if ref.identity == "RawMask")
+            self.assertEqual(15, raw.details["components"][0]["mask"])
+            coverage = build_archivexl_coverage(documents, references)
+            operation = coverage["override_operations"][0]
+            self.assertEqual(3, operation["definitions"])
+            self.assertEqual(3, operation["components"])
+            self.assertEqual(4, operation["chunk_references"])
+
+    def test_override_tag_comparison_uses_whole_definition_last_wins(self) -> None:
+        references = [
+            Reference(
+                "archivexl", "override.tag", "SameTag", mod, f"{mod}.xl",
+                details={"fingerprint": "same"},
+            )
+            for mod in ("A", "B")
+        ]
+        references.extend(
+            [
+                Reference(
+                    "archivexl", "override.tag", "DifferentTag", mod,
+                    f"{mod}.xl", details={"fingerprint": fingerprint},
+                )
+                for mod, fingerprint in (("A", "first"), ("B", "second"))
+            ]
+        )
+        findings = compare_override_references(references)
+        self.assertEqual(
+            {"AXL-OVERRIDE-TAG-CONFLICT", "AXL-OVERRIDE-TAG-DUPLICATE"},
+            {finding.rule_id for finding in findings},
+        )
+
+    def test_override_shape_rejects_out_of_range_chunk(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "bad-overrides.xl"
+            path.write_text(
+                "overrides:\n  tags:\n    Bad:\n      body: {show: [64]}\n",
+                encoding="utf-8",
+            )
+            _documents, references, findings = parse_documents(
+                [artifact(path, "Example")]
+            )
+            self.assertEqual([], references)
+            self.assertEqual("AXL-OVERRIDE-SHAPE", findings[0].rule_id)
+            self.assertEqual(4, findings[0].evidence[0]["line"])
+
     def test_extracts_journal_declaration_with_structural_line(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "journal.xl"
