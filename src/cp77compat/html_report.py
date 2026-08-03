@@ -233,7 +233,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
 
     for (const finding of findings) {
       const prefix = String(finding.rule_id || "").split("-", 1)[0];
-      finding._ecosystem = ({AXL: "ArchiveXL", TXL: "TweakXL", RS: "REDscript", CET: "CET", CORE: "Core", WOLVENKIT: "WolvenKit"})[prefix] || "Other";
+      finding._ecosystem = ({AXL: "ArchiveXL", TXL: "TweakXL", RS: "REDscript", CET: "CET", CFG: "Configuration", CORE: "Core", WOLVENKIT: "WolvenKit"})[prefix] || "Other";
       finding._search = [finding.rule_id, finding.severity, finding.confidence, finding.summary,
         finding.explanation, ...(finding.participants || []), evidenceText(finding.evidence)]
         .join(" ").toLocaleLowerCase();
@@ -379,6 +379,26 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "inactive_references", label: "Inactive refs"}, {key: "note", label: "Notes"}
         ]));
       }
+      if ((analyzer.configuration_formats || []).length) {
+        const label = document.createElement("h3"); label.textContent = "Configuration formats"; group.append(label);
+        group.append(coverageTable(analyzer.configuration_formats, [
+          {key: "name", label: "Format"}, {key: "status", label: "Status"},
+          {key: "documents", label: "Documents"}, {key: "parsed", label: "Parsed"},
+          {key: "failed", label: "Failed"}, {key: "entries", label: "Entries"},
+          {key: "non_utf8", label: "Non-UTF-8"}, {key: "duplicate_keys", label: "Duplicate keys"},
+          {key: "note", label: "Notes"}
+        ]));
+      }
+      if ((analyzer.ownership_operations || []).length) {
+        const label = document.createElement("h3"); label.textContent = "Configuration ownership"; group.append(label);
+        group.append(coverageTable(analyzer.ownership_operations, [
+          {key: "name", label: "Analyzer"}, {key: "status", label: "Status"},
+          {key: "documents", label: "Documents"}, {key: "active_documents", label: "Active"},
+          {key: "scopes", label: "Scopes"}, {key: "shared_scopes", label: "Shared scopes"},
+          {key: "shared_paths", label: "Shared paths"}, {key: "references", label: "References"},
+          {key: "note", label: "Notes"}
+        ]));
+      }
       if ((analyzer.quest_operations || []).length) {
         const label = document.createElement("h3"); label.textContent = "Quest operations"; group.append(label);
         group.append(coverageTable(analyzer.quest_operations, [
@@ -463,7 +483,8 @@ _HTML_TEMPLATE = r'''<!doctype html>
       [summary.archivexl_references, "ArchiveXL references"],
       [summary.tweakxl_references, "TweakXL references"],
       [summary.redscript_references, "REDscript references"],
-      [summary.cet_references, "CET references"], [findings.length, "Findings"]
+      [summary.cet_references, "CET references"],
+      [summary.config_references, "Configuration files"], [findings.length, "Findings"]
     ];
     const statsElement = document.getElementById("stats");
     for (const [value, label] of stats) {

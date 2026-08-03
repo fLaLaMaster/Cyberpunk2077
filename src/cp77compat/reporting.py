@@ -23,6 +23,7 @@ def write_reports(
     tweakxl_references: list[Reference],
     redscript_references: list[Reference],
     cet_references: list[Reference],
+    config_references: list[Reference],
     findings: list[Finding],
     metadata: dict[str, Any],
     coverage: dict[str, Any] | None = None,
@@ -38,6 +39,7 @@ def write_reports(
         "tweakxl_references": len(tweakxl_references),
         "redscript_references": len(redscript_references),
         "cet_references": len(cet_references),
+        "config_references": len(config_references),
         "findings": dict(sorted(Counter(item.severity for item in ordered_findings).items())),
         "coverage": coverage or {},
     }
@@ -111,6 +113,19 @@ def write_reports(
         },
     )
     _write_json(
+        output_dir / "config-findings.json",
+        {
+            "metadata": metadata,
+            "summary": summary,
+            "references": [reference.to_dict() for reference in config_references],
+            "findings": [
+                finding.to_dict()
+                for finding in ordered_findings
+                if finding.rule_id.startswith("CFG-")
+            ],
+        },
+    )
+    _write_json(
         output_dir / "compatibility-findings.json",
         {
             "metadata": metadata,
@@ -132,6 +147,7 @@ def write_reports(
         f"- TweakXL references: {summary['tweakxl_references']}",
         f"- REDscript references: {summary['redscript_references']}",
         f"- CET references: {summary['cet_references']}",
+        f"- Configuration references: {summary['config_references']}",
         "- Findings: " + ", ".join(f"{key}={value}" for key, value in summary["findings"].items()),
         "",
     ]
@@ -232,6 +248,26 @@ def write_reports(
                         f"dynamic globals/API calls={operation['dynamic_globals']}/{operation['dynamic_calls']}; "
                         f"missing modules={operation['unresolved_modules']}; "
                         f"shared hooks={operation['shared_hook_targets']} - {operation['note']}"
+                    )
+            configuration_formats = analyzer.get("configuration_formats", [])
+            if configuration_formats:
+                lines.extend(["", "#### Configuration formats", ""])
+                for operation in configuration_formats:
+                    lines.append(
+                        f"- `{operation['name']}`: {operation['status']}; "
+                        f"documents/parsed/failed={operation['documents']}/{operation['parsed']}/{operation['failed']}; "
+                        f"entries={operation['entries']}; non-UTF-8={operation['non_utf8']}; "
+                        f"duplicate keys={operation['duplicate_keys']} - {operation['note']}"
+                    )
+            ownership_operations = analyzer.get("ownership_operations", [])
+            if ownership_operations:
+                lines.extend(["", "#### Configuration ownership", ""])
+                for operation in ownership_operations:
+                    lines.append(
+                        f"- `{operation['name']}`: {operation['status']}; "
+                        f"documents/active={operation['documents']}/{operation['active_documents']}; "
+                        f"scopes/shared scopes={operation['scopes']}/{operation['shared_scopes']}; "
+                        f"shared paths={operation['shared_paths']} - {operation['note']}"
                     )
             quest_operations = analyzer.get("quest_operations", [])
             if quest_operations:

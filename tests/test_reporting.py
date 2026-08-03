@@ -34,6 +34,7 @@ class HtmlReportTests(unittest.TestCase):
                     "tweakxl_references": 2,
                     "redscript_references": 3,
                     "cet_references": 4,
+                    "config_references": 5,
                     "coverage": {
                         "archivexl": {
                             "documents": 1,
@@ -151,6 +152,26 @@ class HtmlReportTests(unittest.TestCase):
                                 }
                             ],
                         },
+                        "config": {
+                            "documents": 1,
+                            "sections": [],
+                            "configuration_formats": [
+                                {
+                                    "name": "JSON", "status": "analyzed",
+                                    "documents": 1, "parsed": 1, "failed": 0,
+                                    "entries": 2, "non_utf8": 0,
+                                    "duplicate_keys": 0, "note": "Example config coverage",
+                                }
+                            ],
+                            "ownership_operations": [
+                                {
+                                    "name": "configuration ownership", "status": "analyzed",
+                                    "documents": 1, "active_documents": 1,
+                                    "scopes": 1, "shared_scopes": 0, "shared_paths": 0,
+                                    "references": 1, "note": "Example ownership coverage",
+                                }
+                            ],
+                        },
                     },
                 },
                 [finding],
@@ -170,6 +191,8 @@ class HtmlReportTests(unittest.TestCase):
             self.assertIn("World streaming operations", html)
             self.assertIn("REDscript annotation operations", html)
             self.assertIn("CET Lua registrations", html)
+            self.assertIn("Configuration formats", html)
+            self.assertIn("Configuration ownership", html)
             self.assertIn("Runtime log correlation", html)
             self.assertNotIn("</script><script>alert(1)</script>", html)
             match = re.search(

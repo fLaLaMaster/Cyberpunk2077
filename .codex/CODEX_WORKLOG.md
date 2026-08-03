@@ -6,14 +6,52 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.19.0`
+- Scanner version: `0.20.0`
 - Implemented ecosystems: ArchiveXL, TweakXL, REDscript, and CET Lua
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 89 passing
+- Automated tests: 91 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — Shared configuration ownership and validation
+
+Added format-aware inventory and exact-path comparison for staged JSON, TOML,
+INI, and XML configuration files.
+
+Changes:
+
+- Added `shared_config.py` with strict parsers, CP-1252 fallback tracking,
+  duplicate JSON key detection, semantic fingerprints, and one-based parser
+  error lines.
+- Attributed exact deployment paths and broader CET root, engine config,
+  REDscript user-hint, and input configuration scopes to Vortex packages.
+- Compared same-path providers semantically so formatting/key order do not make
+  equivalent JSON/TOML documents look different.
+- Added parse/encoding/duplicate-key, exact-path duplicate/override, and
+  informational multi-package-scope rules.
+- Added `config-findings.json`, configuration HTML filtering/statistics,
+  format/ownership coverage tables, documentation, and scanner version 0.20.0.
+
+Validation:
+
+- All 91 tests pass with warnings promoted to errors.
+- The frozen corpus contains 161 active documents: 138 JSON, 9 TOML, 4 INI,
+  and 10 XML, with 75,392 normalized leaf/element entries.
+- All TOML, INI, and XML files parse. JSON parses 137 of 138 files; no duplicate
+  JSON key was found.
+- Night City Skies `NightCitySkies.schema.json` begins a second top-level JSON
+  object at line 51. The installed Redscript Config Framework calls
+  `ReadAsJson()` once per schema file, so the concatenated document is invalid.
+- Missing Persons `languages\es-es.json` is valid only under CP-1252 because it
+  contains byte `0x96`; this is retained as a compatibility warning.
+- Twenty-two ownership scopes were found. Four are multi-package and
+  informational: `cet:WeatherSwitcher`, `engine-config`, `r6-input`, and
+  `redscript-user-hints`. No exact configuration path has multiple providers.
+- The full cached scan completed in 27.2 seconds. The combined report contains
+  183 findings: 2 conflicts, 11 errors, 18 warnings, 13 reviews, and 139 info.
+- Frozen Vortex and game inputs were not modified.
 
 ### 2026-08-03 — CET explicit global-symbol analysis
 

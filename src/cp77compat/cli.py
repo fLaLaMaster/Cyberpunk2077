@@ -36,6 +36,11 @@ from .deployment import load_deployment
 from .inventory import build_inventory, discover_mods, exact_path_findings
 from .models import Finding
 from .reporting import write_reports
+from .shared_config import (
+    analyze_config_documents,
+    build_config_coverage,
+    parse_config_documents,
+)
 from .redscript import (
     build_redscript_coverage,
     compare_redscript_references,
@@ -244,12 +249,21 @@ def run_scan(args: argparse.Namespace) -> int:
             f"{cet_runtime_coverage['warnings']} warnings, "
             f"{cet_runtime_coverage['findings']} consolidated findings"
         )
+    config_documents, config_references, config_parse_findings = (
+        parse_config_documents(artifacts)
+    )
+    findings.extend(config_parse_findings)
+    findings.extend(analyze_config_documents(config_documents, config_references))
+    coverage["config"] = build_config_coverage(
+        config_documents, config_references
+    )
     print(
         f"Found {len(mods)} mods, {len(artifacts)} files, "
         f"{len(documents)} non-empty ArchiveXL configs, and "
         f"{len(tweak_documents)} non-empty TweakXL configs, "
-        f"{len(redscript_documents)} REDscript files, and "
-        f"{len(cet_documents)} CET Lua files"
+        f"{len(redscript_documents)} REDscript files, "
+        f"{len(cet_documents)} CET Lua files, and "
+        f"{len(config_documents)} shared configuration files"
     )
 
     manifests = []
@@ -508,6 +522,7 @@ def run_scan(args: argparse.Namespace) -> int:
         tweak_references,
         redscript_references,
         cet_references,
+        config_references,
         findings,
         metadata,
         coverage,

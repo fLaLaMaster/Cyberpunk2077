@@ -61,6 +61,9 @@ Implemented analysis includes:
   comparison, and Native Settings path analysis;
 - current CET framework, scripting, and per-mod log parsing with load-state,
   missing-hook, registration, module, and Lua error attribution;
+- JSON, TOML, INI, and XML ownership inventory with strict structural parsing,
+  encoding/duplicate-key diagnostics, semantic fingerprints, exact-path
+  provider comparison, and shared CET/framework scope attribution;
 - deterministic JSON and Markdown reports.
 
 Reports include an analyzer-coverage panel that distinguishes analyzed,
@@ -182,6 +185,20 @@ canonical `<mod-root>.log` files. Loaded, ignored, and failed roots are counted;
 missing RTTI hook targets and Lua source errors are mapped to Vortex artifacts
 and source lines where the logs provide enough information.
 
+Shared configuration analysis covers every staged `.json`, `.toml`, `.ini`,
+and `.xml` file. Format-normalized fingerprints ignore irrelevant JSON/TOML key
+order and formatting when comparing multiple providers of one deployed path.
+Different files contributed to the same CET root, input directory, engine
+configuration domain, or REDscript user-hint directory are retained as
+informational ownership context. XML input IDs are not compared at this layer;
+they are reserved for the dedicated input-mapping analyzer.
+
+Parsing is strict for each underlying format. JSON duplicate keys and non-UTF-8
+fallback decoding are warnings, while malformed documents are errors with a
+source line when the parser exposes one. A failed document remains in the
+ownership inventory and makes semantic coverage partial rather than silently
+disappearing.
+
 ## Run
 
 From this directory:
@@ -267,6 +284,8 @@ different payloads are load-order conflicts.
 - `reports/current/tweakxl-findings.json`: TweakXL references and findings.
 - `reports/current/redscript-findings.json`: REDscript annotations and findings.
 - `reports/current/cet-findings.json`: CET Lua references and runtime findings.
+- `reports/current/config-findings.json`: shared configuration ownership,
+  parsing, and exact-path findings.
 - `reports/current/compatibility-findings.json`: combined machine-readable findings.
 - `reports/current/compatibility-report.html`: searchable, filterable offline report.
 - `reports/current/compatibility-report.md`: concise human-readable report.

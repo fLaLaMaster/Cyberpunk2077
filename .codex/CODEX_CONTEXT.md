@@ -12,8 +12,9 @@ ecosystem-specific semantic compatibility checks.
 
 The scanner is being developed incrementally. ArchiveXL, TweakXL, REDscript,
 and CET Lua are the currently supported ecosystems, including their relevant
-runtime/compiler logs. Planned coverage includes shared input/config files,
-RED4ext native plugins, and runtime correlation for the remaining frameworks.
+runtime/compiler logs. Shared JSON/TOML/INI/XML ownership is also supported.
+Planned coverage includes input mapping semantics, RED4ext native plugins, and
+runtime correlation for the remaining frameworks.
 
 ## Workspace paths
 
@@ -174,6 +175,11 @@ python -m unittest discover -s tests -v
   loaded/ignored/failed roots; and attributes missing hooks, rejected
   registrations, module failures, and Lua errors to staging sources where
   possible.
+- `src/cp77compat/shared_config.py`
+  Inventories JSON, TOML, INI, and XML ownership; parses each format strictly;
+  tracks encoding and duplicate JSON keys; computes format-normalized semantic
+  hashes; compares exact-path providers; and reports broader multi-package
+  configuration scopes without treating them as conflicts.
 - `src/cp77compat/reporting.py`
   Writes inventory, archive manifest, per-ecosystem reference/finding JSON,
   combined findings JSON, Markdown, and HTML reports.
@@ -184,7 +190,7 @@ python -m unittest discover -s tests -v
 - `src/cp77compat/cli.py`
   Orchestrates the scan and exposes CLI options.
 - `tests/`
-  Unit tests for ArchiveXL, TweakXL, REDscript, and CET parsing/comparison; archive
+  Unit tests for ArchiveXL, TweakXL, REDscript, CET, and shared configuration parsing/comparison; archive
   output parsing; loose resource resolution; runtime/compiler-log correlation;
   configuration; and safe HTML embedding.
 
@@ -217,7 +223,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.19.0 scan on 2026-08-03 reported:
+The successful v0.20.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -249,6 +255,11 @@ The successful v0.19.0 scan on 2026-08-03 reported:
 - Definite global-symbol extraction found 492 reachable writes plus two
   computed-name writes across 64 files. `DamageScaling` is the only active root
   assembled from multiple Vortex packages, and it has zero shared exact globals.
+- 161 shared configuration documents were inventoried: 138 JSON, 9 TOML, 4
+  INI, and 10 XML. They contain 75,392 normalized entries across 22 ownership
+  scopes; four scopes have multiple package owners and no exact path is shared.
+- All TOML, INI, and XML documents parse. JSON parses 137 of 138 documents;
+  one JSON file uses CP-1252 and no duplicate JSON key was found.
 - Current CET logs cover 63 files and 19,285 lines. CET 1.37.1 loaded all 61
   active roots, ignored two data directories without `init.lua`, and failed no
   mod roots. Four runtime events produced three consolidated findings.
@@ -287,14 +298,14 @@ The successful v0.19.0 scan on 2026-08-03 reported:
 - The 1,277-line current REDscript compiler log successfully compiled 1,234
   deployed files and saved the modded output. Its zero errors and eight
   warnings were all source-attributed and statically confirmed.
-- 177 consolidated findings overall:
+- 183 consolidated findings overall:
   - 2 conflict candidates.
-  - 10 errors.
-  - 17 warnings.
+  - 11 errors.
+  - 18 warnings.
   - 13 review groups.
-  - 135 informational findings.
+  - 139 informational findings.
 - Zero WolvenKit indexing failures.
-- Eighty-nine automated tests passing with warnings promoted to errors.
+- Ninety-one automated tests passing with warnings promoted to errors.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
@@ -304,8 +315,9 @@ The successful v0.19.0 scan on 2026-08-03 reported:
   v0.13 normal scan completed in 19.7 seconds; the fully cached v0.15 and v0.16
   scans complete in about 20 seconds; the REDscript-enabled v0.17 scan completed
   in about 26 seconds, the CET-enabled v0.18 scan completed in 26.9 seconds,
-  and the global-analysis v0.19 scan completed in 27.5 seconds.
-- All 137,678 ArchiveXL, TweakXL, REDscript, and CET references have one-based declaration/source
+  the global-analysis v0.19 scan completed in 27.5 seconds, and the shared-config
+  v0.20 scan completed in 27.2 seconds.
+- All 137,839 ArchiveXL, TweakXL, REDscript, CET, and configuration references have one-based declaration/source
   lines in the generated reports. Serialized localization, factory, and journal
   entries additionally carry their zero-based payload `entry_index` or
   `row_index`. For minified one-line
@@ -424,6 +436,16 @@ Important current findings:
     packages. Its 14 reachable explicit global functions all belong to the
     Extended entry; the imported standalone GameUI/GameSettings modules expose
     local returned tables, so no cross-package global collision exists.
+36. Night City Skies concatenates two root objects in
+    `NightCitySkies.schema.json`; strict parsing stops at line 51. The installed
+    Redscript Config Framework reads each schema file as one JSON object.
+37. Missing Persons `languages\es-es.json` contains CP-1252 byte `0x96` and is
+    not valid UTF-8. It parses under the fallback encoding but may depend on the
+    behavior of CET's bundled JSON reader.
+38. Four configuration scopes have multiple intentional owners:
+    `cet:WeatherSwitcher`, `engine-config`, `r6-input`, and
+    `redscript-user-hints`. No exact JSON/TOML/INI/XML path is supplied by more
+    than one package.
 
 Analyzer coverage is embedded in all primary reports. It currently records 45
 ArchiveXL documents with `resource` sections and marks all five installed
@@ -458,6 +480,10 @@ loaded/ignored/failed roots, source-attributed runtime events, and compact
 findings. Definite explicit global writes are compared across packages inside
 merged roots. Computed names and ambiguous lexical writes remain partial rather
 than being guessed.
+Configuration coverage records format-level parse/entry/encoding results,
+format-normalized semantic fingerprints, exact shared paths, and broader
+multi-package ownership scopes. XML structure is validated here, while input
+mapping IDs remain reserved for the next dedicated analyzer.
 The four installed `overrides.tags` documents are fully analyzed using
 ArchiveXL-equivalent effective component masks and whole-definition last-wins
 semantics. Their 12 tag names are all distinct.
