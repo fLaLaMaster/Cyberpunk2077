@@ -31,6 +31,8 @@ Implemented analysis includes:
   edit markers;
 - ArchiveXL `overrides.tags` parsing for hide/show chunk lists, shorthand hide
   lists, and raw masks, with whole-tag last-wins collision checks;
+- ArchiveXL `player.bodyTypes` parsing with exact body-type and `Body:<name>`
+  tag identities, scalar/list validation, and idempotent duplicate detection;
 - ArchiveXL character-customization payload inspection with case-sensitive
   group, named-option, anonymous slot/link selector, native-type, and
   type-specific choice comparison;
@@ -66,6 +68,12 @@ names are case-sensitive, and a later same-name tag replaces the entire earlier
 definition. Identical definitions are informational duplicates; different
 definitions are load-order conflicts even when their component lists are
 disjoint.
+
+Player body-type analysis follows ArchiveXL's PuppetState configuration and
+accepts either one scalar name or a list of scalar names. Each name registers a
+case-sensitive body type and matching `Body:<name>` tag. Distinct names compose
+in ArchiveXL's global containers; an exact registration repeated by multiple
+mods is reported as informational and idempotent.
 
 Character-customization analysis follows ArchiveXL's two-pass merge model:
 named options merge first, then anonymous `uiSlot`/`link` selectors. Compatible

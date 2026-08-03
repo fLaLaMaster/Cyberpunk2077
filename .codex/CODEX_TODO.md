@@ -54,7 +54,7 @@ frozen-corpus validation pass are complete.
 - [x] Add `customizations` identity and slot/group collision checks.
 - [x] Determine whether duplicate streaming node deletions are always unsafe,
   idempotent, or rule-dependent; adjust confidence/severity accordingly.
-- [ ] Parse the one installed ArchiveXL `player` declaration and compare its
+- [x] Parse the one installed ArchiveXL `player` declaration and compare its
   effective player-state operation identities.
 - [ ] Parse `streaming.nodeMutations` below sector level and distinguish
   disjoint property/element mutations from incompatible writes.

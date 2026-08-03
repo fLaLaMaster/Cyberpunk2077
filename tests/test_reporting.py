@@ -44,6 +44,17 @@ class HtmlReportTests(unittest.TestCase):
                                 }
                             ],
                             "resource_operations": [],
+                            "player_operations": [
+                                {
+                                    "name": "player.bodyTypes",
+                                    "status": "analyzed",
+                                    "documents": 1,
+                                    "registrations": 1,
+                                    "unique_body_types": 1,
+                                    "shared_body_types": 0,
+                                    "note": "Example player coverage",
+                                }
+                            ],
                             "runtime_logs": [
                                 {
                                     "name": "latest TweakXL log",
@@ -87,6 +98,7 @@ class HtmlReportTests(unittest.TestCase):
             self.assertIn('id="ecosystem"', html)
             self.assertIn('id="coverage"', html)
             self.assertIn("Payload inspection", html)
+            self.assertIn("Player body types", html)
             self.assertIn("Runtime log correlation", html)
             self.assertNotIn("</script><script>alert(1)</script>", html)
             match = re.search(

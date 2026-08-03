@@ -54,8 +54,8 @@ SECTION_COVERAGE = {
         "Visual-tag component overrides are parsed and same-name definitions are compared.",
     ),
     "player": (
-        "unsupported",
-        "Player declarations are not interpreted yet.",
+        "analyzed",
+        "Body-type registrations and their case-sensitive Body:<name> tag identities are parsed and compared.",
     ),
     "quest": (
         "partial",
@@ -219,6 +219,17 @@ def _integer(value: Any) -> int | None:
         except ValueError:
             return None
     return None
+
+
+def _yaml_scalar_text(value: Any) -> str | None:
+    """Match yaml-cpp's acceptance of any non-null YAML scalar."""
+    if isinstance(value, ArchiveXLTagged):
+        return _yaml_scalar_text(value.value)
+    if value is None or isinstance(value, (dict, list)):
+        return None
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
 
 
 def parse_documents(artifacts: Iterable[Artifact]) -> tuple[list[ArchiveXLDocument], list[Reference], list[Finding]]:
@@ -984,6 +995,64 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
     data = document.data
     refs: list[Reference] = []
 
+    player = data.get("player")
+    player_line = _mapping_line(data, "player")
+    if "player" in data:
+        invalid_lines: list[int | None] = []
+        body_types: list[tuple[str, int | None]] = []
+        if not isinstance(player, dict):
+            invalid_lines.append(player_line)
+        else:
+            has_body_types = "bodyTypes" in player
+            raw_body_types = player.get("bodyTypes")
+            body_types_line = _mapping_line(player, "bodyTypes", player_line)
+            if isinstance(raw_body_types, list):
+                for value, line in _sequence_entries(raw_body_types):
+                    body_type = _yaml_scalar_text(value)
+                    if body_type is None:
+                        invalid_lines.append(line or body_types_line)
+                    else:
+                        body_types.append((body_type, line or body_types_line))
+            elif has_body_types:
+                body_type = _yaml_scalar_text(raw_body_types)
+                if body_type is None:
+                    invalid_lines.append(body_types_line)
+                else:
+                    body_types.append((body_type, body_types_line))
+
+        if invalid_lines:
+            findings.append(
+                Finding(
+                    rule_id="AXL-PLAYER-SHAPE",
+                    severity="error",
+                    confidence="high",
+                    summary="Invalid ArchiveXL player.bodyTypes declaration",
+                    explanation=(
+                        "ArchiveXL expects player.bodyTypes to be a scalar body-type "
+                        "name or a sequence containing only scalar names. Valid scalar "
+                        "items in a mixed sequence are still registered."
+                    ),
+                    participants=[document.artifact.mod_name],
+                    evidence=[
+                        {
+                            "path": str(document.artifact.absolute_path),
+                            "line": line,
+                        }
+                        for line in invalid_lines
+                    ],
+                )
+            )
+        for body_type, line in body_types:
+            refs.append(
+                _reference(
+                    document,
+                    "player.body_type",
+                    body_type,
+                    line,
+                    body_tag=f"Body:{body_type}",
+                )
+            )
+
     customizations = data.get("customizations")
     customization_line = _mapping_line(data, "customizations")
     if customizations is not None:
@@ -1435,6 +1504,58 @@ def compare_references(references: Iterable[Reference]) -> list[Finding]:
                         ],
                     }
                     for identity, refs in overlaps
+                ],
+            )
+        )
+    return findings
+
+
+def compare_player_references(references: Iterable[Reference]) -> list[Finding]:
+    """Compare PuppetState registrations using ArchiveXL's exact CName strings."""
+    by_body_type: dict[str, list[Reference]] = defaultdict(list)
+    for reference in references:
+        if reference.kind == "player.body_type":
+            # REDengine CNames and Body:<name> tags are case-sensitive.
+            by_body_type[reference.identity].append(reference)
+
+    duplicates: dict[tuple[str, ...], list[tuple[str, list[Reference]]]] = defaultdict(list)
+    for body_type, group in by_body_type.items():
+        participants = tuple(
+            sorted({reference.mod_name for reference in group}, key=str.casefold)
+        )
+        if len(participants) > 1:
+            duplicates[participants].append((body_type, group))
+    if not duplicates:
+        return []
+
+    findings: list[Finding] = []
+    for participants, registrations in sorted(
+        duplicates.items(),
+        key=lambda item: tuple(participant.casefold() for participant in item[0]),
+    ):
+        count = len(registrations)
+        noun = "body-type registration" if count == 1 else "body-type registrations"
+        findings.append(
+            Finding(
+                rule_id="AXL-PLAYER-BODY-TYPE-DUPLICATE",
+                severity="info",
+                confidence="high",
+                summary=f"{count} idempotent player {noun}",
+                explanation=(
+                    "These mods register the same case-sensitive player body type and "
+                    "Body:<name> tag. ArchiveXL inserts both identities into global "
+                    "set/map containers, so repeating the exact registration is idempotent."
+                ),
+                participants=list(participants),
+                evidence=[
+                    {
+                        "identity": body_type,
+                        "body_tag": f"Body:{body_type}",
+                        "references": [reference.to_dict() for reference in group],
+                    }
+                    for body_type, group in sorted(
+                        registrations, key=lambda item: item[0].casefold()
+                    )
                 ],
             )
         )
@@ -1917,12 +2038,40 @@ def build_archivexl_coverage(
                 ),
             }
         )
+    player_refs = [
+        reference
+        for reference in reference_list
+        if reference.kind == "player.body_type"
+    ]
+    player_operations = []
+    if "player" in section_documents:
+        by_body_type: dict[str, list[Reference]] = defaultdict(list)
+        for reference in player_refs:
+            by_body_type[reference.identity].append(reference)
+        player_operations.append(
+            {
+                "name": "player.bodyTypes",
+                "documents": len(section_documents["player"]),
+                "registrations": len(player_refs),
+                "unique_body_types": len(by_body_type),
+                "shared_body_types": sum(
+                    len({reference.mod_name for reference in group}) > 1
+                    for group in by_body_type.values()
+                ),
+                "status": "analyzed",
+                "note": (
+                    "Body-type and Body:<name> tag identities are case-sensitive. "
+                    "Distinct registrations compose and exact duplicates are idempotent."
+                ),
+            }
+        )
     return {
         "documents": len(document_list),
         "sections": sections,
         "resource_operations": resource_operations,
         "quest_operations": quest_operations,
         "override_operations": override_operations,
+        "player_operations": player_operations,
     }
 
 

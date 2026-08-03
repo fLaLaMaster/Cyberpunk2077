@@ -137,6 +137,18 @@ def write_reports(
                         f"built-in redefinitions={operation['builtin_redefinitions']} - "
                         f"{operation['note']}"
                     )
+            player_operations = analyzer.get("player_operations", [])
+            if player_operations:
+                lines.extend(["", "#### Player body types", ""])
+                for operation in player_operations:
+                    lines.append(
+                        f"- `{operation['name']}`: {operation['status']}; "
+                        f"documents={operation['documents']}; "
+                        f"registrations={operation['registrations']}; "
+                        f"unique/shared body types="
+                        f"{operation['unique_body_types']}/"
+                        f"{operation['shared_body_types']} - {operation['note']}"
+                    )
             quest_operations = analyzer.get("quest_operations", [])
             if quest_operations:
                 lines.extend(["", "#### Quest operations", ""])

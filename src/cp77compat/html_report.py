@@ -324,6 +324,15 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "note", label: "Coverage note"}
         ]));
       }
+      if ((analyzer.player_operations || []).length) {
+        const label = document.createElement("h3"); label.textContent = "Player body types"; group.append(label);
+        group.append(coverageTable(analyzer.player_operations, [
+          {key: "name", label: "Operation"}, {key: "status", label: "Status"},
+          {key: "documents", label: "Documents"}, {key: "registrations", label: "Registrations"},
+          {key: "unique_body_types", label: "Unique"}, {key: "shared_body_types", label: "Shared"},
+          {key: "note", label: "Notes"}
+        ]));
+      }
       if ((analyzer.quest_operations || []).length) {
         const label = document.createElement("h3"); label.textContent = "Quest operations"; group.append(label);
         group.append(coverageTable(analyzer.quest_operations, [

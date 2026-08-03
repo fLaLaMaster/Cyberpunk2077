@@ -8,6 +8,7 @@ from cp77compat.archives import parse_archive_list_output
 from cp77compat.archivexl import (
     build_archivexl_coverage,
     compare_override_references,
+    compare_player_references,
     compare_quest_references,
     compare_references,
     compare_resource_references,
@@ -244,6 +245,81 @@ class ArchiveXLTests(unittest.TestCase):
             {"AXL-OVERRIDE-TAG-CONFLICT", "AXL-OVERRIDE-TAG-DUPLICATE"},
             {finding.rule_id for finding in findings},
         )
+
+    def test_extracts_player_body_types_with_exact_names_and_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "player.xl"
+            path.write_text(
+                "player:\n  bodyTypes:\n    - ANGEL\n    - Angel\n",
+                encoding="utf-8",
+            )
+            documents, references, findings = parse_documents(
+                [artifact(path, "Example")]
+            )
+            self.assertEqual([], findings)
+            self.assertEqual(
+                [("ANGEL", 3, "Body:ANGEL"), ("Angel", 4, "Body:Angel")],
+                [
+                    (reference.identity, reference.line, reference.details["body_tag"])
+                    for reference in references
+                ],
+            )
+            self.assertTrue(
+                all(reference.kind == "player.body_type" for reference in references)
+            )
+            coverage = build_archivexl_coverage(documents, references)
+            section = next(
+                item for item in coverage["sections"] if item["name"] == "player"
+            )
+            self.assertEqual("analyzed", section["status"])
+            operation = coverage["player_operations"][0]
+            self.assertEqual(2, operation["registrations"])
+            self.assertEqual(2, operation["unique_body_types"])
+
+    def test_player_mixed_sequence_keeps_valid_scalars_and_reports_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "bad-player.xl"
+            path.write_text(
+                "player:\n  bodyTypes: [ANGEL, {bad: value}]\n",
+                encoding="utf-8",
+            )
+            _documents, references, findings = parse_documents(
+                [artifact(path, "Example")]
+            )
+            self.assertEqual(["ANGEL"], [reference.identity for reference in references])
+            self.assertEqual("AXL-PLAYER-SHAPE", findings[0].rule_id)
+            self.assertEqual(2, findings[0].evidence[0]["line"])
+
+    def test_player_accepts_single_scalar_body_type(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "scalar-player.xl"
+            path.write_text("player:\n  bodyTypes: SOLO\n", encoding="utf-8")
+            _documents, references, findings = parse_documents(
+                [artifact(path, "Example")]
+            )
+            self.assertEqual([], findings)
+            self.assertEqual([("SOLO", 2)], [
+                (reference.identity, reference.line) for reference in references
+            ])
+
+    def test_player_duplicate_comparison_is_case_sensitive_and_idempotent(self) -> None:
+        references = [
+            Reference(
+                "archivexl",
+                "player.body_type",
+                body_type,
+                mod,
+                f"{mod}.xl",
+                details={"body_tag": f"Body:{body_type}"},
+            )
+            for mod, body_type in (("A", "ANGEL"), ("B", "ANGEL"), ("C", "Angel"))
+        ]
+        findings = compare_player_references(references)
+        self.assertEqual(1, len(findings))
+        self.assertEqual("AXL-PLAYER-BODY-TYPE-DUPLICATE", findings[0].rule_id)
+        self.assertEqual("info", findings[0].severity)
+        self.assertEqual(["A", "B"], findings[0].participants)
+        self.assertEqual("ANGEL", findings[0].evidence[0]["identity"])
 
     def test_override_shape_rejects_out_of_range_chunk(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

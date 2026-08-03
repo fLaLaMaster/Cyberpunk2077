@@ -129,7 +129,8 @@ python -m unittest discover -s tests -v
   indexed archives or loose mod files, and compares whole-definition,
   case-sensitive visual-tag component overrides. Streaming node deletion
   references preserve native type, declared/effective scope, expected element
-  counts, and actor/instance/shape indices.
+  counts, and actor/instance/shape indices. Player body-type declarations are
+  parsed into exact case-sensitive body type and `Body:<name>` tag identities.
 - `src/cp77compat/archivexl_runtime.py`
   Selects the newest ArchiveXL session, streams all rotated chunks in
   chronological order, pairs root-cause and consequence messages, attributes
@@ -191,7 +192,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.14.0 scan on 2026-08-03 reported:
+The successful v0.15.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -199,8 +200,9 @@ The successful v0.14.0 scan on 2026-08-03 reported:
   framework bundle placeholder.
 - 78 ArchiveXL-related archives indexed.
 - 5,458 indexed archive members.
-- 58,749 extracted ArchiveXL references, including 596 child/parent references
-  from 298 quest phase merges, 4,124 serialized localization entries, 14
+- 58,750 extracted ArchiveXL references, including one `player.body_type`
+  registration, 596 child/parent references from 298 quest phase merges, 4,124
+  serialized localization entries, 14
   factory entity rows, 232 serialized journal entries, and 8,302 target-scoped
   resource patch inner identities.
 - Thirty male/female customization declarations resolved to 29 unique archive
@@ -248,15 +250,16 @@ The successful v0.14.0 scan on 2026-08-03 reported:
   - 16 review groups.
   - 24 informational findings.
 - Zero WolvenKit indexing failures.
-- Seventy automated tests passing.
+- Seventy-four automated tests passing.
 - First payload-populating scan time was 546 seconds; the immediate fully cached
   normal scan completed in 9.51 seconds. The fully cached factory-enabled scan
   completed in 8.97 seconds. The first shared-patch pass completed in 73.9
   seconds. The v0.7 dependency-enabled fully cached scan completes in about
   17.8 seconds, including indexing the local official TweakDB sources. The first
   customization payload pass completed in 110.9 seconds; the fully cached
-  v0.13 normal scan completed in 19.7 seconds.
-- All 116,204 ArchiveXL and TweakXL references have one-based declaration/source
+  v0.13 normal scan completed in 19.7 seconds; the fully cached v0.15 scans
+  complete in about 20 seconds.
+- All 116,205 ArchiveXL and TweakXL references have one-based declaration/source
   lines in the generated reports. Serialized localization, factory, and journal
   entries additionally carry their zero-based payload `entry_index` or
   `row_index`. For minified one-line
@@ -358,6 +361,10 @@ payload level. Coverage includes exact resource resolution, ArchiveXL's
 anonymous appearance inheritance, named linked-option behavior, wildcard slot
 matching, group append semantics, native option types, and appearance/morph/
 switcher choice replacement identities.
+The one installed `player.bodyTypes` document is fully analyzed. It registers
+the case-sensitive `ANGEL` body type and `Body:ANGEL` tag at source line 27;
+there are no cross-mod duplicates. Exact duplicates would be informational and
+idempotent, while distinct body-type registrations compose.
 Streaming deletion analysis distinguishes full nodes, partial actors/instances,
 and collision shapes. Same-type full deletions and ordinary partial deletions
 are idempotent/composable; native-type or expected-element disagreements are

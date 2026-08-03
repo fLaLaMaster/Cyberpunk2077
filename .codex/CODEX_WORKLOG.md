@@ -6,14 +6,44 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.14.0`
+- Scanner version: `0.15.0`
 - Implemented ecosystems: ArchiveXL and TweakXL
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 70 passing
+- Automated tests: 74 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — ArchiveXL player body-type semantics
+
+Completed declaration-level analysis of ArchiveXL `player.bodyTypes` using the
+installed upstream PuppetState implementation.
+
+Changes:
+
+- Accepted ArchiveXL's scalar-or-sequence form and retained exact one-based
+  source lines for every valid scalar.
+- Added `AXL-PLAYER-SHAPE` for non-scalar declarations while preserving valid
+  scalar registrations from a mixed sequence, matching ArchiveXL's behavior.
+- Extracted case-sensitive `player.body_type` references and their effective
+  `Body:<name>` tag identities.
+- Added high-confidence informational detection for exact cross-mod duplicate
+  registrations. Distinct names compose; exact repeats are idempotent because
+  ArchiveXL inserts the body types and tags into global set/map containers.
+- Added player-operation coverage to JSON, Markdown, and HTML reports and
+  bumped the scanner to version 0.15.0.
+
+Validation:
+
+- All 74 automated tests pass with warnings promoted to errors.
+- The frozen corpus contains one player document and one registration:
+  `ANGEL` / `Body:ANGEL` at `ANGEL.xl` line 27.
+- No installed mod shares that body type, so the new analyzer adds no finding.
+- The complete cached scan succeeded in about 20 seconds and now emits 58,750
+  ArchiveXL references. The overall 59-finding distribution is unchanged.
+- No PuppetState-specific error appears in the newest ArchiveXL runtime logs.
+- Frozen Vortex and game inputs were not modified.
 
 ### 2026-08-03 — ArchiveXL streaming-node deletion semantics
 

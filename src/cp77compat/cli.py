@@ -12,6 +12,7 @@ from .archivexl_runtime import analyze_archivexl_runtime_logs
 from .archivexl import (
     build_archivexl_coverage,
     compare_override_references,
+    compare_player_references,
     compare_quest_references,
     compare_references,
     compare_resource_references,
@@ -117,6 +118,7 @@ def run_scan(args: argparse.Namespace) -> int:
     findings.extend(compare_resource_references(references))
     findings.extend(compare_quest_references(references))
     findings.extend(compare_override_references(references))
+    findings.extend(compare_player_references(references))
     coverage = {"archivexl": build_archivexl_coverage(documents, references)}
     tweak_documents, tweak_references, tweak_findings = parse_tweak_documents(artifacts)
     findings.extend(tweak_findings)
