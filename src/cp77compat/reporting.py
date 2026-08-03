@@ -25,6 +25,7 @@ def write_reports(
     cet_references: list[Reference],
     config_references: list[Reference],
     input_references: list[Reference],
+    native_references: list[Reference],
     findings: list[Finding],
     metadata: dict[str, Any],
     coverage: dict[str, Any] | None = None,
@@ -42,6 +43,7 @@ def write_reports(
         "cet_references": len(cet_references),
         "config_references": len(config_references),
         "input_references": len(input_references),
+        "native_references": len(native_references),
         "findings": dict(sorted(Counter(item.severity for item in ordered_findings).items())),
         "coverage": coverage or {},
     }
@@ -141,6 +143,19 @@ def write_reports(
         },
     )
     _write_json(
+        output_dir / "native-findings.json",
+        {
+            "metadata": metadata,
+            "summary": summary,
+            "references": [reference.to_dict() for reference in native_references],
+            "findings": [
+                finding.to_dict()
+                for finding in ordered_findings
+                if finding.rule_id.startswith("NATIVE-")
+            ],
+        },
+    )
+    _write_json(
         output_dir / "compatibility-findings.json",
         {
             "metadata": metadata,
@@ -164,6 +179,7 @@ def write_reports(
         f"- CET references: {summary['cet_references']}",
         f"- Configuration references: {summary['config_references']}",
         f"- Input mapping references: {summary['input_references']}",
+        f"- Native binary references: {summary['native_references']}",
         "- Findings: " + ", ".join(f"{key}={value}" for key, value in summary["findings"].items()),
         "",
     ]
@@ -300,6 +316,49 @@ def write_reports(
                         f"{operation['shared_append_nodes']}/{operation['competing_nodes']}; "
                         f"missing/cache mismatches={operation['missing_targets']}/"
                         f"{operation['cache_mismatches']} - {operation['note']}"
+                    )
+            native_operations = analyzer.get("native_operations", [])
+            if native_operations:
+                lines.extend(["", "#### Native binaries and dependencies", ""])
+                for operation in native_operations:
+                    lines.append(
+                        f"- `{operation['name']}`: {operation['status']}; "
+                        f"documents/active={operation['documents']}/{operation['active_documents']}; "
+                        f"references/imports={operation['references']}/{operation['imports']}; "
+                        f"plugin binaries/loaded/companions={operation['plugin_binaries']}/"
+                        f"{operation['loaded_plugins']}/{operation['companion_libraries']}; "
+                        f"non-system/missing imports={operation['non_system_imports']}/"
+                        f"{operation['missing_imports']}; shared paths={operation['shared_paths']}; "
+                        f"deployment mismatches={operation['deployment_mismatches']} - {operation['note']}"
+                    )
+            native_plugins = analyzer.get("native_plugins", [])
+            if native_plugins:
+                lines.extend(["", "#### RED4ext plugins", ""])
+                for plugin in native_plugins:
+                    lines.append(
+                        f"- `{plugin['name']}`: {plugin['runtime_state']}; "
+                        f"runtime/file version={plugin['runtime_version'] or 'unknown'}/"
+                        f"{plugin['file_version'] or 'unknown'}; imports={plugin['imports']}; "
+                        f"deployment match={plugin['deployment_match']} - {plugin['note']}"
+                    )
+            framework_versions = analyzer.get("framework_versions", [])
+            if framework_versions:
+                lines.extend(["", "#### Native framework versions", ""])
+                for framework in framework_versions:
+                    lines.append(
+                        f"- `{framework['name']}`: {framework['status']}; "
+                        f"version={framework['version'] or 'unknown'}; "
+                        f"game={framework['game_file_version'] or framework['game_product_version'] or 'unknown'} - "
+                        f"{framework['note']}"
+                    )
+            framework_logs = analyzer.get("framework_logs", [])
+            if framework_logs:
+                lines.extend(["", "#### Native plugin logs", ""])
+                for log in framework_logs:
+                    lines.append(
+                        f"- `{log['name']}`: {log['status']}; files={log['files']}; "
+                        f"errors/warnings={log['errors'] if log['errors'] is not None else 'delegated'}/"
+                        f"{log['warnings'] if log['warnings'] is not None else 'delegated'} - {log['note']}"
                     )
             quest_operations = analyzer.get("quest_operations", [])
             if quest_operations:

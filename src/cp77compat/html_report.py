@@ -233,7 +233,7 @@ _HTML_TEMPLATE = r'''<!doctype html>
 
     for (const finding of findings) {
       const prefix = String(finding.rule_id || "").split("-", 1)[0];
-      finding._ecosystem = ({AXL: "ArchiveXL", TXL: "TweakXL", RS: "REDscript", CET: "CET", CFG: "Configuration", INPUT: "Input mappings", CORE: "Core", WOLVENKIT: "WolvenKit"})[prefix] || "Other";
+      finding._ecosystem = ({AXL: "ArchiveXL", TXL: "TweakXL", RS: "REDscript", CET: "CET", CFG: "Configuration", INPUT: "Input mappings", NATIVE: "Native frameworks", CORE: "Core", WOLVENKIT: "WolvenKit"})[prefix] || "Other";
       finding._search = [finding.rule_id, finding.severity, finding.confidence, finding.summary,
         finding.explanation, ...(finding.participants || []), evidenceText(finding.evidence)]
         .join(" ").toLocaleLowerCase();
@@ -413,6 +413,47 @@ _HTML_TEMPLATE = r'''<!doctype html>
           {key: "note", label: "Notes"}
         ]));
       }
+      if ((analyzer.native_operations || []).length) {
+        const label = document.createElement("h3"); label.textContent = "Native binaries and dependencies"; group.append(label);
+        group.append(coverageTable(analyzer.native_operations, [
+          {key: "name", label: "Analyzer"}, {key: "status", label: "Status"},
+          {key: "documents", label: "Binaries"}, {key: "active_documents", label: "Active"},
+          {key: "references", label: "References"}, {key: "plugin_binaries", label: "Plugin DLLs"},
+          {key: "loaded_plugins", label: "Loaded"}, {key: "companion_libraries", label: "Companions"},
+          {key: "imports", label: "Imports"}, {key: "non_system_imports", label: "Game-local imports"},
+          {key: "missing_imports", label: "Missing imports"}, {key: "shared_paths", label: "Shared paths"},
+          {key: "deployment_mismatches", label: "Deployment mismatches"}, {key: "note", label: "Notes"}
+        ]));
+      }
+      if ((analyzer.native_plugins || []).length) {
+        const label = document.createElement("h3"); label.textContent = "RED4ext plugins"; group.append(label);
+        group.append(coverageTable(analyzer.native_plugins, [
+          {key: "name", label: "Plugin"}, {key: "runtime_state", label: "Runtime state"},
+          {key: "runtime_version", label: "Runtime version"}, {key: "file_version", label: "File version"},
+          {key: "binary", label: "Binary"}, {key: "imports", label: "Imports"},
+          {key: "non_system_imports", label: "Game-local imports"},
+          {key: "deployment_match", label: "Deployment match"}, {key: "note", label: "Notes"}
+        ]));
+      }
+      if ((analyzer.framework_versions || []).length) {
+        const label = document.createElement("h3"); label.textContent = "Native framework versions"; group.append(label);
+        group.append(coverageTable(analyzer.framework_versions, [
+          {key: "name", label: "Framework"}, {key: "status", label: "Status"},
+          {key: "version", label: "Version"}, {key: "game_product_version", label: "Game product"},
+          {key: "game_file_version", label: "Game executable"}, {key: "log_path", label: "Selected log"},
+          {key: "note", label: "Notes"}
+        ]));
+      }
+      if ((analyzer.framework_logs || []).length) {
+        const label = document.createElement("h3"); label.textContent = "Native plugin logs"; group.append(label);
+        group.append(coverageTable(analyzer.framework_logs, [
+          {key: "name", label: "Plugin"}, {key: "status", label: "Status"},
+          {key: "files", label: "Files"}, {key: "lines", label: "Lines"},
+          {key: "errors", label: "Errors"}, {key: "warnings", label: "Warnings"},
+          {key: "delegated_to", label: "Delegated analyzer"}, {key: "log_path", label: "Selected log"},
+          {key: "note", label: "Notes"}
+        ]));
+      }
       if ((analyzer.quest_operations || []).length) {
         const label = document.createElement("h3"); label.textContent = "Quest operations"; group.append(label);
         group.append(coverageTable(analyzer.quest_operations, [
@@ -499,7 +540,8 @@ _HTML_TEMPLATE = r'''<!doctype html>
       [summary.redscript_references, "REDscript references"],
       [summary.cet_references, "CET references"],
       [summary.config_references, "Configuration files"],
-      [summary.input_references, "Input references"], [findings.length, "Findings"]
+      [summary.input_references, "Input references"],
+      [summary.native_references, "Native references"], [findings.length, "Findings"]
     ];
     const statsElement = document.getElementById("stats");
     for (const [value, label] of stats) {

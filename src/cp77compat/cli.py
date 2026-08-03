@@ -36,6 +36,7 @@ from .deployment import load_deployment
 from .inventory import build_inventory, discover_mods, exact_path_findings
 from .input_mapping import analyze_input_documents, parse_input_documents
 from .models import Finding
+from .native import analyze_native_binaries, parse_native_binaries
 from .reporting import write_reports
 from .shared_config import (
     analyze_config_documents,
@@ -266,6 +267,14 @@ def run_scan(args: argparse.Namespace) -> int:
     )
     findings.extend(input_findings)
     coverage["input"] = input_coverage
+    native_binaries, native_references = parse_native_binaries(artifacts, args.game)
+    native_findings, native_coverage = analyze_native_binaries(
+        native_binaries,
+        native_references,
+        args.game,
+    )
+    findings.extend(native_findings)
+    coverage["native"] = native_coverage
     print(
         f"Found {len(mods)} mods, {len(artifacts)} files, "
         f"{len(documents)} non-empty ArchiveXL configs, and "
@@ -273,7 +282,13 @@ def run_scan(args: argparse.Namespace) -> int:
         f"{len(redscript_documents)} REDscript files, "
         f"{len(cet_documents)} CET Lua files, and "
         f"{len(config_documents)} shared configuration files, and "
-        f"{len(input_documents)} Input Loader XML fragments"
+        f"{len(input_documents)} Input Loader XML fragments, and "
+        f"{len(native_binaries)} native DLL/ASI files"
+    )
+    print(
+        f"Validated {native_coverage['native_operations'][0]['loaded_plugins']} "
+        f"RED4ext plugin loads and "
+        f"{native_coverage['native_operations'][0]['imports']} hard DLL imports"
     )
 
     manifests = []
@@ -534,6 +549,7 @@ def run_scan(args: argparse.Namespace) -> int:
         cet_references,
         config_references,
         input_references,
+        native_references,
         findings,
         metadata,
         coverage,

@@ -11,10 +11,9 @@ resources inside `.archive` files with WolvenKit CLI, and performs
 ecosystem-specific semantic compatibility checks.
 
 The scanner is being developed incrementally. ArchiveXL, TweakXL, REDscript,
-CET Lua, and Input Loader XML are the currently supported ecosystems, including
+CET Lua, Input Loader XML, and RED4ext/native plugins are supported, including
 their relevant runtime/compiler logs. Shared JSON/TOML/INI/XML ownership is also
-supported. Planned coverage includes RED4ext native plugins and runtime
-correlation for the remaining frameworks.
+supported.
 
 ## Workspace paths
 
@@ -185,6 +184,12 @@ python -m unittest discover -s tests -v
   exact whole-node replacement and child-append semantics; resolves mapping,
   context, and action targets; compares vanilla definitions; validates the two
   generated cache files; and correlates `input_loader.log`.
+- `src/cp77compat/native.py`
+  Inventories DLL/ASI providers without executing them; compares staging and
+  deployed hashes; extracts Windows fixed file versions and PE normal/delay
+  imports; resolves native dependencies; correlates RED4ext plugin load states,
+  framework/game versions, and structured plugin logs; and delegates
+  ArchiveXL, TweakXL, and Input Loader diagnostics to dedicated analyzers.
 - `src/cp77compat/reporting.py`
   Writes inventory, archive manifest, per-ecosystem reference/finding JSON,
   combined findings JSON, Markdown, and HTML reports.
@@ -228,7 +233,7 @@ usable at large scale.
 
 ## Current verified baseline
 
-The successful v0.21.0 scan on 2026-08-03 reported:
+The successful v0.22.0 scan on 2026-08-03 reported:
 
 - 266 Vortex mod directories.
 - 3,476 files.
@@ -463,6 +468,11 @@ Important current findings:
     `Dodge_Button`; its `ToggleSprint_Button` definition is identical to the
     current vanilla definition. Both generated caches match all seven active
     fragments, and the startup log contains no diagnostics.
+41. All 19 selected native DLL/ASI files match their deployed copies. Their PE
+    tables contain 232 hard imports; the only game-local import is RadioExt's
+    resolved `fmod.dll` companion. RED4ext 1.30.0 confirms 13 plugin
+    entrypoints on game product 2.31 / executable 3.0.80.51928. CET 1.37.1
+    reports the same executable version, and native logs add no diagnostics.
 
 Analyzer coverage is embedded in all primary reports. It currently records 45
 ArchiveXL documents with `resource` sections and marks all five installed
@@ -502,6 +512,9 @@ format-normalized semantic fingerprints, exact shared paths, and broader
 multi-package ownership scopes. Input Loader coverage separately records XML
 node/reference counts, vanilla replacements/appends, cross-mod identities,
 missing targets, generated-cache mismatches, and current startup-log results.
+Native coverage records DLL/ASI hashes and deployed equality, PE imports,
+fixed file versions, RED4ext runtime names/versions/authors, companion-library
+classification, framework/game versions, and direct/delegated plugin-log state.
 The four installed `overrides.tags` documents are fully analyzed using
 ArchiveXL-equivalent effective component masks and whole-definition last-wins
 semantics. Their 12 tag names are all distinct.
@@ -558,6 +571,9 @@ current compiler log confirms all eight active replacement-overwrite warnings.
 - `reports/current/input-findings.json`
   All Input Loader XML references with source lines, merge findings, vanilla
   comparison, generated-cache validation, and startup-log coverage.
+- `reports/current/native-findings.json`
+  Native DLL/ASI references, hashes, versions, PE dependencies,
+  deployed/runtime state, and native framework findings.
 - `reports/current/compatibility-findings.json`
   Combined machine-readable findings without the full reference inventories.
 - `reports/current/archive-manifests.json`

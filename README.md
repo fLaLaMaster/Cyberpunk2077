@@ -68,6 +68,9 @@ Implemented analysis includes:
   replacement versus child-append semantics, nested action identity checks,
   mapping/context/action target resolution, vanilla override detection,
   generated-cache validation, and startup-log correlation;
+- RED4ext/native binary inventory with byte-level deployment verification,
+  Windows file versions, PE normal/delay import resolution, plugin load-state
+  correlation, framework/game version comparison, and plugin-log diagnostics;
 - deterministic JSON and Markdown reports.
 
 Reports include an analyzer-coverage panel that distinguishes analyzed,
@@ -213,6 +216,17 @@ against `r6/cache/inputContexts.xml`, `r6/cache/inputUserMappings.xml`, and the
 current `red4ext/logs/input_loader.log`. Ordinary shared append targets remain
 informational; incompatible whole-node providers are conflicts.
 
+Native framework analysis never loads or executes staged code. It hashes each
+DLL/ASI provider and its deployed copy, reads Windows fixed-version resources,
+and parses PE import tables directly. Non-system imports are resolved against
+the binary directory and normal game-local framework locations. The newest
+RED4ext loader session supplies the exact framework/game versions and confirms
+successful plugin entrypoints; imported DLLs are retained as companion
+libraries rather than misclassified as failed plugins. CET and RED4ext game
+executable versions are compared to detect stale cross-framework logs.
+Structured Codeware and other plugin logs are checked here, while ArchiveXL,
+TweakXL, and Input Loader logs remain owned by their dedicated analyzers.
+
 ## Run
 
 From this directory:
@@ -302,6 +316,8 @@ different payloads are load-order conflicts.
   parsing, and exact-path findings.
 - `reports/current/input-findings.json`: Input Loader mappings, contexts,
   source lines, cache validation, and startup-log findings.
+- `reports/current/native-findings.json`: DLL/ASI providers, hashes, versions,
+  PE imports, deployed state, runtime plugin state, and native findings.
 - `reports/current/compatibility-findings.json`: combined machine-readable findings.
 - `reports/current/compatibility-report.html`: searchable, filterable offline report.
 - `reports/current/compatibility-report.md`: concise human-readable report.

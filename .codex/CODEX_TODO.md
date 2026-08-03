@@ -108,13 +108,13 @@ frozen-corpus validation pass are complete.
 
 ## RED4ext and framework validation
 
-- [ ] Inventory native plugin versions and declared dependencies.
-- [ ] Compare bundled framework binaries across staging mods and deployed
+- [x] Inventory native plugin versions and declared dependencies.
+- [x] Compare bundled framework binaries across staging mods and deployed
   winners.
-- [ ] Add game-version/framework-version compatibility rules from authoritative
+- [x] Add game-version/framework-version compatibility rules from authoritative
   local metadata or official sources.
-- [ ] Parse RED4ext, ArchiveXL, TweakXL, Codeware, and other framework logs.
-- [ ] Report missing DLL dependencies and native plugin load failures.
+- [x] Parse RED4ext, ArchiveXL, TweakXL, Codeware, and other framework logs.
+- [x] Report missing DLL dependencies and native plugin load failures.
 
 ## Reporting and performance
 

@@ -6,14 +6,53 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.21.0`
-- Implemented ecosystems: ArchiveXL, TweakXL, REDscript, CET Lua, and Input Loader XML
+- Scanner version: `0.22.0`
+- Implemented ecosystems: ArchiveXL, TweakXL, REDscript, CET Lua, Input Loader XML, and RED4ext/native frameworks
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 94 passing
+- Automated tests: 97 passing
 - Last complete scan: successful on 2026-08-03
 - Frozen inputs were not modified
 
 ## History
+
+### 2026-08-03 — RED4ext and native-framework analyzer
+
+Implemented read-only native binary, dependency, deployment, and runtime
+validation.
+
+Changes:
+
+- Added `native.py` with DLL/ASI classification, SHA-256 deployment comparison,
+  Windows fixed-version extraction, and direct PE normal/delay import parsing.
+- Added exact-path provider duplicate/override rules, unresolved hard-import
+  checks, missing/mismatched deployment checks, and PE parse diagnostics.
+- Correlated RED4ext loader paths with staged binaries and runtime plugin
+  name/version/author metadata; distinguished imported companion DLLs from
+  plugin entrypoints.
+- Compared RED4ext and CET game executable versions and consolidated structured
+  RED4ext/Codeware/other plugin diagnostics. ArchiveXL, TweakXL, and Input
+  Loader logs remain delegated to their dedicated analyzers.
+- Added `native-findings.json`, Native frameworks HTML filtering/statistics,
+  four native coverage tables, README documentation, and scanner version
+  0.22.0.
+
+Validation:
+
+- All 97 tests pass with warnings promoted to errors, including synthetic PE
+  imports, missing dependencies, runtime plugin/companion correlation, and
+  competing native providers.
+- The frozen corpus has 19 active native files and 251 native references from
+  19 binary records plus 232 hard imports. All deployed hashes match.
+- RED4ext 1.30.0 confirms 13 loaded plugin entrypoints on game product 2.31 /
+  executable 3.0.80.51928. RadioExt's `fmod.dll` is correctly recognized as its
+  one resolved companion library. CET 1.37.1 reports the same executable.
+- No missing hard imports, shared native paths, deployment mismatches, PE parse
+  failures, plugin-load failures, version disagreements, or non-delegated log
+  diagnostics were found.
+- The full cached scan completed in about 27 seconds. The combined report
+  remains at 185 findings: 2 conflicts, 11 errors, 18 warnings, 13 reviews, and
+  141 info; the native analyzer added no finding to the healthy current state.
+- Frozen Vortex and game inputs were not modified.
 
 ### 2026-08-03 — Input Loader XML semantic analyzer
 
