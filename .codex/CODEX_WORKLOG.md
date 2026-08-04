@@ -6,15 +6,65 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.27.0`
+- Scanner version: `0.28.0`
 - Implemented ecosystems: ArchiveXL, TweakXL, REDscript, CET Lua, Input Loader XML, RED4ext/native frameworks, CET-to-REDscript hooks, and CET-to-TweakXL TweakDB cross-analysis
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 110 passing
-- Last complete scan: successful on 2026-08-03
+- Automated tests: 112 passing
+- Last complete scan: successful on 2026-08-04
 - The v0.27.0 frozen baseline was not modified by Codex; the user has now begun
   manual review and may change the mod collection
 
 ## History
+
+### 2026-08-04 — Journal HandleRefId resolution and collision fix
+
+Fixed the fingerprint stop triggered by the newly installed Immersive Gigs
+journals.
+
+Changes:
+
+- Indexed WolvenKit journal handle wrappers by `HandleId` before traversing the
+  serialized graph.
+- Resolved forward and repeated `HandleRefId` nodes to their shared journal
+  objects while preserving each effective occurrence and source declaration.
+- Added ancestor-path cycle detection so shared sibling references remain valid
+  but true recursive graphs stop safely.
+- Consolidated multiple structural issues in one journal resource into one
+  finding with per-location evidence, preventing identical diagnostics from
+  colliding even for genuinely malformed payloads.
+- Added regression tests for forward/repeated references, missing targets, and
+  cycles; updated documentation and scanner version 0.28.0.
+
+Validation:
+
+- All 112 tests pass with warnings promoted to errors.
+- Real cached Regina and Wakako payloads resolve two and one handle-reference
+  occurrences respectively, with zero shape findings.
+- A complete updated-collection scan completed in 27.4 seconds: 271 mods, 3,597
+  files, 79 indexed archives, 104 non-empty ArchiveXL configs, 214 non-empty
+  TweakXL configs, 1,278 REDscript files, and 304 CET Lua files.
+- All 12 journal payloads serialized successfully into 388 entry identities;
+  no journal duplicate, conflict, review, or shape finding remains.
+- The report contains 225 findings: 221 active and four acknowledged, with no
+  stale acknowledgements. Relative to v0.27 it records 27 new, 18 changed, 17
+  resolved, and 180 unchanged findings.
+- Original mod packages and deployed game files were not modified.
+
+### 2026-08-04 — Fingerprint collision diagnosed after collection update
+
+The first scan after the user's mod changes stopped before report writing with
+fingerprint `31e8fa680b32d441367c768a173d3a3bbb655826a9985f3c6606e6967d29b5be`.
+The collision guard itself worked as designed; two identical current findings
+would otherwise make acknowledgements and scan diffs ambiguous.
+
+Both findings came from Immersive Gigs' serialized Regina journal. At
+`contacts/regina_jones/sts_random`, two child handles contain `HandleRefId`
+rather than inline `Data`. The journal analyzer does not yet resolve serialized
+handle references, so it incorrectly emitted the same
+`AXL-JOURNAL-PAYLOAD-SHAPE` empty-ID finding twice. This result did not establish
+that the mod payload was invalid. The pre-scan report remained intact because
+classification failed before report files were written. This defect was fixed
+and validated in v0.28.0.
 
 ### 2026-08-03 — Collection moved into manual review
 

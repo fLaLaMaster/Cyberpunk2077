@@ -35,6 +35,10 @@ frozen-corpus validation pass are complete.
 
 ## ArchiveXL semantic coverage
 
+- [x] Resolve WolvenKit serialized `HandleRefId` nodes while traversing journal
+  payloads. Immersive Gigs' Regina journal contains two such references under
+  `contacts/regina_jones/sts_random`; v0.28 resolves them without false
+  empty-ID findings or fingerprint collisions.
 - [x] Inspect serialized localization resources and detect duplicate
   `secondaryKey` definitions across mods.
 - [x] Detect competing edits to the same localization `primaryKey`.

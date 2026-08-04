@@ -93,6 +93,11 @@ Journal analysis selectively serializes declared `.journal` resources and
 compares the effective entry paths used by ArchiveXL itself. Shared containers
 are composable; incompatible leaf definitions, competing edits, and mixed
 edit/merge operations receive distinct findings.
+WolvenKit's serialized journal graph is indexed by `HandleId`, so forward and
+repeated `HandleRefId` entries resolve to their shared objects before effective
+paths are reconstructed. Missing references and true ancestor cycles remain
+structural errors and are consolidated per resource with graph-location
+evidence.
 Visual-tag override analysis compares effective 64-bit component masks. Tag
 names are case-sensitive, and a later same-name tag replaces the entire earlier
 definition. Identical definitions are informational duplicates; different

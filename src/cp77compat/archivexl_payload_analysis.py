@@ -1249,6 +1249,58 @@ def _journal_handle_data(value: Any) -> Any:
     return value
 
 
+def _journal_handle_key(value: Any) -> str | None:
+    if value is None or isinstance(value, (dict, list)):
+        return None
+    return str(value)
+
+
+def _journal_handle_index(value: Any) -> dict[str, dict[str, Any]]:
+    """Index WolvenKit handle wrappers before following graph references."""
+    handles: dict[str, dict[str, Any]] = {}
+
+    def visit(item: Any) -> None:
+        if isinstance(item, dict):
+            handle_id = _journal_handle_key(item.get("HandleId"))
+            if handle_id is not None and isinstance(item.get("Data"), dict):
+                handles.setdefault(handle_id, item)
+            for child in item.values():
+                visit(child)
+        elif isinstance(item, list):
+            for child in item:
+                visit(child)
+
+    visit(value)
+    return handles
+
+
+def _resolve_journal_handle(
+    value: Any, handles: dict[str, dict[str, Any]]
+) -> tuple[Any, str | None, str | None, str | None]:
+    """Return node data, effective handle ID, reference ID, and any error."""
+    reference_id = (
+        _journal_handle_key(value.get("HandleRefId"))
+        if isinstance(value, dict)
+        else None
+    )
+    resolved = value
+    if reference_id is not None:
+        resolved = handles.get(reference_id)
+        if resolved is None:
+            return (
+                None,
+                None,
+                reference_id,
+                f"Journal HandleRefId {reference_id} has no matching HandleId.",
+            )
+    handle_id = (
+        _journal_handle_key(resolved.get("HandleId"))
+        if isinstance(resolved, dict)
+        else None
+    )
+    return _journal_handle_data(resolved), handle_id, reference_id, None
+
+
 def _journal_shape_finding(
     declaration: Reference, explanation: str, archive_path: str
 ) -> Finding:
@@ -1284,7 +1336,14 @@ def parse_journal_payload(
                 archive_path,
             )
         ]
-    root = _journal_handle_data(resource.get("entry"))
+    handles = _journal_handle_index(resource)
+    root, root_handle_id, _root_reference_id, root_error = _resolve_journal_handle(
+        resource.get("entry"), handles
+    )
+    if root_error is not None:
+        return [], [
+            _journal_shape_finding(declaration, root_error, archive_path)
+        ]
     if (
         not isinstance(root, dict)
         or root.get("$type") != "gameJournalRootFolderEntry"
@@ -1317,29 +1376,55 @@ def parse_journal_payload(
 
     payload_source = f"{archive_path}::{declaration.identity}"
     references: list[Reference] = []
-    findings: list[Finding] = []
+    issues: list[dict[str, Any]] = []
     entry_index = 0
 
-    def visit(handle: Any, parent_path: str) -> None:
+    def issue(
+        explanation: str,
+        journal_path: str,
+        handle_id: str | None = None,
+        handle_ref_id: str | None = None,
+    ) -> None:
+        issues.append({
+            "explanation": explanation,
+            "journal_path": journal_path,
+            "handle_id": handle_id,
+            "handle_ref_id": handle_ref_id,
+        })
+
+    def visit(
+        handle: Any, parent_path: str, active_handles: frozenset[str]
+    ) -> None:
         nonlocal entry_index
-        node = _journal_handle_data(handle)
+        node, handle_id, handle_ref_id, resolve_error = _resolve_journal_handle(
+            handle, handles
+        )
+        if resolve_error is not None:
+            issue(resolve_error, parent_path, handle_id, handle_ref_id)
+            return
+        if handle_id is not None and handle_id in active_handles:
+            issue(
+                f"Journal handle graph contains an ancestor cycle at HandleId {handle_id}.",
+                parent_path,
+                handle_id,
+                handle_ref_id,
+            )
+            return
         if not isinstance(node, dict):
-            findings.append(
-                _journal_shape_finding(
-                    declaration,
-                    "A journal entry handle has no object data.",
-                    archive_path,
-                )
+            issue(
+                "A journal entry handle has no object data.",
+                parent_path,
+                handle_id,
+                handle_ref_id,
             )
             return
         raw_id_value = _scalar(node.get("id"))
         if not isinstance(raw_id_value, str) or not raw_id_value:
-            findings.append(
-                _journal_shape_finding(
-                    declaration,
-                    "Every journal entry requires a non-empty string ID.",
-                    archive_path,
-                )
+            issue(
+                "Every journal entry requires a non-empty string ID.",
+                parent_path,
+                handle_id,
+                handle_ref_id,
             )
             return
         raw_id = raw_id_value
@@ -1348,24 +1433,22 @@ def parse_journal_payload(
         if marked_for_edit:
             segments[-1] = segments[-1][:-1]
         if any(not segment for segment in segments):
-            findings.append(
-                _journal_shape_finding(
-                    declaration,
-                    f"Journal entry ID contains an empty path segment: {raw_id}",
-                    archive_path,
-                )
+            issue(
+                f"Journal entry ID contains an empty path segment: {raw_id}",
+                parent_path,
+                handle_id,
+                handle_ref_id,
             )
             return
         identity = "/".join([part for part in (parent_path, *segments) if part])
         children = node.get("entries")
         is_container = isinstance(children, list)
         if "entries" in node and not is_container:
-            findings.append(
-                _journal_shape_finding(
-                    declaration,
-                    f"Journal container entries must be a sequence: {identity}",
-                    archive_path,
-                )
+            issue(
+                f"Journal container entries must be a sequence: {identity}",
+                identity,
+                handle_id,
+                handle_ref_id,
             )
         references.append(
             Reference(
@@ -1383,17 +1466,43 @@ def parse_journal_payload(
                     "entry_type": str(node.get("$type") or "unknown"),
                     "is_container": is_container,
                     "marked_for_edit": marked_for_edit,
+                    "handle_id": handle_id,
+                    "handle_ref_id": handle_ref_id,
                     "fingerprint": _patch_fingerprint(node),
                 },
             )
         )
         entry_index += 1
         if is_container:
+            next_active = (
+                active_handles | {handle_id}
+                if handle_id is not None
+                else active_handles
+            )
             for child in children:
-                visit(child, identity)
+                visit(child, identity, next_active)
 
+    root_active = frozenset({root_handle_id}) if root_handle_id is not None else frozenset()
     for entry in root_entries:
-        visit(entry, "")
+        visit(entry, "", root_active)
+    findings = []
+    if issues:
+        findings.append(Finding(
+            rule_id="AXL-JOURNAL-PAYLOAD-SHAPE",
+            severity="error",
+            confidence="high",
+            summary=f"Invalid journal payload: {declaration.identity}",
+            explanation=(
+                f"The serialized journal contains {len(issues)} structural issue"
+                f"{'s' if len(issues) != 1 else ''}; see evidence for each graph location."
+            ),
+            participants=[declaration.mod_name],
+            evidence=[{
+                **declaration.to_dict(),
+                "archive_path": archive_path,
+                "issues": issues,
+            }],
+        ))
     return references, findings
 
 

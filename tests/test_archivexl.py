@@ -394,6 +394,85 @@ class ArchiveXLTests(unittest.TestCase):
         self.assertTrue(references[1].details["marked_for_edit"])
         self.assertEqual(7, references[1].line)
 
+    def test_resolves_forward_and_repeated_journal_handle_references(self) -> None:
+        declaration = Reference(
+            "archivexl", "journal", r"mod\shared.journal", "A", "a.xl", 8
+        )
+        serialized = {
+            "Data": {
+                "RootChunk": {
+                    "$type": "gameJournalResource",
+                    "entry": {
+                        "HandleId": "0",
+                        "Data": {
+                            "$type": "gameJournalRootFolderEntry",
+                            "id": "",
+                            "entries": [
+                                {"HandleRefId": "1"},
+                                {
+                                    "HandleId": "1",
+                                    "Data": {
+                                        "$type": "gameJournalFolderEntry",
+                                        "id": "contacts",
+                                        "entries": [],
+                                    },
+                                },
+                                {"HandleRefId": "1"},
+                            ],
+                        },
+                    },
+                }
+            }
+        }
+        references, findings = parse_journal_payload(
+            declaration, serialized, "a.archive"
+        )
+        self.assertEqual([], findings)
+        self.assertEqual(3, len(references))
+        self.assertEqual(["contacts"] * 3, [item.identity for item in references])
+        self.assertEqual("1", references[0].details["handle_ref_id"])
+        self.assertIsNone(references[1].details["handle_ref_id"])
+        self.assertEqual("1", references[2].details["handle_ref_id"])
+
+    def test_consolidates_missing_and_cyclic_journal_handle_issues(self) -> None:
+        declaration = Reference(
+            "archivexl", "journal", r"mod\broken.journal", "A", "a.xl", 9
+        )
+        serialized = {
+            "Data": {
+                "RootChunk": {
+                    "$type": "gameJournalResource",
+                    "entry": {
+                        "HandleId": "0",
+                        "Data": {
+                            "$type": "gameJournalRootFolderEntry",
+                            "id": "",
+                            "entries": [
+                                {"HandleRefId": "99"},
+                                {
+                                    "HandleId": "1",
+                                    "Data": {
+                                        "$type": "gameJournalFolderEntry",
+                                        "id": "loop",
+                                        "entries": [{"HandleRefId": "1"}],
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                }
+            }
+        }
+        references, findings = parse_journal_payload(
+            declaration, serialized, "a.archive"
+        )
+        self.assertEqual(1, len(references))
+        self.assertEqual(1, len(findings))
+        issues = findings[0].evidence[0]["issues"]
+        self.assertEqual(2, len(issues))
+        self.assertIn("no matching HandleId", issues[0]["explanation"])
+        self.assertIn("ancestor cycle", issues[1]["explanation"])
+
     def test_journal_comparison_distinguishes_containers_conflicts_and_edits(self) -> None:
         references = [
             Reference(

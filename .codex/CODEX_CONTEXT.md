@@ -124,8 +124,10 @@ python -m unittest discover -s tests -v
   validates target resources against indexed archives and loose files. Shared
   resource patch sources are serialized and compared through stable named
   objects, scalar properties, and C2dArray row identities. Journal resources
-  are reconstructed into effective entry paths and compared using ArchiveXL's
-  container, leaf, and final-`*` property-edit semantics. Character
+  are reconstructed into effective entry paths after resolving WolvenKit
+  `HandleId`/`HandleRefId` graphs, then compared using ArchiveXL's container,
+  leaf, and final-`*` property-edit semantics. Missing references and ancestor
+  cycles are consolidated into per-resource structural findings. Character
   customization resources are compared by gender, body part, group entry,
   named option, anonymous slot/link selector, native type, and type-specific
   choice identity.
@@ -410,6 +412,26 @@ Compatibility fixes follow a strict overlay-mod workflow:
   intended winner and any new semantic interactions;
 - keep our package identity and filenames distinct enough that later author
   updates cannot be confused with locally maintained fixes.
+
+### Current post-baseline state
+
+The first successful scan after the user's collection changes is v0.28.0 on
+2026-08-04. It supersedes v0.27.0 for current issue review while v0.27.0 remains
+the historical frozen baseline.
+
+- 271 mod directories and 3,597 files.
+- 79 archives indexed; 104 non-empty ArchiveXL and 214 non-empty TweakXL
+  configurations.
+- 1,278 REDscript and 304 CET Lua files.
+- Twelve journal payloads serialized into 388 effective entry occurrences.
+  WolvenKit `HandleRefId` graph references in Immersive Gigs resolve correctly;
+  there are no journal shape, duplicate, conflict, or review findings.
+- 225 consolidated findings: 2 conflicts, 10 errors, 20 warnings, 13 reviews,
+  and 180 informational findings.
+- 221 findings are active and four acknowledged; no acknowledgement is stale.
+- Compared with the v0.27 report: 27 new, 18 changed, 17 resolved, and 180
+  unchanged findings.
+- 112 automated tests pass with warnings promoted to errors.
 
 1. Immersive Night City Fixes and TheNullifier patch the same streaming sector
    with different `expectedNodes` values: 1237 versus 1263.
