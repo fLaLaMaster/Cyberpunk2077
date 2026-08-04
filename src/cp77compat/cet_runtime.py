@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -63,13 +64,64 @@ def _read_lines(path: Path) -> list[str]:
     return path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
 
 
+def _timestamp_value(timestamp: str | None) -> datetime | None:
+    if not timestamp:
+        return None
+    try:
+        return datetime.fromisoformat(timestamp.replace(" UTC", "")).replace(tzinfo=None)
+    except ValueError:
+        return None
+
+
+def _is_mod_load_status(message: str) -> bool:
+    return bool(
+        _LOADED.match(message)
+        or _FAILED.match(message)
+        or _IGNORED.match(message)
+    )
+
+
+def _latest_scripting_session(
+    lines: list[str],
+) -> tuple[list[str], int, datetime | None, str | None]:
+    clusters: list[tuple[int, int]] = []
+    cluster_start: int | None = None
+    cluster_count = 0
+    for index, line in enumerate(lines):
+        _, message = _message(line)
+        if _is_mod_load_status(message):
+            if cluster_start is None:
+                cluster_start = index
+                cluster_count = 0
+            cluster_count += 1
+        elif cluster_start is not None:
+            clusters.append((cluster_start, cluster_count))
+            cluster_start = None
+            cluster_count = 0
+    if cluster_start is not None:
+        clusters.append((cluster_start, cluster_count))
+
+    if not clusters:
+        return lines, 0, None, None
+    session_clusters = [cluster for cluster in clusters if cluster[1] >= 2]
+    session_start = (session_clusters or clusters)[-1][0]
+    timestamp, _ = _message(lines[session_start])
+    return (
+        lines[session_start:],
+        session_start,
+        _timestamp_value(timestamp),
+        timestamp,
+    )
+
+
 def _parse_scripting_log(path: Path) -> tuple[list[CETRuntimeEvent], dict[str, Any]]:
-    lines = _read_lines(path)
+    all_lines = _read_lines(path)
+    lines, line_offset, session_start, session_timestamp = _latest_scripting_session(all_lines)
     events: list[CETRuntimeEvent] = []
     loaded: list[str] = []
     ignored: list[str] = []
     failed: list[str] = []
-    for number, line in enumerate(lines, 1):
+    for number, line in enumerate(lines, line_offset + 1):
         timestamp, message = _message(line)
         if match := _LOADED.match(message):
             loaded.append(match.group("root"))
@@ -105,20 +157,30 @@ def _parse_scripting_log(path: Path) -> tuple[list[CETRuntimeEvent], dict[str, A
             ))
     return events, {
         "lines": len(lines),
+        "total_lines": len(all_lines),
+        "session_start": session_start,
+        "session_timestamp": session_timestamp,
         "loaded_mods": sorted(set(loaded), key=str.casefold),
         "ignored_mods": sorted(set(ignored), key=str.casefold),
         "failed_mods": sorted(set(failed), key=str.casefold),
     }
 
 
-def _parse_mod_log(path: Path, root: str) -> tuple[list[CETRuntimeEvent], int]:
+def _parse_mod_log(
+    path: Path, root: str, session_start: datetime | None = None
+) -> tuple[list[CETRuntimeEvent], int]:
     lines = _read_lines(path)
     events: list[CETRuntimeEvent] = []
     seen: set[tuple[str, int, str]] = set()
+    selected_lines = 0
     for number, line in enumerate(lines, 1):
         if line[:1].isspace() or line.strip().casefold() == "stack traceback:":
             continue
         timestamp, message = _message(line)
+        event_time = _timestamp_value(timestamp)
+        if session_start is not None and event_time is not None and event_time < session_start:
+            continue
+        selected_lines += 1
         match = _LUA_ERROR.match(message)
         if match:
             source_path = match.group("path")
@@ -147,11 +209,18 @@ def _parse_mod_log(path: Path, root: str) -> tuple[list[CETRuntimeEvent], int]:
                 "CET-RUNTIME-MODULE-ERROR", "error", message, path, number,
                 timestamp=timestamp, mod_root=root,
             ))
-    return events, len(lines)
+    return events, selected_lines
 
 
-def _parse_main_log(path: Path) -> dict[str, Any]:
-    lines = _read_lines(path)
+def _parse_main_log(path: Path, session_start: datetime | None = None) -> dict[str, Any]:
+    all_lines = _read_lines(path)
+    lines: list[str] = []
+    for line in all_lines:
+        timestamp, _ = _message(line)
+        event_time = _timestamp_value(timestamp)
+        if session_start is not None and event_time is not None and event_time < session_start:
+            continue
+        lines.append(line)
     version = None
     game_version = None
     errors = 0
@@ -166,6 +235,7 @@ def _parse_main_log(path: Path) -> dict[str, Any]:
         warnings += "[warning]" in lowered or "[warn]" in lowered
     return {
         "lines": len(lines),
+        "total_lines": len(all_lines),
         "cet_version": version,
         "game_version": game_version,
         "framework_errors": errors,
@@ -239,7 +309,9 @@ def analyze_cet_runtime_logs(
 
     try:
         events, scripting_stats = _parse_scripting_log(scripting_log)
-        main_stats = _parse_main_log(main_log) if main_log.is_file() else {
+        main_stats = _parse_main_log(
+            main_log, scripting_stats["session_start"]
+        ) if main_log.is_file() else {
             "lines": 0, "cet_version": None, "game_version": None,
             "framework_errors": 0, "framework_warnings": 0,
         }
@@ -267,7 +339,9 @@ def analyze_cet_runtime_logs(
         if not mod_log.is_file():
             continue
         try:
-            mod_events, line_count = _parse_mod_log(mod_log, root)
+            mod_events, line_count = _parse_mod_log(
+                mod_log, root, scripting_stats["session_start"]
+            )
         except OSError:
             continue
         events.extend(mod_events)
@@ -394,6 +468,7 @@ def analyze_cet_runtime_logs(
         "failed_mods": len(scripting_stats["failed_mods"]),
         "cet_version": main_stats["cet_version"],
         "game_version": main_stats["game_version"],
-        "note": "The current CET framework/scripting logs and canonical per-mod logs are parsed; load state, missing hook targets, registration failures, module failures, and Lua stack origins are correlated.",
+        "session_timestamp": scripting_stats["session_timestamp"],
+        "note": "The latest appended CET session is selected from scripting.log, and framework plus canonical per-mod events are bounded to that session timestamp; load state, missing hook targets, registration failures, module failures, and Lua stack origins are correlated.",
     }
     return findings, coverage

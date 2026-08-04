@@ -230,11 +230,15 @@ reported in coverage but never matched speculatively.
 Each scan also reads the current `cyber_engine_tweaks.log`, `scripting.log`, and
 canonical `<mod-root>.log` files. Loaded, ignored, and failed roots are counted;
 missing RTTI hook targets and Lua source errors are mapped to Vortex artifacts
-and source lines where the logs provide enough information.
+and source lines where the logs provide enough information. Because CET appends
+multiple game runs to these files, the scanner selects the newest scripting
+load block and bounds framework and per-mod events to that session timestamp.
 
-Shared configuration analysis covers every staged `.json`, `.toml`, `.ini`,
-and `.xml` file. Format-normalized fingerprints ignore irrelevant JSON/TOML key
-order and formatting when comparing multiple providers of one deployed path.
+Shared configuration analysis covers every staged textual `.json`, `.toml`,
+`.ini`, and `.xml` file. Cooked CR2W resources whose game extension is `.json`
+are identified by their binary magic and excluded from textual configuration
+parsing. Format-normalized fingerprints ignore irrelevant JSON/TOML key order
+and formatting when comparing multiple providers of one deployed path.
 Different files contributed to the same CET root, input directory, engine
 configuration domain, or REDscript user-hint directory are retained as
 informational ownership context. Input XML receives additional semantic
@@ -283,6 +287,110 @@ started with just:
 
 ```powershell
 .\run-scanner.cmd
+```
+
+To display the scan command's built-in help:
+
+```powershell
+.\run-scanner.cmd --help
+```
+
+## Command-line options
+
+`run-scanner.cmd` forwards its arguments to the scanner's `scan` command.
+Command-line values override values from `cp77compat.yaml`, which makes them
+useful for one-off scans without editing the tracked configuration.
+
+Path options:
+
+- `--config <path>` selects another YAML configuration file. The launcher uses
+  `cp77compat.yaml` from its own directory by default.
+- `--staging <path>` selects the Vortex mod staging directory. The current YAML
+  default is `C:\Games\Programs\Vortex Mods\cyberpunk2077`.
+- `--game <path>` selects the Cyberpunk 2077 installation directory. The
+  current YAML default is
+  `C:\Games\Steam\steamapps\common\Cyberpunk 2077`.
+- `--wolvenkit <path>` selects `WolvenKit.CLI.exe`. The current YAML default is
+  `C:\Games\Programs\WolvenKit-Console\WolvenKit.CLI.exe`.
+- `--output <path>` selects the report output directory. The current YAML
+  default is `reports\current`.
+- `--cache <path>` selects the WolvenKit manifest and serialized-payload cache.
+  The current YAML default is `.cache\archives`.
+
+Relative paths in YAML are resolved from the directory containing that YAML
+file. Relative command-line paths are resolved from the terminal's current
+working directory.
+
+Archive-analysis options:
+
+- `--archive-scope none` skips archive indexing and does not execute WolvenKit.
+- `--archive-scope xl` indexes archives belonging to mods that contain `.xl`
+  files. This is the current default.
+- `--archive-scope all` indexes every discovered mod archive.
+- `--payload-scope none` analyzes ArchiveXL declarations without materializing
+  their referenced payloads.
+- `--payload-scope customizations`, `localization`, `factories`, `journals`, or
+  `patches` limits payload inspection to that resource type.
+- `--payload-scope all` inspects every implemented ArchiveXL payload type. This
+  is the current default.
+
+`--payload-scope` has an effect only when archive indexing is enabled.
+
+Hashing and performance options:
+
+- `--hash-mode none` disables inventory hashing.
+- `--hash-mode archives` hashes only `.archive` files. This is the current
+  default.
+- `--hash-mode all` hashes every discovered mod file.
+- `--workers <number>` sets the number of parallel archive-processing workers.
+  It must be a positive integer; the current default is `4`.
+- `--wolvenkit-timeout <seconds>` sets the maximum duration of an individual
+  WolvenKit operation. It must be a positive integer; the current default is
+  `120` seconds.
+
+Cache-control options:
+
+- `--refresh-cache` rebuilds WolvenKit archive manifests and extracted or
+  serialized payload caches instead of reusing existing results.
+- `--no-refresh-cache` explicitly enables cache reuse, including when the
+  selected YAML file specifies `refresh_cache: true`. Cache reuse is the
+  current default.
+
+General options:
+
+- `-h` or `--help` displays the scan command help.
+- The Python entry point also supports `--version`. Because the batch launcher
+  inserts the `scan` subcommand automatically, display the application version
+  directly with:
+
+  ```powershell
+  $env:PYTHONPATH = "$PWD\src"
+  python -m cp77compat --version
+  ```
+
+The acknowledgements path is configured only through
+`paths.acknowledgements` in YAML. CET, REDscript, TweakXL, shared configuration,
+Input Loader, and native analysis currently run on every scan; the scope options
+control archive work only.
+
+For example, a quick scan without WolvenKit or inventory hashing is:
+
+```powershell
+.\run-scanner.cmd `
+  --archive-scope none `
+  --hash-mode none
+```
+
+A complete archive scan that rebuilds every cache is:
+
+```powershell
+.\run-scanner.cmd `
+  --archive-scope all `
+  --payload-scope all `
+  --hash-mode all `
+  --refresh-cache `
+  --workers 4 `
+  --wolvenkit-timeout 180
 ```
 
 ## Configuration

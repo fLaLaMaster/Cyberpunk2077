@@ -9,6 +9,45 @@ from cp77compat.models import Artifact, Reference
 
 
 class CETRuntimeTests(unittest.TestCase):
+    def test_ignores_events_from_older_appended_sessions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = Path(temp)
+            game = workspace / "game"
+            cet = game / "bin" / "x64" / "plugins" / "cyber_engine_tweaks"
+            mod_dir = cet / "mods" / "ExampleRoot"
+            mod_dir.mkdir(parents=True)
+            source = workspace / "init.lua"
+            source.write_text("registerForEvent('onInit', function() end)\n", encoding="utf-8")
+            stat = source.stat()
+            artifact = Artifact(
+                "Example Package", source,
+                r"bin\x64\plugins\cyber_engine_tweaks\mods\ExampleRoot\init.lua",
+                ".lua", stat.st_size, stat.st_mtime_ns, deployed_state="deployed",
+            )
+            (cet / "cyber_engine_tweaks.log").write_text(
+                "[2026-01-01 10:00:00 UTC+00:00] [error] old framework error\n"
+                "[2026-01-01 11:00:00 UTC+00:00] [info] CET version v1.test\n",
+                encoding="utf-8",
+            )
+            (cet / "scripting.log").write_text(
+                "[2026-01-01 10:00:00 UTC+00:00] [1] Mod ExampleRoot loaded! ('C:\\Game\\mods\\ExampleRoot')\n"
+                "[2026-01-01 10:00:01 UTC+00:00] [1] Function Old in class Target does not exist\n"
+                "[2026-01-01 11:00:00 UTC+00:00] [2] Mod ExampleRoot loaded! ('C:\\Game\\mods\\ExampleRoot')\n",
+                encoding="utf-8",
+            )
+            (mod_dir / "ExampleRoot.log").write_text(
+                "[2026-01-01 10:00:02 UTC+00:00] [1] init.lua:1: old failure\n",
+                encoding="utf-8",
+            )
+
+            findings, coverage = analyze_cet_runtime_logs(
+                game, [artifact], [], []
+            )
+
+            self.assertEqual([], findings)
+            self.assertEqual(0, coverage["errors"])
+            self.assertEqual("2026-01-01 11:00:00 UTC+00:00", coverage["session_timestamp"])
+
     def test_correlates_loaded_mod_lua_error_and_missing_hook(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             workspace = Path(temp)

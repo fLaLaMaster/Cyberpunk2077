@@ -16,6 +16,7 @@ from .models import Artifact, Finding, Reference
 
 CONFIG_EXTENSIONS = {".json", ".toml", ".ini", ".xml"}
 CET_MODS_PREFIX = "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\"
+CR2W_MAGIC = b"CR2W"
 
 
 @dataclass(slots=True)
@@ -193,7 +194,10 @@ def parse_config_documents(
         format_name = extension[1:]
         encoding = "unknown"
         try:
-            text, encoding = _decode(artifact.absolute_path.read_bytes())
+            data = artifact.absolute_path.read_bytes()
+            if data.startswith(CR2W_MAGIC):
+                continue
+            text, encoding = _decode(data)
             value, duplicate_keys = _parse_value(format_name, text)
             document = ConfigDocument(
                 artifact=artifact,

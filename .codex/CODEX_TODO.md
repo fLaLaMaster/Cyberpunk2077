@@ -1,10 +1,29 @@
 # Codex TODO
 
-Last reviewed: 2026-08-03
+Last reviewed: 2026-08-04
 
 This list describes planned scanner work. Reorder it when user priorities
 change. Check an item only after implementation, relevant tests, and a real
 frozen-corpus validation pass are complete.
+
+## Manual compatibility packages
+
+- [x] Build `Immersive First Person - Settings Shutdown Guard-1.0.0.zip` with a
+  nil-safe `GameSettings.Set` for the CET `onShutdown` lifecycle.
+- [ ] After the user imports and deploys the Immersive First Person guard as the
+  winning `GameSettings.lua`, launch and exit the game, then rescan to confirm
+  the latest CET session has no Lua callback error.
+- [x] Diagnose why `Cyberware EX Keybinds - Localization Resource
+  Fix-1.0.0.zip` did not resolve the runtime error: cooked resources were
+  deployed loose instead of indexed inside a REDengine `.archive`.
+- [x] Replace the incomplete Cyberware EX Keybinds 1.0.0 repair with a revised
+  Vortex package containing the two cooked localization resources inside a
+  game `.archive`.
+- [ ] After the user imports and deploys the package through Vortex, rerun the
+  game and scanner to confirm the ArchiveXL runtime finding is resolved.
+- [x] Exclude CR2W-magic `.json` resource files from the shared textual
+  configuration analyzer so valid cooked resources do not produce
+  `CFG-PARSE-ERROR` findings.
 
 ## Configuration foundation
 
@@ -109,6 +128,8 @@ frozen-corpus validation pass are complete.
 - [x] Inventory shared JSON, TOML, INI, and XML ownership.
 - [x] Parse input mapping IDs and identify duplicate or overwritten mappings.
 - [x] Correlate CET findings with CET framework, scripting, and per-mod logs.
+- [x] Bound append-only CET framework, scripting, and canonical per-mod events
+  to the newest game session so resolved historical errors become inactive.
 
 ## Cross-ecosystem analysis
 

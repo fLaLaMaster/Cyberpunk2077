@@ -32,6 +32,23 @@ def artifact(
 
 
 class SharedConfigTests(unittest.TestCase):
+    def test_skips_cooked_cr2w_resources_with_json_extension(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "localization.json"
+            path.write_bytes(b"CR2W" + bytes(range(32)))
+
+            documents, references, findings = parse_config_documents([
+                artifact(
+                    path,
+                    "Localization Mod",
+                    r"archive\pc\mod\example\localization\en-us.json",
+                )
+            ])
+
+            self.assertEqual([], documents)
+            self.assertEqual([], references)
+            self.assertEqual([], findings)
+
     def test_parses_all_formats_and_reports_encoding_duplicates_and_errors(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

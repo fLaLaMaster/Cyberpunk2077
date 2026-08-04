@@ -6,15 +6,148 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.28.0`
+- Scanner version: `0.28.2`
 - Implemented ecosystems: ArchiveXL, TweakXL, REDscript, CET Lua, Input Loader XML, RED4ext/native frameworks, CET-to-REDscript hooks, and CET-to-TweakXL TweakDB cross-analysis
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 112 passing
+- Automated tests: 114 passing
 - Last complete scan: successful on 2026-08-04
 - The v0.27.0 frozen baseline was not modified by Codex; the user has now begun
   manual review and may change the mod collection
 
 ## History
+
+### 2026-08-04 — Complete command-line reference
+
+Expanded `README.md` with every supported `scan` argument, accepted scope and
+hash values, current YAML defaults, command-line precedence, relative-path
+behavior, cache controls, help/version commands, and quick versus complete scan
+examples. Documented that acknowledgements remain YAML-only and that the
+non-archive analyzers currently run on every scan.
+
+Validation: `git diff --check` passed; only the repository's existing line-ending
+conversion warnings were emitted.
+
+### 2026-08-04 — Immersive First Person shutdown guard and CET session bounds
+
+Diagnosed the recurring `CET-RUNTIME-LUA-ERROR` in Immersive First Person.
+`module.parsePath` successfully matches both literal mouse-sensitivity paths;
+the nil receiver is `Game.GetSettingsSystem()` during the mod's `onShutdown`
+callback after the game settings system has already been destroyed.
+
+Created the independent Vortex-ready patch:
+
+- `C:\Games\Programs\Mods\cyberpunk2077-mods\Immersive First Person - Settings Shutdown Guard-1.0.0.zip`
+- SHA-256:
+  `2DF375856F0B89607582FCF7389449BB3C4C19F41B7DBDF0BF2A839D109ECA8E`
+- The ZIP contains only the patched
+  `bin/x64/plugins/cyber_engine_tweaks/mods/ImmersiveFirstPerson/Modules/GameSettings.lua`.
+- `GameSettings.Set` now validates the parsed path/name and settings-system
+  handle before calling `GetVar`; normal in-session behavior is unchanged.
+
+Scanner changes:
+
+- CET runtime analysis now selects the latest appended `scripting.log` mod-load
+  block and bounds framework plus canonical per-mod events to that session's
+  timestamp.
+- Mixed CET timestamps with and without explicit timezones are normalized to
+  local wall-clock time before comparison.
+- Added regression coverage proving errors from an older appended game session
+  do not remain active after a clean later session.
+- Updated documentation and bumped the scanner to 0.28.2.
+
+Validation:
+
+- All 114 tests pass with warnings promoted to errors.
+- A complete real scan succeeded with 272 staged mods and 224 findings.
+- CET coverage for the newest session contains one Lua error and one hook
+  warning instead of historical totals; the Immersive First Person evidence now
+  points to the latest `2026-08-04 20:30:18 UTC+03:00` occurrence.
+- ArchiveXL's prior Cyberware localization error is absent from the newest
+  runtime session, independently confirming that repair.
+- Upstream mod packages and deployed game files were not modified by Codex.
+
+### 2026-08-04 — Archive-based Cyberware EX fix and CR2W config exclusion
+
+Replaced the incomplete loose-resource repair design with a corrected
+Vortex-ready version 1.0.1 package and fixed the scanner false positives it
+exposed.
+
+Package:
+
+- `C:\Games\Programs\Mods\cyberpunk2077-mods\Cyberware EX Keybinds - Localization Resource Fix-1.0.1.zip`
+- SHA-256:
+  `24AB5153809BAAF38DE0349BBE4B3A913B67C3EF873762C5C7289C67B414423E`
+- The ZIP contains only
+  `archive/pc/mod/cyberware-ex-keybinds-localization-resource-fix.archive`.
+- The game archive indexes exactly
+  `cyberware_ex_keybinds\localization\en-us.json` and `fr-fr.json`.
+- Both cooked resources begin with CR2W magic and round-trip through WolvenKit
+  with all 22 entries, keys, and localized texts preserved per language.
+
+Scanner changes:
+
+- `shared_config.py` now identifies CR2W binary magic before attempting text
+  decoding and excludes cooked game resources from JSON/TOML/INI/XML config
+  analysis.
+- Added a regression test using a CR2W-magic `.json` file.
+- Updated documentation and bumped the scanner to 0.28.1.
+
+Validation:
+
+- All 113 tests pass with warnings promoted to errors.
+- A complete cached scan finished in 29.1 seconds with scanner 0.28.1.
+- Neither loose cooked Cyberware localization file produces a configuration
+  parse finding. The single remaining `CFG-PARSE-ERROR` belongs to the
+  unrelated Night City Skies schema.
+- The prior ArchiveXL runtime error correctly remains until the user disables
+  repair 1.0.0, imports/deploys 1.0.1, launches the game, and rescans.
+- No upstream staging package or deployed game file was modified by Codex.
+
+### 2026-08-04 — Cyberware EX Keybinds localization repair package
+
+Diagnosed `AXL-RUNTIME-LOCALIZATION-FAILED` for Cyberware EX Keybinds. Its
+`en-us.json` and `fr-fr.json` files were valid WolvenKit serialized JSON text,
+but had been shipped under the cooked single-extension filenames. ArchiveXL
+resolved the declared paths and then rejected the text files because the game
+resource loader requires binary CR2W resources.
+
+Created the independent Vortex-ready package:
+
+- `C:\Games\Programs\Mods\cyberpunk2077-mods\Cyberware EX Keybinds - Localization Resource Fix-1.0.0.zip`
+- SHA-256:
+  `DDF22169167AA4FA7B9A712BB5BB164C0FA0200399E231FBA15BDF7C2612D754`
+
+The package contains only compiled replacements for:
+
+- `archive/pc/mod/cyberware_ex_keybinds/localization/en-us.json`
+- `archive/pc/mod/cyberware_ex_keybinds/localization/fr-fr.json`
+
+Validation:
+
+- Both compiled files begin with the `CR2W` resource signature.
+- WolvenKit round-trip serialization preserved all 22 entries, secondary keys,
+  and localized text in each language.
+- The ZIP contains exactly the two intended resources under the proper Vortex
+  deployment hierarchy.
+- Upstream staging and deployed game files were not modified. The user will
+  import the ZIP and make it the Vortex winner for the two paths.
+
+Correction after deployment testing:
+
+- Version 1.0.0 of this repair package is incomplete and must not be treated as
+  the final fix. It deploys the cooked CR2W resources loose under
+  `archive/pc/mod`; ArchiveXL's resource loader still cannot resolve them
+  because the resources must be indexed inside a REDengine `.archive`.
+- The scanner also incorrectly inventories the loose cooked `.json` resources
+  as textual shared configuration, producing two false `CFG-PARSE-ERROR`
+  findings. CR2W-magic `.json` files must be excluded from that analyzer.
+- The visible Native Settings menu is not evidence that ArchiveXL localization
+  succeeded. The mod's Lua source embeds English and French strings and falls
+  back to them when `Game.GetLocalizedText` returns no usable translation.
+- An isolated WolvenKit packing test produced an 8,192-byte archive whose
+  indexed members exactly matched
+  `cyberware_ex_keybinds\localization\en-us.json` and `fr-fr.json`. A revised
+  package should contain that game archive rather than loose cooked files.
 
 ### 2026-08-04 — Journal HandleRefId resolution and collision fix
 

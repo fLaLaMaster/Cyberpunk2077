@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last updated: 2026-08-03
+Last updated: 2026-08-04
 
 ## Purpose
 
@@ -19,8 +19,10 @@ cross-ecosystem analysis are also supported.
 ## Workspace paths
 
 - Scanner repository: `C:\Games\Programs\Mods\cyberpunk2077`
-- Frozen Vortex staging collection:
+- Vortex staging collection:
   `C:\Games\Programs\Vortex Mods\cyberpunk2077`
+- Locally built Vortex-ready compatibility/repair packages:
+  `C:\Games\Programs\Mods\cyberpunk2077-mods`
 - Deployed game:
   `C:\Games\Steam\steamapps\common\Cyberpunk 2077`
 - WolvenKit CLI:
@@ -50,6 +52,10 @@ cross-ecosystem analysis are also supported.
    change them. The known winners are:
    - Damage Scaling and Balance - Extended over Damage Scaling.
    - Classic Drinks over the standalone No Paper Bags copy.
+6. Local fixes belong in independently named Vortex packages under
+   `C:\Games\Programs\Mods\cyberpunk2077-mods`. The user imports and deploys
+   them; Codex must not modify the upstream package or deploy the fix unless
+   explicitly requested.
 
 ## Runtime and dependencies
 
@@ -182,9 +188,9 @@ python -m unittest discover -s tests -v
   registrations using the installed CET sandbox and callback-chain semantics.
 - `src/cp77compat/cet_runtime.py`
   Parses current CET framework, scripting, and canonical per-mod logs; records
-  loaded/ignored/failed roots; and attributes missing hooks, rejected
-  registrations, module failures, and Lua errors to staging sources where
-  possible.
+  selects the newest appended game session, records loaded/ignored/failed roots,
+  and attributes missing hooks, rejected registrations, module failures, and
+  Lua errors to staging sources where possible.
 - `src/cp77compat/cross_ecosystem.py`
   Compares active literal CET observers and overrides with active REDscript
   wrappers and replacements by class, method, and available NativeDB full
@@ -195,9 +201,10 @@ python -m unittest discover -s tests -v
   tagged arrays, `$base`, `$type`, and descendant record properties.
 - `src/cp77compat/shared_config.py`
   Inventories JSON, TOML, INI, and XML ownership; parses each format strictly;
-  tracks encoding and duplicate JSON keys; computes format-normalized semantic
-  hashes; compares exact-path providers; and reports broader multi-package
-  configuration scopes without treating them as conflicts.
+  excludes cooked CR2W resources that use a `.json` game extension; tracks
+  encoding and duplicate JSON keys; computes format-normalized semantic hashes;
+  compares exact-path providers; and reports broader multi-package configuration
+  scopes without treating them as conflicts.
 - `src/cp77compat/input_mapping.py`
   Parses `r6/input/*.xml` with structural source lines; models Input Loader's
   exact whole-node replacement and child-append semantics; resolves mapping,
