@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last updated: 2026-08-04
+Last updated: 2026-08-05
 
 ## Purpose
 
@@ -56,6 +56,16 @@ cross-ecosystem analysis are also supported.
    `C:\Games\Programs\Mods\cyberpunk2077-mods`. The user imports and deploys
    them; Codex must not modify the upstream package or deploy the fix unless
    explicitly requested.
+7. Defer gameplay checks that require meaningful story progression until the
+   user finishes reviewing the static/runtime report. Maintain an accumulated
+   checklist and provide one consolidated in-game validation plan afterward,
+   rather than asking the user to replay or advance the intro after every fix.
+8. For routine runtime-log refreshes, the user launches the game and loads an
+   early Street Kid save at the starting bar in central Night City. The populated
+   location is the standard baseline because it initializes an actual save plus
+   UI, streaming, crowds, NPCs, and common gameplay systems. Use it for general
+   startup/log validation, while retaining feature-specific checks for the final
+   consolidated pass when the save has access to the required items or systems.
 
 ## Runtime and dependencies
 
@@ -148,6 +158,11 @@ python -m unittest discover -s tests -v
   counts, and actor/instance/shape indices. Streaming node and nested element
   mutations are reduced to their effective property writes and compared with
   other mutations and deletions using ArchiveXL's application semantics.
+  Vortex-overridden `.xl` providers are retained by inventory/exact-path
+  provenance but excluded from active ArchiveXL semantics. A unique minimally
+  edited exact-path winner inherits its overridden provider as logical ownership
+  so compatibility repair packages resolve the upstream companion archives and
+  do not appear as duplicate independent mods.
   Player body-type declarations are parsed into exact case-sensitive body type
   and `Body:<name>` tag identities.
 - `src/cp77compat/archivexl_runtime.py`
@@ -440,8 +455,24 @@ the historical frozen baseline.
   unchanged findings.
 - 112 automated tests pass with warnings promoted to errors.
 
-1. Immersive Night City Fixes and TheNullifier patch the same streaming sector
-   with different `expectedNodes` values: 1237 versus 1263.
+1. The earlier Immersive Night City Fixes/TheNullifier `expectedNodes` conflict
+   was a scanner-side misclassification of an operation that ArchiveXL rejects
+   during config parsing. The installed GIM sector has 1,263 node setups. INCF
+   correctly deletes setup 251; TheNullifier transposed its values by declaring
+   `expectedNodes: 1237` and out-of-range index 1263. The named front-door proxy
+   is setup 1237. Scanner v0.28.5 now emits `AXL-NODE-DELETION-SHAPE` and omits
+   such inert sectors from cross-mod comparison. A two-line TheNullifier Vortex
+   override corrects the values and composes with INCF as disjoint deletions.
+   The user subsequently deployed it and confirmed the former conflict/finding
+   disappeared.
+   Scanner v0.28.5 also exposed an independent INCF deletion typo in
+   `exterior_-18_33_0_0.streamingsector`: the current sector has 2,510 node
+   setups, and the intended Northside `japanese_lantern_a_center.mesh` is a
+   `worldStaticMeshNode` at setup 1,812, while INCF declared impossible index
+   18,812. A one-line full `INCF.xl` Vortex override has been packaged; user
+   deployment is confirmed. Scanner v0.28.6 corrected exact-path winner and
+   logical-owner handling; the fixed full-file override now replaces rather
+   than duplicates INCF semantics, and the invalid deletion is absent.
 2. Five participant groups repeat 40 full streaming-node deletions. ArchiveXL
    hides these nodes in place without removing or renumbering them, so all five
    groups are high-confidence informational/idempotent overlaps. The largest is

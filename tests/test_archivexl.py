@@ -33,7 +33,12 @@ from cp77compat.archivexl_payload_analysis import (
 from cp77compat.models import ArchiveManifest, ArchiveMember, Artifact, Reference
 
 
-def artifact(path: Path, mod: str) -> Artifact:
+def artifact(
+    path: Path,
+    mod: str,
+    deployed_state: str = "unknown",
+    deployed_source: str | None = None,
+) -> Artifact:
     stat = path.stat()
     return Artifact(
         mod_name=mod,
@@ -42,6 +47,8 @@ def artifact(path: Path, mod: str) -> Artifact:
         extension=".xl",
         size=stat.st_size,
         modified_ns=stat.st_mtime_ns,
+        deployed_state=deployed_state,
+        deployed_source=deployed_source,
     )
 
 
@@ -1170,6 +1177,128 @@ class ArchiveXLTests(unittest.TestCase):
             self.assertEqual("full", deletion.details["deletion_scope"])
             self.assertEqual([], deletion.details["element_deletions"])
             self.assertFalse([item for item in findings if item.severity == "error"])
+
+    def test_out_of_range_node_deletion_is_skipped_before_sector_comparison(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            valid_path = root / "valid.xl"
+            invalid_path = root / "invalid.xl"
+            valid_path.write_text(
+                r"""streaming:
+  sectors:
+    - path: base\worlds\example.streamingsector
+      expectedNodes: 10
+      nodeDeletions:
+        - index: 7
+          type: worldStaticMeshNode
+""",
+                encoding="utf-8",
+            )
+            invalid_path.write_text(
+                r"""streaming:
+  sectors:
+    - path: base\worlds\example.streamingsector
+      expectedNodes: 8
+      nodeDeletions:
+        - index: 8
+          type: worldStaticMeshNode
+""",
+                encoding="utf-8",
+            )
+
+            _documents, references, findings = parse_documents(
+                [artifact(valid_path, "Valid"), artifact(invalid_path, "Invalid")]
+            )
+
+            self.assertEqual(
+                ["Valid"],
+                [
+                    reference.mod_name
+                    for reference in references
+                    if reference.kind == "streaming.sector"
+                ],
+            )
+            invalid = next(
+                item
+                for item in findings
+                if item.rule_id == "AXL-NODE-DELETION-SHAPE"
+            )
+            self.assertEqual("error", invalid.severity)
+            self.assertEqual(8, invalid.evidence[0]["index"])
+            self.assertEqual(8, invalid.evidence[0]["expected_nodes"])
+            self.assertFalse(
+                [
+                    item
+                    for item in compare_references(references)
+                    if item.rule_id == "AXL-SECTOR-EXPECTED-NODES"
+                ]
+            )
+
+    def test_small_exact_path_override_replaces_original_and_inherits_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            original_path = root / "original" / "INCF.xl"
+            winner_path = root / "fix" / "INCF.xl"
+            original_path.parent.mkdir()
+            winner_path.parent.mkdir()
+            original_path.write_text(
+                r"""localization:
+  onscreens: incf\localization.json
+streaming:
+  sectors:
+    - path: base\worlds\example.streamingsector
+      expectedNodes: 10
+      nodeDeletions:
+        - index: 10
+          type: worldStaticMeshNode
+""",
+                encoding="utf-8",
+            )
+            winner_path.write_text(
+                r"""localization:
+  onscreens: incf\localization.json
+streaming:
+  sectors:
+    - path: base\worlds\example.streamingsector
+      expectedNodes: 10
+      nodeDeletions:
+        - index: 7
+          type: worldStaticMeshNode
+""",
+                encoding="utf-8",
+            )
+
+            documents, references, findings = parse_documents(
+                [
+                    artifact(
+                        original_path,
+                        "INCF Original",
+                        "overridden",
+                        "INCF Fix",
+                    ),
+                    artifact(winner_path, "INCF Fix", "deployed", "INCF Fix"),
+                ]
+            )
+
+            self.assertEqual(1, len(documents))
+            self.assertEqual(winner_path, documents[0].artifact.absolute_path)
+            self.assertEqual("INCF Original", documents[0].mod_name)
+            self.assertTrue(references)
+            self.assertEqual({"INCF Original"}, {item.mod_name for item in references})
+            self.assertEqual(
+                {str(winner_path)}, {item.source_path for item in references}
+            )
+            self.assertTrue(
+                all(
+                    item.details.get("deployed_mod_name") == "INCF Fix"
+                    and item.details.get("override_origin") == "INCF Original"
+                    for item in references
+                )
+            )
+            self.assertFalse(
+                [item for item in findings if item.rule_id == "AXL-NODE-DELETION-SHAPE"]
+            )
+            self.assertFalse(compare_references(references))
 
     def test_partial_node_deletion_preserves_actor_and_shape_identities(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

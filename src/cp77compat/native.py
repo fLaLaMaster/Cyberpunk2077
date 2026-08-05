@@ -17,7 +17,7 @@ NATIVE_EXTENSIONS = {".dll", ".asi"}
 SYSTEM_DLLS = {
     "advapi32.dll", "bcrypt.dll", "bcryptprimitives.dll", "combase.dll",
     "crypt32.dll", "d3d11.dll", "d3d12.dll", "d3dcompiler_47.dll", "dbghelp.dll",
-    "dinput8.dll", "dxgi.dll", "gdi32.dll", "imm32.dll", "kernel32.dll", "ntdll.dll",
+    "dinput8.dll", "dxgi.dll", "gdi32.dll", "imm32.dll", "kernel32.dll", "mmdevapi.dll", "ntdll.dll",
     "ole32.dll", "oleaut32.dll", "rpcrt4.dll", "secur32.dll", "setupapi.dll",
     "shell32.dll", "shlwapi.dll", "user32.dll", "version.dll", "winhttp.dll",
     "winmm.dll", "wintrust.dll", "ws2_32.dll",

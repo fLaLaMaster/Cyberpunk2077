@@ -225,7 +225,8 @@ def parse_config_documents(
         documents.append(document)
         reference = _reference(document)
         references.append(reference)
-        if not document.parsed:
+        active = artifact.deployed_state != "overridden"
+        if active and not document.parsed:
             findings.append(Finding(
                 rule_id="CFG-PARSE-ERROR",
                 severity="error",
@@ -235,7 +236,7 @@ def parse_config_documents(
                 participants=[artifact.mod_name],
                 evidence=[reference.to_dict()],
             ))
-        if document.encoding == "cp1252":
+        if active and document.encoding == "cp1252":
             findings.append(Finding(
                 rule_id="CFG-NON-UTF8",
                 severity="warning",
@@ -245,7 +246,7 @@ def parse_config_documents(
                 participants=[artifact.mod_name],
                 evidence=[reference.to_dict()],
             ))
-        if document.duplicate_keys:
+        if active and document.duplicate_keys:
             findings.append(Finding(
                 rule_id="CFG-DUPLICATE-KEY",
                 severity="warning",

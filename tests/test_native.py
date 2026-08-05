@@ -82,7 +82,11 @@ class NativeAnalyzerTests(unittest.TestCase):
             game = root / "game"
             inputs: list[Artifact] = []
             definitions = [
-                ("Test Mod", r"red4ext\plugins\Test\Test.dll", ["KERNEL32.dll", "missing.dll"]),
+                (
+                    "Test Mod",
+                    r"red4ext\plugins\Test\Test.dll",
+                    ["KERNEL32.dll", "MMDevAPI.dll", "missing.dll"],
+                ),
                 ("Radio Mod", r"red4ext\plugins\Radio\Radio.dll", ["fmod.dll"]),
                 ("Radio Mod", r"red4ext\plugins\Radio\fmod.dll", ["KERNEL32.dll"]),
             ]

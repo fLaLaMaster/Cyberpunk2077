@@ -6,15 +6,290 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.28.2`
+- Scanner version: `0.28.6`
 - Implemented ecosystems: ArchiveXL, TweakXL, REDscript, CET Lua, Input Loader XML, RED4ext/native frameworks, CET-to-REDscript hooks, and CET-to-TweakXL TweakDB cross-analysis
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 114 passing
-- Last complete scan: successful on 2026-08-04
+- Automated tests: 117 passing
+- Last complete scan: successful on 2026-08-05
 - The v0.27.0 frozen baseline was not modified by Codex; the user has now begun
   manual review and may change the mod collection
 
 ## History
+
+### 2026-08-05 — ArchiveXL exact-path winner and repair-lineage correction
+
+After the user imported and correctly ordered the INCF lantern fix after the
+upstream package, the report expanded from the normal range to 621 findings.
+The user's diagnosis was correct: ArchiveXL analysis parsed both the Vortex-
+overridden original `INCF.xl` and the deployed repair copy. This retained the
+old index-18,812 error, duplicated all streaming operations as cross-package
+conflicts, and attributed hundreds of upstream archive resources to the repair
+package as implicit dependencies.
+
+Updated ArchiveXL parsing to exclude artifacts marked `overridden` from active
+semantic analysis. For a unique exact-path winner differing from its overridden
+provider by at most 20 changed lines, the deployed file now inherits the
+upstream provider as its logical ArchiveXL owner while retaining the repair
+package and absolute path in reference provenance. This lets payload/resource
+resolution use INCF's still-deployed companion archives and prevents a small
+full-file repair from masquerading as a second independent mod.
+
+Bumped the scanner to v0.28.6 and added a deployment regression using an
+invalid overridden original plus a minimally corrected deployed winner. All
+117 tests pass with warnings as errors. A complete scan of 280 mods and 3,637
+files succeeded with 237 findings: one conflict, 21 warnings, 13 reviews, and
+202 informational items. There are zero `AXL-NODE-DELETION-SHAPE`,
+`AXL-CROSS-MOD-RESOURCE`, `AXL-NODE-MUTATION-DELETION-CONFLICT`, or
+`AXL-NODE-MUTATION-WRITE-CONFLICT` findings. The physical lantern repair appears
+only in the expected exact-path Vortex provenance item; the invalid `#18812`
+identity is absent.
+
+### 2026-08-05 — Immersive Night City Fixes lantern node repair
+
+The user imported/deployed the TheNullifier GIM repair and confirmed its former
+conflict/finding disappeared. Investigated the newly visible
+`AXL-NODE-DELETION-SHAPE` in `INCF.xl` line 13,550 for
+`exterior_-18_33_0_0.streamingsector`. The author block declares 2,510 expected
+node setups but targets impossible index 18,812. Selective WolvenKit extraction
+of the installed EP1 sector confirmed 2,510 setups. The documented
+`japanese_lantern_a_center.mesh` target at the coordinates in INCF's comment is
+a `worldStaticMeshNode` at setup index 1,812, establishing that the extra `8`
+is a source typo rather than a removed target.
+
+Created the Vortex-ready package
+`C:\Games\Programs\Mods\cyberpunk2077-mods\Immersive Night City Fixes - Lantern Node Fix-1.0.0.zip`.
+It overrides only `archive/pc/mod/INCF.xl` and differs from INCF 0.31-HF by one
+line, changing index 18,812 to 1,812. Scanner parsing retains the valid deletion
+at index 298, accepts the corrected deletion at 1,812 with the intended native
+type, and emits no `AXL-NODE-DELETION-SHAPE`. The ZIP contains the one intended
+file and has SHA-256
+`978B213A96D6D1AC754A14C3E34204D3131F6F4A4CA46BD4277AC139AA9D6A3B`.
+The author staging package was not edited. The user imported and deployed the
+repair as the exact-path winner. Scanner v0.28.6 subsequently confirmed the
+invalid deletion is gone after correcting overridden-provider semantics.
+
+### 2026-08-05 — TheNullifier GIM node repair and ArchiveXL parser correction
+
+Investigated the apparent `AXL-SECTOR-EXPECTED-NODES` conflict between
+Immersive Night City Fixes and TheNullifier for
+`exterior_-5_-5_0_3.streamingsector`. Neither mod replaces the sector in its
+companion archive, and no deployed mod archive replaces it. The installed EP1
+sector has 1,263 node setups. Immersive Night City Fixes correctly targets
+setup index 251, a `worldStaticMeshNode`. TheNullifier's declaration had the
+two significant numbers transposed: `expectedNodes: 1237` with out-of-range
+index `1263`. The named `{q110_mall_front_door}_ProxyMesh` is actually setup
+index 1,237 and has the declared `worldGenericProxyMeshNode` type.
+
+Created the Vortex-ready package
+`C:\Games\Programs\Mods\cyberpunk2077-mods\TheNullifier - GIM ArchiveXL Node Fix-1.0.0.zip`.
+It overrides only `archive/pc/mod/TheNullifier-removals.xl`, preserves the full
+author file, and changes exactly two lines: expected node count 1,237 to 1,263
+and node index 1,263 to 1,237. Its SHA-256 is
+`23543B160971251C567F9C525AB2D7649BAC8128177C72EA75F619D03220D3FC`.
+Scanner validation with INCF reports matching expected counts and disjoint node
+deletions, with no fix parse errors.
+
+The scanner previously retained sector references even when ArchiveXL itself
+discarded every invalid deletion in that sector. Updated the ArchiveXL parser
+to reject invalid or out-of-range node deletion declarations, emit
+`AXL-NODE-DELETION-SHAPE`, and omit empty sector declarations before cross-mod
+comparison. Bumped the scanner to v0.28.5. All 116 tests pass with warnings as
+errors, and a full scan of 279 mods and 3,636 files succeeded. The misleading
+cross-mod conflict is gone and TheNullifier's invalid source line is now
+reported directly. The same scan exposed one separate out-of-range deletion in
+INCF at line 13,550; review it independently rather than folding it into this
+package.
+
+The user confirmed the Better Living Buffs unknown-property errors disappeared
+after deploying its repair. Feature behavior remains deferred to the final
+consolidated gameplay pass.
+
+### 2026-08-05 — Better Living Buffs rejected-field repair
+
+Diagnosed 12 `TXL-RUNTIME-UNKNOWN-PROPERTY` identities in Better Living Buffs.
+One constant stat modifier contained invalid exporter residue `isActive: []`;
+eleven `gamedataGameplayLogicPackageUIData_Record` definitions contained the
+unrelated field `maxFactor: 0`. The current schemas do not expose those fields
+on the declared record types, and TweakXL rejected them while accepting the
+actual duration, localized UI, float, and integer values. Removing the rejected
+fields therefore preserves the mod's current effective behavior.
+
+Created the Vortex-ready package
+`C:\Games\Programs\Mods\cyberpunk2077-mods\Better Living Buffs - Unknown Property Fix-1.0.0.zip`.
+It contains the 12 affected YAML paths. Each override differs from its author
+file by exactly one removed rejected line, for 12 removals and no additions.
+All 12 documents parse with 49 references, no findings, and no residual
+`isActive` or `maxFactor` assignments. The ZIP SHA-256 is
+`4B90FCC4263246806089044DC8B27C94165A4D0D37168F2F78A3D45B15CB7EEA`.
+
+The original staged package was not modified. The user later deployed the
+repair, refreshed the runtime log, and confirmed all related errors disappeared.
+Housing-buff duration and representative consumable/booster effects remain on
+the consolidated gameplay checklist.
+
+### 2026-08-05 — NCEE NPC invalid vendor-property repair
+
+Diagnosed `TXL-RUNTIME-UNKNOWN-PROPERTY` on
+`Vendors.maels_ripper.enabledPhotoModePuppet`. NCEE declares the target as a
+`gamedataVendor_Record`, but the current game sources define
+`enabledPhotoModePuppet` as a boolean-array field on the global photo-mode setup.
+The assigned `Loot.TygerClawsShotgunBikerT3` value is instead an NPC loot-drop
+record used by a Tyger Claws shotgunner. No other installed mod uses that field
+on a vendor. TweakXL rejected the assignment, so removing it preserves the
+current effective behavior rather than deleting an applied feature.
+
+Created the Vortex-ready package
+`C:\Games\Programs\Mods\cyberpunk2077-mods\NCEE NPC - Invalid Vendor Property Fix-1.0.0.zip`.
+It contains only `r6/tweaks/NCEE NPC/ncee_characters.yaml`. Exact comparison
+against the author file reports one removed line and no additions; the patched
+document parses with 1,719 references and no findings, retains the
+`Vendors.maels_ripper` type declaration, and no longer emits the invalid flat.
+The ZIP SHA-256 is
+`7DC80DD9052A7064CF034AF407B14AEA4C884E06A277047B9F137688065AE889`.
+
+The original staged package and deployed game were not modified. The user later
+deployed the fix, refreshed the runtime log, and confirmed the unknown-property
+finding disappeared. Representative NCEE content and the Maelstrom ripper
+interaction, if accessible, remain on the final consolidated gameplay checklist.
+
+### 2026-08-05 — More Mods More Fun / weapon slots ambiguous-record repair
+
+Diagnosed 20 `TXL-RUNTIME-AMBIGUOUS-DEFINITION` identities repeated while
+TweakXL loaded More Mods More Fun, 6 More Weapon Mod Slots, and their dedicated
+compatibility patch. The installed TweakDB confirms all 20 exact IDs are absent:
+four `BladeMod2` tiers, three `BluntMod3`, two `ThrowMod2`, three `RangedMod1`,
+one `PowerMod2`, three `SmartMod1`, and four `ShotgunMod2`. Their other existing
+tiers remain valid. Each package attempted an array mutation against these
+absent records, so TweakXL could not infer a record/value type. This is not a
+load-order issue, and synthesizing the absent tiers would risk changing loot or
+item behavior.
+
+Created the Vortex-ready package
+`C:\Games\Programs\Mods\cyberpunk2077-mods\More Mods More Fun - 6 More Weapon Mod Slots Ambiguous Record Fix-1.0.0.zip`.
+It overrides the six affected melee/ranged YAML paths and removes only the
+invalid `$instances` entries. Exact comparisons show 9 removals from each of
+the three melee files and 11 removals from each of the three ranged files, with
+no added or otherwise changed lines. Scanner parsing reports six documents,
+18,520 references, no parse findings, 206 distinct mutation targets, and zero
+missing targets against the installed game index.
+
+The ZIP contains exactly the six intended YAML files and has SHA-256
+`75B2163EE05FBE4395D17190A19AA3640DED968F627EB48D6C724B04FFCF72DB`.
+The original staged packages and deployed game were not modified. Vortex
+deployment and a fresh game-log rescan were subsequently completed by the user;
+the 20 ambiguous-definition errors disappeared. Functional verification remains
+deferred to the consolidated gameplay pass and will cover the combined behavior
+of More Mods More Fun, 6 More Weapon Mod Slots, and their compatible patch on
+representative melee and ranged weapons, including slot visibility, attachment
+acceptance and persistence, and duplicate/empty/unusable slots.
+
+The user also established an early Street Kid save at the populated starting
+bar in central Night City as the standard runtime-log baseline. It exercises a
+loaded save, streaming, crowds, NPCs, UI, and common systems without requiring
+additional story progression. Feature-specific checks that need unavailable
+items or later systems remain on the final accumulated checklist.
+
+### 2026-08-05 — Attachments Crafting System base-case repair package
+
+Created the Vortex-ready package
+`C:\Games\Programs\Mods\cyberpunk2077-mods\Attachments Crafting System - Balanced Base Case Fix-1.0.0.zip`
+for the Balanced Version's `Items.w_att_scope_sniper_02_legendary` base typo.
+The obvious capitalization-only edit is unsafe because the generated record is
+already `Items.w_att_scope_sniper_02_Legendary`, which would make it inherit
+from itself. Instead, the patch removes that scope from the lowercase-clone
+template and applies the same quality, modifier-group, and tag operations
+directly to the official uppercase record.
+
+Validation: the installed TweakDB index contains the uppercase record and not
+the lowercase spelling; isolated TweakXL analysis reports no parse finding,
+missing base, case mismatch, or inheritance cycle. The ZIP contains exactly
+`r6/tweaks/Attachments Crafting System.yaml` and has SHA-256
+`5886C4620D465C93B02E95140C5BCB009E2E7A251F4C9331A71255E84AF676F6`.
+The original author package and deployed game were not modified. Vortex
+deployment was subsequently completed by the user, and the next scan confirmed
+that `TXL-BASE-CASE-MISMATCH` disappeared. Only an optional in-game sanity check
+of the affected legendary sniper-scope crafting behavior remains. The user will
+perform it during a consolidated validation pass after reviewing all report
+findings, because advancing through the intro separately for each repair would
+be counterproductive. Future repairs that need gameplay verification should be
+added to the same final checklist.
+
+### 2026-08-05 — Audioware MMDevAPI false missing-dependency correction
+
+Diagnosed `NATIVE-DEPENDENCY-MISSING` after the Audioware update. The staged PE
+imports `mmdevapi.dll`, Microsoft Windows' Core Audio system component; it is
+not supposed to ship beside the plugin. Current RED4ext logs independently
+confirm Audioware 1.9.9-rc.0 loads and initializes successfully, with no errors
+or warnings in its plugin log. Added `mmdevapi.dll` to the scanner's system DLL
+classification, extended the native dependency regression, documented the
+classification, and bumped the scanner to `0.28.4`.
+
+Validation: all 115 tests pass with warnings promoted to errors. A complete
+scan of 275 mods and 3,616 files succeeded; the Audioware missing-dependency
+finding moved to `resolved`. Native coverage reports Audioware loaded, deployed
+bytes matching staging, 18 imports, and zero non-system imports. No downgrade,
+downloaded DLL, or compatibility package is needed.
+
+The user also reported the malformed Night City Skies schema to its author and
+noted that a major Immersive First Person update supersedes the local shutdown
+guard package. The historical ZIP remains available but should not be deployed
+over the updated upstream mod.
+
+### 2026-08-04 — Night City Skies repair runtime verification
+
+The user redeployed `Night City Skies - Malformed Schema Fix-1.0.0`, launched
+the game, loaded a save, and confirmed that the normal Night City Skies settings
+panel remained available. The following scanner run no longer reported the
+`CFG-PARSE-ERROR`, confirming that the neutral `{}` schema preserves the mod's
+programmatic REDscript registration while safely replacing the malformed loose
+schema file.
+
+### 2026-08-04 — Overridden configuration diagnostics correction
+
+The Night City Skies report showed that Vortex had correctly selected the
+neutral schema fix, but `CFG-PARSE-ERROR` was still active because the shared
+configuration parser emitted content diagnostics for every staged provider,
+including providers marked `overridden`. Updated `shared_config.py` so
+overridden documents remain parsed and inventoried for exact-path provenance
+but cannot emit active parse, non-UTF-8, or duplicate-key diagnostics. Added a
+regression using a malformed original plus valid deployed winner, documented
+the behavior, and bumped the scanner to `0.28.3`.
+
+Validation: all 115 tests pass with warnings promoted to errors. A complete
+real-corpus scan also succeeded. That scan correctly saw the author file as
+active because the user had intentionally removed the fix deployment before
+the scan; the user will deploy the neutral package again for final confirmation.
+
+### 2026-08-04 — Night City Skies neutral schema repair package
+
+Created the Vortex-ready package
+`C:\Games\Programs\Mods\cyberpunk2077-mods\Night City Skies - Malformed Schema Fix-1.0.0.zip`.
+It contains only
+`r6/storages/RedscriptConfigFramework/NightCitySkies.schema.json`, replaced by
+the valid neutral object `{}`. This preserves the effective behavior of the
+currently rejected author file, avoids duplicate `NightCitySkies` registration,
+and does not expose inert `NCSSkywatch` controls.
+
+Validation: the source parsed as JSON, the ZIP member path and three-byte
+payload were inspected, and the package SHA-256 is
+`190EB1855AAC70723CF16DB0F90F5BCBF9F150923C5433F07477E5866C0E975B`.
+The upstream staging package and deployed game were not modified. Vortex
+deployment, game launch, and scanner confirmation remain pending.
+
+### 2026-08-04 — Night City Skies malformed schema diagnosis
+
+Confirmed that `NightCitySkies.schema.json` is genuinely malformed: a complete
+`NCSSkywatch` object is directly concatenated with a complete
+`NightCitySkies` object at line 51. Redscript Config Framework documents one
+`<modId>.schema.json` per mod and its installed loader calls `ReadAsJson()` once
+per file, accepting one `JsonObject`; it does not support streamed roots.
+
+The main `NightCitySkies` panel remains functional because `NCS_System.reds`
+registers it programmatically and `NCS_Settings.reds` builds the same settings.
+Deployed `NightCitySkies.json`, defaults, and cache files confirm that path is
+active. No `NCSSkywatch` state file or code references to its keys exist, so the
+first object is inactive and appears to be accidentally included content.
+No author or deployed mod file was changed; remediation remains a user decision.
 
 ### 2026-08-04 — Complete command-line reference
 

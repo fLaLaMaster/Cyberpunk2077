@@ -248,7 +248,9 @@ Parsing is strict for each underlying format. JSON duplicate keys and non-UTF-8
 fallback decoding are warnings, while malformed documents are errors with a
 source line when the parser exposes one. A failed document remains in the
 ownership inventory and makes semantic coverage partial rather than silently
-disappearing.
+disappearing. Diagnostics from Vortex-overridden providers remain available in
+that inventory but are not emitted as active findings; only the selected
+provider can affect the deployed game.
 
 Input mapping analysis follows Input Loader's installed merge algorithm. A
 same-tag, same-name top-level node replaces the earlier whole definition unless
@@ -268,6 +270,8 @@ RED4ext loader session supplies the exact framework/game versions and confirms
 successful plugin entrypoints; imported DLLs are retained as companion
 libraries rather than misclassified as failed plugins. CET and RED4ext game
 executable versions are compared to detect stale cross-framework logs.
+Windows Core Audio components such as `Mmdevapi.dll` are classified as system
+dependencies and do not require game-local copies.
 Structured Codeware and other plugin logs are checked here, while ArchiveXL,
 TweakXL, and Input Loader logs remain owned by their dedicated analyzers.
 

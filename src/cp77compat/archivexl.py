@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -165,6 +166,11 @@ class ArchiveXLDocument:
     artifact: Artifact
     data: dict[str, Any]
     text: str
+    logical_mod_name: str | None = None
+
+    @property
+    def mod_name(self) -> str:
+        return self.logical_mod_name or self.artifact.mod_name
 
 
 def _line_for(text: str, value: str) -> int | None:
@@ -528,7 +534,7 @@ def _extract_node_mutations(
                     confidence="high",
                     summary=f"{summary}: {len(evidence)} occurrence(s)",
                     explanation=explanation,
-                    participants=[document.artifact.mod_name],
+                    participants=[document.mod_name],
                     evidence=evidence,
                 )
             )
@@ -560,15 +566,56 @@ def _consolidate_node_mutation_parse_findings(
     return consolidated
 
 
+def _small_override_origin(
+    winner: Artifact,
+    overridden: list[Artifact],
+    text_by_path: dict[Path, str],
+) -> str | None:
+    """Return a unique logical owner for a minimally edited exact-path winner."""
+    if len(overridden) != 1:
+        return None
+    original = overridden[0]
+    winner_lines = text_by_path[winner.absolute_path].splitlines()
+    original_lines = text_by_path[original.absolute_path].splitlines()
+    changed_lines = sum(
+        (winner_end - winner_start) + (original_end - original_start)
+        for opcode, original_start, original_end, winner_start, winner_end
+        in SequenceMatcher(None, original_lines, winner_lines, autojunk=False).get_opcodes()
+        if opcode != "equal"
+    )
+    return original.mod_name if changed_lines <= 20 else None
+
+
 def parse_documents(artifacts: Iterable[Artifact]) -> tuple[list[ArchiveXLDocument], list[Reference], list[Finding]]:
     documents: list[ArchiveXLDocument] = []
     references: list[Reference] = []
     findings: list[Finding] = []
 
-    for artifact in sorted(artifacts, key=lambda item: str(item.absolute_path).casefold()):
-        if artifact.extension != ".xl":
+    archive_xl_artifacts = sorted(
+        (artifact for artifact in artifacts if artifact.extension == ".xl"),
+        key=lambda item: str(item.absolute_path).casefold(),
+    )
+    by_deployed_path: dict[str, list[Artifact]] = defaultdict(list)
+    text_by_path: dict[Path, str] = {}
+    for artifact in archive_xl_artifacts:
+        by_deployed_path[artifact.normalized_path].append(artifact)
+        text_by_path[artifact.absolute_path] = artifact.absolute_path.read_text(
+            encoding="utf-8-sig", errors="replace"
+        )
+
+    logical_owners: dict[Path, str] = {}
+    for group in by_deployed_path.values():
+        winners = [item for item in group if item.deployed_state != "overridden"]
+        overridden = [item for item in group if item.deployed_state == "overridden"]
+        if len(winners) == 1:
+            origin = _small_override_origin(winners[0], overridden, text_by_path)
+            if origin is not None:
+                logical_owners[winners[0].absolute_path] = origin
+
+    for artifact in archive_xl_artifacts:
+        if artifact.deployed_state == "overridden":
             continue
-        text = artifact.absolute_path.read_text(encoding="utf-8-sig", errors="replace")
+        text = text_by_path[artifact.absolute_path]
         if not text.strip():
             is_bundle = "red4ext\\plugins\\archivexl\\bundle" in artifact.normalized_path
             findings.append(
@@ -630,7 +677,12 @@ def parse_documents(artifacts: Iterable[Artifact]) -> tuple[list[ArchiveXLDocume
             )
             continue
 
-        document = ArchiveXLDocument(artifact=artifact, data=loaded, text=text)
+        document = ArchiveXLDocument(
+            artifact=artifact,
+            data=loaded,
+            text=text,
+            logical_mod_name=logical_owners.get(artifact.absolute_path),
+        )
         documents.append(document)
         if used_tab_fallback and not json_shaped:
             findings.append(
@@ -643,7 +695,7 @@ def parse_documents(artifacts: Iterable[Artifact]) -> tuple[list[ArchiveXLDocume
                         "The scanner normalized tab whitespace for parsing; the "
                         "original file was not modified."
                     ),
-                    participants=[artifact.mod_name],
+                    participants=[document.mod_name],
                     evidence=[{"path": str(artifact.absolute_path)}],
                 )
             )
@@ -662,7 +714,7 @@ def parse_documents(artifacts: Iterable[Artifact]) -> tuple[list[ArchiveXLDocume
                         "The scanner does not yet understand these sections; they "
                         "are not necessarily invalid."
                     ),
-                    participants=[artifact.mod_name],
+                    participants=[document.mod_name],
                     evidence=[{"path": str(artifact.absolute_path), "sections": unknown}],
                 )
             )
@@ -682,10 +734,19 @@ def _reference(
         ecosystem="archivexl",
         kind=kind,
         identity=identity,
-        mod_name=document.artifact.mod_name,
+        mod_name=document.mod_name,
         source_path=str(document.artifact.absolute_path),
         line=line or _line_for(document.text, identity),
-        details=details,
+        details={
+            **details,
+            "deployed_state": document.artifact.deployed_state,
+            "deployed_mod_name": document.artifact.mod_name,
+            **(
+                {"override_origin": document.logical_mod_name}
+                if document.logical_mod_name is not None
+                else {}
+            ),
+        },
     )
 
 
@@ -724,7 +785,7 @@ def _resource_shape_finding(
         confidence="high",
         summary=f"Invalid ArchiveXL resource.{operation} declaration",
         explanation=explanation,
-        participants=[document.artifact.mod_name],
+        participants=[document.mod_name],
         evidence=[{"path": str(document.artifact.absolute_path), "line": line}],
     )
 
@@ -766,7 +827,7 @@ def _extract_resource_references(
                         "The operation is inventoried by coverage reporting but its "
                         "semantics are not compared."
                     ),
-                    participants=[document.artifact.mod_name],
+                    participants=[document.mod_name],
                     evidence=[
                         {
                             "path": str(document.artifact.absolute_path),
@@ -950,7 +1011,7 @@ def _quest_shape_finding(
         confidence="high",
         summary="Invalid ArchiveXL quest.phases declaration",
         explanation=explanation,
-        participants=[document.artifact.mod_name],
+        participants=[document.mod_name],
         evidence=[{"path": str(document.artifact.absolute_path), "line": line}],
     )
 
@@ -996,7 +1057,7 @@ def _override_shape_finding(
         confidence="high",
         summary="Invalid ArchiveXL overrides.tags declaration",
         explanation=explanation,
-        participants=[document.artifact.mod_name],
+        participants=[document.mod_name],
         evidence=[{"path": str(document.artifact.absolute_path), "line": line}],
     )
 
@@ -1058,7 +1119,7 @@ def _extract_override_references(
                         "Only overrides.tags is implemented by the installed ArchiveXL "
                         "garment override configuration parser."
                     ),
-                    participants=[document.artifact.mod_name],
+                    participants=[document.mod_name],
                     evidence=[{
                         "path": str(document.artifact.absolute_path),
                         "line": _mapping_line(overrides, raw_operation, overrides_line),
@@ -1129,7 +1190,7 @@ def _extract_override_references(
                             explanation=(
                                 "ArchiveXL only reads hide or show from a component override mapping."
                             ),
-                            participants=[document.artifact.mod_name],
+                            participants=[document.mod_name],
                             evidence=[{
                                 "path": str(document.artifact.absolute_path),
                                 "line": _mapping_line(raw_mask, unknown_keys[0], component_line),
@@ -1360,7 +1421,7 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                         "name or a sequence containing only scalar names. Valid scalar "
                         "items in a mixed sequence are still registered."
                     ),
-                    participants=[document.artifact.mod_name],
+                    participants=[document.mod_name],
                     evidence=[
                         {
                             "path": str(document.artifact.absolute_path),
@@ -1395,7 +1456,7 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                         "customizations must be a mapping containing male and/or "
                         "female resource paths."
                     ),
-                    participants=[document.artifact.mod_name],
+                    participants=[document.mod_name],
                     evidence=[
                         {
                             "path": str(document.artifact.absolute_path),
@@ -1419,7 +1480,7 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                                 "ArchiveXL accepts only the exact customizations keys "
                                 "female and male."
                             ),
-                            participants=[document.artifact.mod_name],
+                            participants=[document.mod_name],
                             evidence=[
                                 {
                                     "path": str(document.artifact.absolute_path),
@@ -1441,7 +1502,7 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                                 "A customization gender must contain a resource path "
                                 "or a sequence of resource paths."
                             ),
-                            participants=[document.artifact.mod_name],
+                            participants=[document.mod_name],
                             evidence=[
                                 {
                                     "path": str(document.artifact.absolute_path),
@@ -1509,7 +1570,7 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                                 "The localization key is not one of the documented "
                                 "Cyberpunk 2077 language codes."
                             ),
-                            participants=[document.artifact.mod_name],
+                            participants=[document.mod_name],
                             evidence=[
                                 {
                                     "path": str(document.artifact.absolute_path),
@@ -1540,7 +1601,7 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                     confidence="high",
                     summary="Invalid ArchiveXL journal declaration",
                     explanation="journal must be a resource path or a sequence of resource paths.",
-                    participants=[document.artifact.mod_name],
+                    participants=[document.mod_name],
                     evidence=[
                         {
                             "path": str(document.artifact.absolute_path),
@@ -1571,15 +1632,8 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                     continue
                 path = sector["path"]
                 path_line = _mapping_line(sector, "path", sector_line)
-                refs.append(
-                    _reference(
-                        document,
-                        "streaming.sector",
-                        path,
-                        path_line,
-                        expected_nodes=sector.get("expectedNodes"),
-                    )
-                )
+                expected_nodes = _integer(sector.get("expectedNodes"))
+                sector_refs: list[Reference] = []
                 deletions = sector.get("nodeDeletions")
                 if isinstance(deletions, list):
                     for deletion, deletion_line in _sequence_entries(deletions):
@@ -1587,6 +1641,45 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                             index_line = _mapping_line(
                                 deletion, "index", deletion_line or path_line
                             )
+                            node_index = _integer(deletion.get("index"))
+                            node_type = _yaml_scalar_text(deletion.get("type"))
+                            if (
+                                node_index is None
+                                or node_type is None
+                                or node_index < 0
+                                or (
+                                    expected_nodes is not None
+                                    and expected_nodes > 0
+                                    and node_index >= expected_nodes
+                                )
+                            ):
+                                mutation_parse_findings.append(
+                                    Finding(
+                                        rule_id="AXL-NODE-DELETION-SHAPE",
+                                        severity="error",
+                                        confidence="high",
+                                        summary="Invalid ArchiveXL streaming node deletions: 1 occurrence(s)",
+                                        explanation=(
+                                            "ArchiveXL skips a whole node deletion when its required "
+                                            "index/type is invalid or the index is outside expectedNodes."
+                                        ),
+                                        participants=[document.mod_name],
+                                        evidence=[
+                                            {
+                                                "path": str(document.artifact.absolute_path),
+                                                "line": index_line,
+                                                "identity": f"{path}#{deletion.get('index')}",
+                                                "index": deletion.get("index"),
+                                                "expected_nodes": expected_nodes,
+                                                "reason": (
+                                                    "node deletion has an invalid type or index, "
+                                                    "or its index is outside expectedNodes"
+                                                ),
+                                            }
+                                        ],
+                                    )
+                                )
+                                continue
                             element_deletions: list[dict[str, int]] = []
                             deletion_fields: list[str] = []
                             expected_elements: list[Any] = []
@@ -1622,15 +1715,15 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                                                 "sub_element_index": _integer(value[1]),
                                             }
                                         )
-                            refs.append(
+                            sector_refs.append(
                                 _reference(
                                     document,
                                     "streaming.node_deletion",
-                                    f"{path}#{deletion['index']}",
+                                    f"{path}#{node_index}",
                                     index_line,
                                     sector=path,
-                                    index=deletion["index"],
-                                    node_type=deletion.get("type"),
+                                    index=node_index,
+                                    node_type=node_type,
                                     deletion_scope=(
                                         "partial" if element_deletions else "full"
                                     ),
@@ -1650,7 +1743,7 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                                     element_deletions=element_deletions,
                                 )
                             )
-                refs.extend(
+                sector_refs.extend(
                     _extract_node_mutations(
                         document,
                         sector,
@@ -1658,6 +1751,21 @@ def _extract_references(document: ArchiveXLDocument, findings: list[Finding]) ->
                         mutation_parse_findings,
                     )
                 )
+                # ArchiveXL drops sector declarations that contain no valid
+                # node deletions or mutations. Keeping their sector reference
+                # would create expectedNodes overlaps for operations that the
+                # runtime never registers.
+                if sector_refs:
+                    refs.append(
+                        _reference(
+                            document,
+                            "streaming.sector",
+                            path,
+                            path_line,
+                            expected_nodes=sector.get("expectedNodes"),
+                        )
+                    )
+                    refs.extend(sector_refs)
     findings.extend(
         _consolidate_node_mutation_parse_findings(mutation_parse_findings)
     )

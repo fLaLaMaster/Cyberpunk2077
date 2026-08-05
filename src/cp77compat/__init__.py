@@ -1,3 +1,3 @@
 """Cyberpunk 2077 mod compatibility scanner."""
 
-__version__ = "0.28.2"
+__version__ = "0.28.6"

@@ -32,6 +32,34 @@ def artifact(
 
 
 class SharedConfigTests(unittest.TestCase):
+    def test_keeps_overridden_parse_failure_without_active_diagnostic(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            invalid_path = root / "invalid.json"
+            invalid_path.write_text("{}{}", encoding="utf-8")
+            winner_path = root / "winner.json"
+            winner_path.write_text("{}", encoding="utf-8")
+            relative_path = (
+                r"r6\storages\RedscriptConfigFramework\Example.schema.json"
+            )
+
+            documents, references, parse_findings = parse_config_documents([
+                artifact(
+                    invalid_path,
+                    "Original Package",
+                    relative_path,
+                    "overridden",
+                ),
+                artifact(winner_path, "Fix Package", relative_path),
+            ])
+
+            self.assertEqual(2, len(documents))
+            self.assertFalse(documents[0].parsed)
+            self.assertEqual("overridden", references[0].details["deployed_state"])
+            self.assertEqual([], parse_findings)
+            findings = analyze_config_documents(documents, references)
+            self.assertEqual(["CFG-PATH-OVERRIDE"], [item.rule_id for item in findings])
+
     def test_skips_cooked_cr2w_resources_with_json_extension(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "localization.json"
