@@ -1,11 +1,493 @@
 version: 1
 
 acknowledgements:
+  - fingerprint: 01728d272ff92a6190b139794a8ea8f6e5bb0fb6e4b2a8f819925485589eca44
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 01b1cadef6bb8ab4d8954c989e8120b43b88f371f1821ed7bba259eb4d8a1b86
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 03bd5daedd6c2ebcf8c2cad160d56ac6309a2e3b67f6fdf61933526d765c6496
+    note: "Two tabs occur only as trailing whitespace after a value and a comment; they do not affect ArchiveXL parsing."
+  - fingerprint: 044a9f48a47ec7fb45687046ce9b6f7496cba97fb46d58c58a808ac8bdf87294
+    note: "Intentional They Will Remember detection behavior. Friendly turrets exclude the player while ordinary targets retain vanilla superclass handling. Detection-zero cleanup resets TWR monitoring state before performing vanilla’s reevaluation. No competing wrappers are installed."
+  - fingerprint: 0589f17127c8327ae8ab6d1338b191f01181273cdac65666637a465f2fab162c
+    note: "Intentional Inventory Adjustments Hub tooltip replacement. Both overloads rebuild vanilla attachment entries to support name, description, or combined display. Calling vanilla afterward would overwrite or duplicate the layout; no competing wrappers are installed. IAH remains enabled."
+  - fingerprint: 05bd00c6781f6ece0f50f4315953424b6c411435acc0f47a01cee53cf25e99fb
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 06dc058e20d454a06ab7638ece6aeb69a52680f99f381b35e450cb8940590609
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 070fa64131b4444897db2e33e86ea1afd67e40621e99a251caa91f77386dfda2
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 07de9a52f5035ec2020089e78d91dc86f1221d0c4e9c7230bbaf4b431245a648
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 08fc0277fc69dba167813fee43e50a20b62f32b5a1a2f55837c637d3ecf108dc
+    note: "Identical full-node deletion; repeated application is idempotent."
+  - fingerprint: 09156214563686274c62d46f5690f4cb1735a4322b1e4a4c85a9e87838444e06
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 0ccd8f114e9db51f4384fabd803d29a3bd1ee2fa15a325cd5ad66f08762a642c
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: 0fbe661ddc2f4f4efcdc73a48fba9d3817e1a42437f4ff22071fb7e0bb688c07
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 1046b68de4e7471afc11858cbf9315bbd608875fb21f613a20e7e5b624dde4e0
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 109e25ced099f40b591cee69b6b7d7ef4cfcba39953530e2c9c3a3645631998c
+    note: "nativeInteractions is intentional framework project data; ReferencePathTracing is an empty Vortex-managed residue. Neither is a standalone CET mod, so CET correctly ignores both."
+  - fingerprint: 10e115733cc6c16ea006b1f29989298599d9838932fa1fa7e9e31f6f28bcee61
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 125f32eadb79f2a4aa27853af65775cb022f4caa52629e255ce7072b99f85d83
+    note: "NCEE and INCF patch the same device container but add six distinct hashed device entries. ArchiveXL composes them without overwriting."
+  - fingerprint: 1298a803e1b23bffcf98f857164401b2abbe04224917ff4178a37e7775ec63ee
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 129e8162265ab7451f0801d472930280c0e369219633a7cc24b797389ec06c89
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 12f7129ee955559faad18d114702d575498ec6e7a62a27a2315b49ed0536dba5
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 1304ef8b523dc912856319302f0728eb277ed39ad68cf3b786db018eef218a79
+    note: "Expected Vortex file override. The intended updated, extended, or compatibility-fixed CET entry is deployed, while the original provider is overridden."
+  - fingerprint: 15abf4c1b04e3bf26319af2e0c7f146f330e3a953785a0400102f928178fc192
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: 15f65bd2223dbff6f1aa76b5def57a72b4312d7a2de2fafa9acd136939a56b97
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 17765f93dfa3d1474c5389a4034a468ef908e904b764c341459430e6b9698919
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 189caf034d6f3318d54bc8b380521f69242c180de8cac10ba834e8bef6e4d8a2
+    note: "Composable TweakXL array mutations. Providers add distinct values without whole-array assignment, duplication, or opposing removals."
+  - fingerprint: 1ac25dc5f3c57a74f96e173790de54e01ecaf3c74b2c422147f475ae564d2c44
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 1b4240ab866f205eaac7faa24de65f4a9b2c9b0fa5baeb8cfcf62ee0953406b5
+    note: "Intentional Retrievable Weapon Mods behavior. It replaces vanilla occupied-slot handling with SwapItemPart so the previous weapon mod is retained. Calling wrappedMethod would perform a second attachment transaction. No other active EquipPart wrapper is installed."
+  - fingerprint: 1d664eec5ecd56b9abb8cef58a7dd59e82b591a385a8ded2fb398fdb4de9a3d5
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: 1d7455e07f193ffbfc415cc084ed2675333854ebf553af49d0de2746d96b0b10
+    note: "Intentional Equipment-EX wardrobe replacement. Vanilla transmog ownership is superseded by Equipment-EX’s persistent OutfitSystem after vanilla sets are imported and the vanilla wardrobe path is disabled. Combining both results could retain stale vanilla items."
+  - fingerprint: 1f4cf915f7699150d49d078645ed713513fdad8fbf0211a6cb77d5ae515d80b3
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 201905dfb413a00f9898652f318c54a5b812ff8f16ae029f76ed7802021fc0ed
+    note: "Participating mods operate on different stable node indices and agree on expectedNodes. ArchiveXL composes the sector operations safely."
+  - fingerprint: 204363c20f7d5716e82c4d7839fdb126ff6dd107c839fb42d8fda1948b584047
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 20524790ebcad9c4d571e161a1716569b02ff670bb7cec6f03b50c089ac5f2d4
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 233621d0933525e77f4ab667b2e862d4b5c1e24a5ab94b6e8c358845747c5e37
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 2535823fbd8b2647dc1b5e0a0294061ac4e924c849b8ed7961fa169c8933c1ca
+    note: "Identical full-node deletion; repeated application is idempotent."
+  - fingerprint: 27e1a4ed1a12063fb160fb8762781232528a1c6e7674b3e86786df0a776027de
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 28d19a4c803a2958380d7e7df6b938386e8f65faac5d703c9cb13d2d871bc3a3
+    note: "Both mods share the sector but operate on disjoint nodes: 4x Vending deletes entity nodes 197–199, while General Shadows Fix edits instances under node 622. The operations compose safely."
+  - fingerprint: 2909417907e0a0f5149b7c96aa8f80776ee898f0a5cb945e34731fdf2e60448c
+    note: "Expected exact-path winner from a validated private fix or compatibility package. Keep the fix after its upstream mod and rebuild it after upstream updates."
+  - fingerprint: 29ec1f7a890f4ecd48e4cf812a72d06c55655561b6789634f56721288cda139e
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 2b65c89a497c92cddd9b15a3a866cb9b2f1ce39f13d12d21f392e7551832561c
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 2b858d8be84b70384b23775587abb2122a8642a5146eb32f10037c509637c5d4
+    note: "Expected exact-path winner from a validated private fix or compatibility package. Keep the fix after its upstream mod and rebuild it after upstream updates."
+  - fingerprint: 2b8ab5dfacca77964d7fe1ba036f5f6f56e395104a9b5608decc4447faafe8b8
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 2e31ae178151e915db66b0c35b25a48897f50c5eeb17d98f2e56e292fb8d39f3
+    note: "Acknowledged from HTML report."
+  - fingerprint: 2e8d9e4120ccb5343bf6e355cffde35d3d2c43c27e29f7348c8c14bab30335ac
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 2f14ca82b4015d265132caaa7bdf1f1b53ac98afdf2f97754e2ec321a8659537
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 326e1496cc80e6116b02abe4b752f7b860f5bcbe905acda0d5d63ba1be1a2aad
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 334cc62f502c5dd229cf35183df046c27e523048412f20295b2a3992126dc506
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 33b12a56622a8c1fce4ae3ca57938a2ad446032e27294eb3ebda81a838498c16
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 34ff11cc118b8547e4ebeeead218581acd086a7b9aa45a33374a93c648665bd7
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 35d7aeda7bd7e9812fb5217b6aedfa4121db7f9b477bc092dbb93afc874d6318
+    note: "Intentional multi-package ownership of one configuration scope. Providers contribute distinct valid files; exact-path overlaps are checked separately."
+  - fingerprint: 3612e05d1d5b42365ac587a41bcc3bf700a76ab1138d67496748ef9efbea0c87
+    note: "Acknowledged from HTML report."
+  - fingerprint: 364461a64ab723066892368c79c2b24b98ebc055eadfc72bf770a8519e4389be
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 36f5e3f53cf211f4b4c1ef46cbeb7c32301bef7295e9dbf4ad8d70209824e9ae
+    note: "Participating mods operate on different stable node indices and agree on expectedNodes. ArchiveXL composes the sector operations safely."
+  - fingerprint: 371e13f59b36b5d69e153b783cb40f1aad941f243c80a1978e2684eb3767f10e
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: 372254b9c4374ed8d0fc29a2a4959aa7f89aed87f41af65237cd5a233e536c0b
+    note: "Expected dependencies of the More Mods More Fun repair package. Keep both provider packages installed and recheck after updating or removing them."
+  - fingerprint: 37b56f8d49e961f31b6e3c0a560f8881470e0089c0e4e98637f0fd90d74695ae
+    note: "Intentional More Mods More Fun / 6 More Weapon Mod Slots repair override. Invalid nonexistent tier references were removed and the runtime errors were confirmed gone. Rebuild after updating any related upstream mod."
+  - fingerprint: 38178efc5844a37c7ab719bb7f946d276766c9936235173460e8d1241db13636
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 3847740587b2cf4b1f53d1c3364b163321d1e5c6c5dad052a66fde610bef83fc
+    note: "Intentional local repair: valid empty schema overrides the malformed upstream two-object JSON. Night City Skies settings were verified in game."
+  - fingerprint: 38effd2e89ac9ab6271c95516c91ff63742ca0fc68ce3a252f954620aa359ad4
+    note: "Intentional Attachments Unrestricted slot-routing replacements. They extend vanilla matching with custom scope/muzzle markers and unrestricted selected-slot fallback. Vanilla return values cannot be combined, and no competing selector wrappers are installed."
+  - fingerprint: 3a83957fab6659c4d9ac07b3d86ce7dcfe67aca4a7b20e9943def3ce25b88994
+    note: "Expected exact-path winner from a validated private fix or compatibility package. Keep the fix after its upstream mod and rebuild it after upstream updates."
+  - fingerprint: 3b84763a77bd97d263552ef65ebb88d4bbdf82c8b1db9d574da4f88bce6ca961
+    note: "Intentional Cyberware-EX superseding wrapper. It replaces vanilla’s fixed power-up of musculoskeletal slots 0–2 with an all-slots implementation required for expanded cyberware slots. Calling wrappedMethod would duplicate the vanilla effect."
+  - fingerprint: 3d94f5b8a5709690ed1f787a1e96c02423a31405af0a8f2e23aa3bce555b2e23
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 3f213b3d692b0a326c4c0d41600d963f2b6fb3dc8a0e0b2cb886a17778898a71
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 3f525e36c35425cc7c7004e4bea2e630829d53f073cf552c5673b7cb964c3ffa
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 4010f666eaa8e64bfeaf2bd902391dfc85197270fbfe2271debc7af7b1cec936
+    note: "Private merged questphase intentionally wins. It preserves Immersive Gigs’ quest graph and includes Minor Activities Quest Fixes’ Six Feet Under vehicle-damage correction."
+  - fingerprint: 401d1b0962d2de465c2aa3e7e2398938dd9890361adeebc6e05ccd65d6f988e1
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 422b05516055299811e86f0f79931bc8b544731d3c2aa0844e0bc45639e81a3b
+    note: "Acknowledged from HTML report."
+  - fingerprint: 42f2fd3acaa846c150149be84926b3e36da947ad6ab346b197dc08d55eeac82a
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 4330ba5face3974a4f5f55098d10633a551a00b7636aa19c2a06482f99876bfa
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 44eba904cc2d5c58b298be3cc7a2e5d0ceb5500a70322e93e8dc062a5167bee8
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 47091a8439cbc608d6c68ac3c7f9b7fc7ad4a616644a15655e060a0e9246d7d3
+    note: "Acknowledged from HTML report."
+  - fingerprint: 47c1a8b7dfecda305b63ba2b0c31468fb987c5ab994f86d487599fb457ce9128
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 4bb9b16b782e20400bd6757d5d01527212962f37d341912b2ca41b765116e3b4
+    note: "Expected exact-path winner from a validated private fix or compatibility package. Keep the fix after its upstream mod and rebuild it after upstream updates."
+  - fingerprint: 4d09510180014c72184ededa06eb03d8ccdca799b9cae3e0a226754d65f5c23d
+    note: "Intentional shared DNBNHLP Mods container. Each mod uses a distinct subcategory, and no setting-control identities overlap."
+  - fingerprint: 4dafcecb7107d7e2f56a56c1e3eb677b203fe676027d7d377d5ad6141f0f88ac
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 4e9defe5080fc4422e970a5e5e8558350c8fbb81f98e9597c5a1d2e8673533f0
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 501adbb724a36c4f15f04f257814445ca860232cb9e1921e88a35bed26ec1ee5
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 51ee00daa81ee1014af1765372cf943eb34d39a82efed037c8ac2e954bccc453
+    note: "Intentional multi-package ownership of one configuration scope. Providers contribute distinct valid files; exact-path overlaps are checked separately."
+  - fingerprint: 522a835ff580d6403ece86b532eb30c83a66e3fad3dbbdce54f2e9e31b14d959
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 52514b4e92927730cec1cbb91670e649e2a76755b8db8bd87fe568247250ac09
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 52efb420ab0b40d5a9387a6dbac0d90e7197c2edbda1d13bc42e0cd3202148aa
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: 54323da7ada6d9c8c3b9ccae2b00957d379504f40df6dadf1ec9d2a6ee628ed1
+    note: "Intentional More Mods More Fun / 6 More Weapon Mod Slots repair override. Invalid nonexistent tier references were removed and the runtime errors were confirmed gone. Rebuild after updating any related upstream mod."
+  - fingerprint: 54533e14b32a8beefde80e139aea58dd75f9941eff7d5ec607aa6b8ac41eeb19
+    note: "Intentional cumulative damage pipeline. Flashback Fixer's CET observer adjusts attackComputed before Damage Scaling and Balance Extended and Lifepath Bonuses process the hit through REDscript; all implementations remain active. Retain the deferred scripted/vehicle-combat sanity check."
+  - fingerprint: 54c3d3fa1fe1b5956a37945d26dd80f02edc275a036fcfb8b02bfc197b0128e5
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: 54de88c7170ba2901deb7986fd29681585ed5a025449a655e2c1878dc05c6934
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: 55e6d5c70a4f481f70f6adff1ee5433be297f6e6924d05f25657ddc5748a040d
+    note: "Participating mods operate on different stable node indices and agree on expectedNodes. ArchiveXL composes the sector operations safely."
+  - fingerprint: 57a1fd102f76d330bf58752d0145169507999a5bc92a75bc1e589bdeb5d3e1f2
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 5924cb9d4129d0a9e6d236a2e8ce6be62bc8ad14fe077fd050522f25171379cd
+    note: "Intentional ArchiveXL framework bundle placeholder; no repair needed."
+  - fingerprint: 5980e05cee153656635e7139b1df75efe448261ab445470745a4f6779e9218ad
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 5aee933f2f76d8a93849fec224faf7a73700b742ae07fdf1598ca4e38e98ce0f
+    note: "Expected exact-path winner from a validated private fix or compatibility package. Keep the fix after its upstream mod and rebuild it after upstream updates."
+  - fingerprint: 5b74a23f78b2a3aa576b0857827ce2bb4201d619559282fc797b7077be25dc20
+    note: "Intentional Better Leveling level-150 skill-bar replacements. Calling wrappedMethod would also run vanilla UI construction and produce duplicate or conflicting milestone widgets. The separate movement wrappers were corrected by the Reflexes level-85 fix."
+  - fingerprint: 5b8c048bc8586760779e50e794d53eabbb14f7d5e52f97e0ba3bd013662de6b3
+    note: "Shared contacts parent container; child journal entries are distinct and recursively composed by ArchiveXL."
+  - fingerprint: 5d5362e6dc7662693285a701e60ad600e58f02e8b93aaafadf7ad365b7ca245e
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 60b498e01152c8ad65d6c94ecd90967dd9f7394bc9a7e1faf340e0fc24121e63
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
   - fingerprint: 623a760b16fe49963fe8d585e949c2bd1bd1f57b9a9a2e8fe2b8cc9e4a12a028
     note: "Classic Drinks is the selected Vortex winner over the standalone No Paper Bags package."
+  - fingerprint: 649705874279ef3379c11e2623f28bbbb246b89c7dd176dbcfc471b9a274a534
+    note: "Expected exact-path winner from a private fix/compatibility package. The override has been validated and must remain after its upstream mod."
+  - fingerprint: 6623bf5d433ca9ac6d3ab4a9e7bb64e215c1ea37b3f0b7f9928df837453a4c30
+    note: "Identical full-node deletion; repeated application is idempotent."
+  - fingerprint: 669c52b49ae39a9c2b87893cce5e06e6279191f2fd2f7ea7061ff2b98b2eedd9
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 67d38aeff122d66f118b23a8ee38d10fa909a48701a9e28ec03b6b7a09ad900c
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 67ed53e81ddf6d11eb46e13588e433a929ed1847093716759bae661a96a7170d
+    note: "Runtime confirmation of the acknowledged identical replacements. The later Cyberdeck annotations have equivalent bodies, so no behavior is lost."
+  - fingerprint: 6a37adfa60d5cb33c4fb500068a6d91ede4aa9b1923eda47da46450b79825d90
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 6a3ea64759b7465181a9312c978fbc972e3f9d1abfeb15dd7bc3cadba9ef86df
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 6ad7e7feeb033ba1f0b8d6ef064946ae1f0bb83acfc1a32322b6ac7e77ebc548
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 6b1f09805c5a782b474a75b5bceae01c8164f363ad4b0e9fca61968189420c2c
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 6c8d23d554bd1c4c837e80eaffed2a2c37300735329cbdae4f62af36280e0e59
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 706d341f2003b7603a6e749ab72cff48598640eba93395058a73b2c38b415a19
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 70cbfe6ae58be17ac514a8287c7f2c07254fd8b7a403a84e1c393838b9553f13
+    note: "Intentional multi-package ownership of one configuration scope. Providers contribute distinct valid files; exact-path overlaps are checked separately."
+  - fingerprint: 71746559fc9e7c800d79956635bff068635dc2b1e6c110d6578a408f2783d393
+    note: "Expected Vortex file override. The intended updated, extended, or compatibility-fixed CET entry is deployed, while the original provider is overridden."
+  - fingerprint: 764d3d8aa189d153bf3a77000c2cd813276ad8049714b1526fdb98541f969ec9
+    note: "Composable TweakXL array mutations. Providers add distinct values without whole-array assignment, duplication, or opposing removals."
+  - fingerprint: 78d480f9f0895a0a15838ae9b39f43acbe725c5749891730f22318c6fe99a0b9
+    note: "Participating mods operate on different stable node indices and agree on expectedNodes. ArchiveXL composes the sector operations safely."
+  - fingerprint: 794aacea46500e486507eb7700832459c93e9bfe23c6b5614d91b8ba585f16e7
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 7a7ff58ec16483a43910164bf13222937bc346aabea70f44721edce2e890fa53
+    note: "Participating mods operate on different stable node indices and agree on expectedNodes. ArchiveXL composes the sector operations safely."
+  - fingerprint: 7b12129b3d0223d7fb2eb7627150184e1d7204042dd7a0a27f29491a91145d51
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 7b20166c740d4c1ba730250107a3a287dd6088119454e36c5d1f8ca75c624c56
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 7d2e6f0656a0c012b5c3eff17ebf98ea977873a314c2953d4defc46c99f319b3
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 7d9131374b51ce5f4634040d9364fcffad92d9b10d183397af3aedc0d5684075
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 7ef514a7714e1dc60a5ad6fc6db5ae00c0adc80c029e6c3e77b776e0465f315e
+    note: "Participating mods operate on different stable node indices and agree on expectedNodes. ArchiveXL composes the sector operations safely."
+  - fingerprint: 804beb00383169bdfe52d09dcddb7f8eb532167523757e120ff6936c735ce825
+    note: "Intentional More Mods More Fun / 6 More Weapon Mod Slots repair override. Invalid nonexistent tier references were removed and the runtime errors were confirmed gone. Rebuild after updating any related upstream mod."
+  - fingerprint: 8118ccea3e59e821a038c1c5cebeb53cbd833fca58414d5ff38a05436f4f06e0
+    note: "Participating mods operate on different stable node indices and agree on expectedNodes. ArchiveXL composes the sector operations safely."
+  - fingerprint: 82173380414e99d8bbe2deb16539cf0790ff2cc9d1bd651ec5c3eed025834a14
+    note: "Intentional Always First Equip terminal wrapper. The mod disables the vanilla ToFirstEquip decision and implements first-equip behavior through its own HasPlayedFirstEquip and HandleWeaponEquip logic. No other installed mod targets this method."
+  - fingerprint: 8391c0b71904bade77fe3b55f467f1c4c93e042d6f864af99fed3d98ec9b7e46
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 83c24ddd4d311bed4b534d2f458a77bd974a10253dcad97902778b3538b707c2
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 8588a451a568a8848f0590b2eb49d2fb3668d57b49f392b2c95dc0477ecf69a0
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 85f8818ab3260f64c579af59ebf3d79c46149856c2448b8d9eec29797f333271
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 8652a72b1191c2918d573114683084b0ff85d8a6cd594feaeec629fd994d46fe
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 86b43168a51294d7cdb5781b2d43178c10edac1a3e368f15b96389c929baf419
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 86b8d4bc5772ec7e392ab34299bb54f19c32f6cf40bef5de27cecaf11708c8da
+    note: "Expected Vortex file override. The intended updated, extended, or compatibility-fixed CET entry is deployed, while the original provider is overridden."
+  - fingerprint: 8735bddce68b634c76deac963c61f375902fda4f53bf375da7599002f7593eef
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 88303c01a5d96ecdd62c4f08b84004b2e0271d78a1ec5b008e31cc811247ef66
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 88447be8052fd31472a7cf53719aa1ec52a129d04e9c0ea2683a4085e11dde61
+    note: "Participating mods operate on different stable node indices and agree on expectedNodes. ArchiveXL composes the sector operations safely."
+  - fingerprint: 88b1cf287278d3fa7affeb557f8cc4493a7373a26ab043dc1fe57e5a64bbf8f3
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 89dd01d4343eec8fb2e56214cf2cb1c95847eb0507960ba7a8d61129fc0d69df
+    note: "Participating mods operate on different stable node indices and agree on expectedNodes. ArchiveXL composes the sector operations safely."
+  - fingerprint: 8a2953e9d200da1a51763c327922231321a772757f2f12185c02854d2a3f9046
+    note: "ArchiveXL’s bundled customization patches and Hair Profiles CCXL add distinct appearance/mesh identities across the six hair, brow, and lash targets. ArchiveXL composes them safely."
+  - fingerprint: 8a7f0b2b78e543ac4b541323198456e364726d1d76b03530ada6a16d88c6e921
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 8b1dc0cb713d5a2a6d488c3d13b9ac684df743b333adefee543a14eaed65d543
+    note: "Intentional shared Dark Mods container. Each mod uses a separate subcategory, with no child-control collisions."
+  - fingerprint: 8c12bc94987acadce6d14a99edfed2666059c4c4245feffa20c47a12d72a59c7
+    note: "All providers use Input Loader append semantics, so their child bindings compose. Incompatible child repetitions are checked by separate scanner rules."
+  - fingerprint: 8ed0708ba2ce9c4bfd2f0943b23271dfb37288952873a0f27c33eea1eae1e103
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 8faf78b3e8201e6fd34f6dda090c7af29da14f3d88092a91ba084993ae12fcb4
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 9182250f402065b0ef05632f993e69a977c7013ed42122abc078399090681194
+    note: "Expected exact-path winner from a private fix/compatibility package. The override has been validated and must remain after its upstream mod."
+  - fingerprint: 9266be64d93324fb63e270b70af30609a2eb20d327712a75c6196e60b2ac7a6a
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 9560a3944680277cf74d3d7dfa4bcffb8262d87b4f76f8f447b4d43105f4e924
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: 958be696e2fb95ebb840c00f296c2b89927570be17b4c3880e7d9d318f1d0656
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 95d2beadcd796e0a4c4ef5363039211e348cec486156c88db9bdd7299f017160
+    note: "Intentional multi-package ownership of one configuration scope. Providers contribute distinct valid files; exact-path overlaps are checked separately."
+  - fingerprint: 962d5f616ce4d4bd4a39e921920f8720be4fe891ab5946800710830e2aa63739
+    note: "Intentional full Upgrade Weapons Unlocked replacements for weapon enumeration, tier repair, tier lookup, and quality/Plus progression. Calling wrappedMethod would duplicate inventory processing or apply vanilla quality advancement in addition to the mod’s custom mutation. No unrelated installed mod targets these exact signatures."
+  - fingerprint: 965cd50c90b82bef61eb84f07a5ac4881ad41ce9cd3a433b7306435507392de7
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: 96c459652cc399095cb77b5924c67f20feb93d706b275e77f863913dd274df18
+    note: "nativeInteractions is intentional framework project data; ReferencePathTracing is an empty Vortex-managed residue. Neither is a standalone CET mod, so CET correctly ignores both."
+  - fingerprint: 99cc941637486b3a0af496ec804476d4bb104a61c988da6e0bc700f6442dfbec
+    note: "Verified optional/detection-only GetMod calls. All missing targets are nil-guarded; two are obsolete/incompatible mod checks whose absence is expected."
+  - fingerprint: 9a240cf40d16186d62151bd7c3c8eef3d43c30936a9cc1cfbde01fa7590cec6d
+    note: "Intentional Dodging Fix full-method repair. It preserves the current vanilla selector and adds an in-loop fallback for valid Dodge-ticket actions. The change cannot be composed by calling wrappedMethod before or after, and no other installed mod targets this method."
+  - fingerprint: 9a576cba17f0d7e325ff16d2dfeb08b63d2615949026710e5c7eeaa932be8c1a
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 9a87b435bc3fb2f8728248c7eae0ff002d7039313e7e8d4a6ea578b8f7c0587d
+    note: "Expected Vortex file override. The intended updated, extended, or compatibility-fixed CET entry is deployed, while the original provider is overridden."
+  - fingerprint: 9c0ba300c77b022bfe6940ed0de062d6dc887d561b62841de7d74bfb75628dc7
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: 9d2a7c7941fd38c18f54fea237802f63fa663b0ab12a5d1aa09fbb39aa3fda87
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: 9dadbd9f6b7e3cb2ff0f823af228898c811ab679d600e07a1bb7cf942a637d2e
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: a0422f2ecfcdb7970e2e6b6f09d76e3926342f76741a34626202fd643b7a07c9
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: a10ff5c2a2c96543bf2553e3ac9a7ad2865ed3c2963fedbcc47c25e781b72944
+    note: "Both mods bundle identical More Weapon Mod Slots replacements. All seven method bodies match, so the later replacement is behaviorally equivalent. Recheck after either mod updates."
+  - fingerprint: a133859f332607792d4307cfa5739062995bd6c95af722d46a551d8e4c258993
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: a1ddd380f7693ad24492983ca6cb705516934553374fe317d752b4695d4de9a5
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: a4b8523efee773de5e79eed7f68d6f01af2743f2e2f162a8e2f4504321c5b2d3
+    note: "Intentional multi-package ownership of one configuration scope. Providers contribute distinct valid files; exact-path overlaps are checked separately."
+  - fingerprint: a4fa138a688e9393f24ccf2e938f5e5664b1398a5ff6673f50ca701ea9b38f28
+    note: "Expected Better Armor Tooltip localization-fix override. The fix must win this .xl path to replace the broken es-mx declaration while preserving all other languages."
+  - fingerprint: a50d40d319b1bc367c31f4965cb7a5a10d737f2338f88ae22a8ead83f510210a
+    note: "Intentional multi-package ownership of one configuration scope. Providers contribute distinct valid files; exact-path overlaps are checked separately."
+  - fingerprint: a66176227c19b55a068094758afe6e852186e28836b46c3a20a321f2fef6d8fd
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: a74139ba3e8bd97f36eb166baca0b72a3a1c1e2527f3aa42df37d35b1289ef31
+    note: "Intentional More Mods More Fun / 6 More Weapon Mod Slots repair override. Invalid nonexistent tier references were removed and the runtime errors were confirmed gone. Rebuild after updating any related upstream mod."
+  - fingerprint: a87f5a534083bf0e2cfb7ebe395f7f0e08ef552fa404c0a7d76286cc6dbc6c56
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: a96a031bb2f2bb2d32b1aa6a060235656c422633ffda7d7ffb5ccf0c39b2f29a
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: aa6441afc042d1df552ef289607179f405a54442a1d389d753154bbfe0b1f3f4
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: abcbf3341f1722ab7be691bb7acb072c755da3935fc444403268496bd6730c25
+    note: "Expected exact-path winner from a private fix/compatibility package. The override has been validated and must remain after its upstream mod."
+  - fingerprint: ad481ce9d9c3f11bcdedda3719dbba303c9c4d7a39388e56c9d70d6fdbaa7929
+    note: "Extended supplies the winning init.lua and intentionally reuses GameUI.lua and GameSettings.lua from the original Damage Scaling package. Both imports resolve; keep the base package installed."
+  - fingerprint: adf0f0a43d9fd31d095505b2134a789671b15acc9d7a652ecee56aff1f1b37e1
+    note: "Expected exact-path winner from a private fix/compatibility package. The override has been validated and must remain after its upstream mod."
+  - fingerprint: ae1db5ee43982a7c4637e1e3a61af425007fe1a2b7c5cbd15e0f5df3f8319911
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: ae8e53e9e775f0ed4a4ba6968c153b6ccddded3e42fbd3b5a236dcacd2a25155
+    note: "Identical full-node deletion; repeated application is idempotent."
+  - fingerprint: aed035d7697fe0c67ad827876dc408cd0dd83237c520aeed6e79be10ca23ca22
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: b08de9bfaac84f9f83fd8bf9878b1f21c3487e726f103f2c57a7bf52ea05c99a
+    note: "4x Vending Machine Framework intentionally replaces these vanilla vending nodes and supplies replacement entities in all affected sectors. INCF mutations are redundant; prefer the 4x layouts and appearances."
   - fingerprint: b14d026767dd7dc38cba2adc72702eabe43f6cd9df8ae30e36238ad0d5ed8f8b
     note: "Damage Scaling and Balance - Extended is the selected Vortex winner for the shared localization file."
+  - fingerprint: b20000687e567d75db711af902e65b35993772bf4545f21a4c480c630ddcef72
+    note: "Identical full-node deletion; repeated application is idempotent."
+  - fingerprint: b2c5f421aef8872c2a05534454dbbb2f3fca9c14edd7a0975f6e890dbc46e5f8
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: b2d9e6a3e54b3c681476391f6f97fbeaaeec20a22bd1d3829fa286e52e156577
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: b309a4eab5678fea43942f52b07abcb238a58bb4c5dbd9ea1e530b3e8f56fe1b
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: b37e7948a7abb60955b8d25e6209cc46ae4850ca57382385e425ff8ce2c45b59
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: b3d042b4848beed7ad1335e50209af388310c754d1d290daf7a4dd00180b62c6
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: b4cedadf19ae5a44b3c51b25bdd8f3146c4b7927d3f6a7c6236c3ceb354e5f92
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: b528172afe4c1ceb7b3cc70c9b034cd26802c58f1a53dd53fabbd0839b1c21be
+    note: "Acknowledged from HTML report."
+  - fingerprint: b619c94b27336d8b124c86e54996fe8d47b9177e3c3b1ed244244c799e7c4249
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: b64341c54a3b0a4cd7378d93465daba9bb3f47874bf6c6b070b0f5d5f8a503a3
+    note: "Expected exact-path winner from a private fix/compatibility package. The override has been validated and must remain after its upstream mod."
+  - fingerprint: b64925c10eb3ee5bef7ec724bf740eae1ef667232267c39d9443f2ee24d640f8
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: b9ddffffb90ead7ffd04eac189c087d2e149f5f0fa45e026dcea1c3f26c0a267
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: b9e151a0ae6c25892f9b69f9971e4e9695a3078cf0f9c024c3578e8e374fa61d
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: bcc7b9a70d68453d77f86af9b6df7625b14e691393b41ef43f2e249cd65de727
+    note: "Intentional NCA Prevention-reaction override. It removes vanilla’s blanket rejection of alerted reactions for Prevention NPCs while retaining the normal stimulus filter, coordinated with NCA’s Investigate handling for non-player gunshots."
+  - fingerprint: bd357d0f5502f8f2a61128254c133ec696ac0ba0e3fde91013ab8c74bc729a16
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: bd502ae6cc3d27a2c2e2e710fb1756fa4f0f45b2725f3c2711727f21610ee4b5
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: bf2befd20c88a820e5b92439f4aff24ad90a53d21334703759850e13c99a8665
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: bf53a80a454146de71aeed9c4423509f657881e837f575ee7d140a0b397fb5ae
+    note: "Intentional full UI replacements for the seven-column cyberware grid. Calling wrappedMethod would rebuild the grid or run positioning animations twice. No other installed mod targets these exact signatures."
+  - fingerprint: bf6200d14bf31cd30779f5aecd6c53ea1d551d92fc35ca6a20b9eecf5f6691f3
+    note: "Expected exact-path winner from a private fix/compatibility package. The override has been validated and must remain after its upstream mod."
+  - fingerprint: bfba12947fb186c591b0f7da3a1775e97927ff2e038a343f144cf9335b686f63
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: c1a42e10af71ecd44f9b3f4865402f154c071a12322f24c25d91f9d8af661e4a
+    note: "Expected exact-path winner from a private fix/compatibility package. The override has been validated and must remain after its upstream mod."
+  - fingerprint: c1ee5fc38eb806682cdd32972bb22dcce7ca3c71946d1935189eae339df0dc2a
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: c251b9935b2b4868dc0380cf27026279c2e24943e68d527131ceab64cd032d95
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: c2dda65606f527d610bf1ee3f26dc2a3a794bb64ed590821a7d52f4c02f0154a
+    note: "Expected exact-path winner from a validated private fix or compatibility package. Keep the fix after its upstream mod and rebuild it after upstream updates."
   - fingerprint: c315fecc5e6d605124b5c6dd5cb3f82bd49d3a513b09c0c6cf5eb3172a2871cf
     note: "Damage Scaling and Balance - Extended is the selected Vortex winner for the CET entrypoint."
+  - fingerprint: c3c61380c0409adb325b2d717b6c1c5dd1469a5ddaffdce3a519428a674f5ceb
+    note: "Participating mods operate on different stable node indices and agree on expectedNodes. ArchiveXL composes the sector operations safely."
+  - fingerprint: c7124a8eedcf11e3a6eb8f97229c5971d22e41351ced80c399fc4df63e8a0d94
+    note: "Empty packaged TweakXL placeholder/preset; contributes no operations and overrides no meaningful content."
+  - fingerprint: c7260190cb0987682950df64010ffc58e8b9665e88adc2585c6012c005b03a2c
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: c7ddbd579670b4f10e543098bd849038b626dcfa0c1ae94c522abccef5ae81b2
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: c87ab629065eda440b8f0505423bad34eb476069c855b4b3050675e47f3985c4
+    note: "Expected UTF-8 encoding override. Both files contain semantically identical JSON, while the fix remains the deployed winner to replace the original CP-1252 encoding."
+  - fingerprint: ca028d1afde9fe8f0f874c830c9ae8d23ce0e17f2c140bdc11009603f15d878b
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: caeb9e4fc380267cdfbfd3849f98c9d8cf1b240816e12ffe0c324cfb9aea122b
+    note: "Expected Vortex file override. The intended updated, extended, or compatibility-fixed CET entry is deployed, while the original provider is overridden."
+  - fingerprint: cb28123f9810acb349f10a27a099c9fd4c54dc761ae3262d9a3fc427d3affb39
+    note: "Participating mods operate on different stable node indices and agree on expectedNodes. ArchiveXL composes the sector operations safely."
+  - fingerprint: ccfece371557407a28e37975eff38e91e30b58fe6b0f63c54238855e8c33c010
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: cea2f053c1f2ee2cadedc9c80d1956319a10a023c9154818aa1154f860708030
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: cf02d59aa225ad26f6d6376601826ff18550326feba61ae1dbb27c19b8dbb7ff
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: d26fb9fcf512532a210b204b4abe740933f5e51edeea8fbc6ff888ec4ce0df76
+    note: "Participating mods operate on different stable node indices and agree on expectedNodes. ArchiveXL composes the sector operations safely."
+  - fingerprint: d2c52d3617dc6e05f9f39332d8c8f056626282043ae2e750f271195769b92282
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: d2f06ec886ae2b8acb8cd736a7542019a49ec846eae23918fe92a75360c18bda
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: d46a38f6d52b4f3b8d91265f18af9f2d7210c17404b80246f4a98ab50b4562b7
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
   - fingerprint: d49f9fcc67fc35890f2550b67b43c5cccb77ef926986092e2abb7721ccbca82a
     note: "Damage Scaling and Balance - Extended is the selected Vortex winner for the REDscript file."
+  - fingerprint: d8eafcffe027de80a1e5dea76094f36885871979d2904a50c2a13778c16245f2
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: d9bb2139e6ec2b6934972ba3584f2edfb987cb994a88cdc53b86f88562b36302
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: dbe4f67e9139af962f70fde3d07fb0518ec0d75c251c4726cded436c9047ab83
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: dc8d5d4fad793b2ccd97f4f0ef60afc6bc0c55e6c3f2eb02dca485b4a7025cb4
+    note: "Expected exact-path winner from a private fix/compatibility package. The override has been validated and must remain after its upstream mod."
+  - fingerprint: dc8ded8e4edcf06c950f85a44f067e7a01bfed078b8273dfbaf2f3ea45713631
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: dd20f276526e7221e878b1590a7e6583f50554d611ab9ff93407bd83645cbf68
+    note: "Expected exact-path winner from a validated private fix or compatibility package. Keep the fix after its upstream mod and rebuild it after upstream updates."
+  - fingerprint: dd3c3a888091e67e104bef0eabc9a6ca182523eb7ef24d968f2a5d6393040150
+    note: "Acknowledged from HTML report."
+  - fingerprint: ddeda88b5baebca50c92a6a0da3c32cf0ac904f7ad08d450d3c71373cec09fe5
+    note: "Citizen Breast Physics adds distinct component entries, while Expanded Citizens modifies separate appearance and citizen-data identities across all 36 templates. ArchiveXL composes them safely."
+  - fingerprint: df112ef7e65ea024c993914b14140bce87d15211d4da05e27459c49559d04aad
+    note: "Participating mods operate on different stable node indices and agree on expectedNodes. ArchiveXL composes the sector operations safely."
+  - fingerprint: df36146160d5d0febcbffc268a65a4b0c864e4f4e1290061e44641ad9253f343
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: e36b6cabc99254c289668b1c6f93d2d6038296a91f6990dac10c1d8fe9584f20
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: e416116457e2667e84b7c3013fda215748cad2ae052dfa02146f4f7ee431a1d3
+    note: "Expected exact-path winner from a private fix/compatibility package. The override has been validated and must remain after its upstream mod."
+  - fingerprint: e4291cf2e7c92de385897f3f7c22bd08da8e1e02a56b4e0c555f067ba34137c4
+    note: "Composable TweakXL array mutations. Providers add distinct values without whole-array assignment, duplication, or opposing removals."
+  - fingerprint: e62229aa6b8814e197c773f579991b15b1ddaadcd664033eed14809667f4e306
+    note: "Acknowledged from HTML report."
+  - fingerprint: e7ef0bc5ebab87b9c2b304f0d63f33963d295f761e1478643a6d62022b5b601b
+    note: "Expected exact-path winner from a validated private fix or compatibility package. Keep the fix after its upstream mod and rebuild it after upstream updates."
+  - fingerprint: e813cb4a7f0dac1e4ac596f370799180acd3c77c1991074404721253590f81c6
+    note: "Expected exact-path winner from a private fix/compatibility package. The override has been validated and must remain after its upstream mod."
+  - fingerprint: e98e679cfa0759a0d2d55919c81709de62ebfd58f6684714645606fa9362ff26
+    note: "Empty packaged TweakXL placeholder/preset; contributes no operations and overrides no meaningful content."
+  - fingerprint: eaf08fff6ca8178687864cc1fe9252f7742693ee95113a0bed47a923df6e1158
+    note: "Expected exact-path winner from a validated private fix or compatibility package. Keep the fix after its upstream mod and rebuild it after upstream updates."
+  - fingerprint: edea829ad52a8ca6833859bbff8043f186f57ba96996ef03c14dcfd4fb7ace9f
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: ee7e6c061b59358a8ff6adf0706f6526bca2bb247118188b66ff39708a350334
+    note: "Audited additive CET/REDscript overlap. CET observers remain registered around the effective method; REDscript wrappers preserve wrappedMethod and intentional replacements remain compatible. No patch or load-order rule is required."
+  - fingerprint: f3ed878e82ebaae1d16fdd88e1ed47f29b769c5688dde914b97e9cdd943620e6
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: f4e69803e5695958b69c4689b78158f6e670a6c6cc8e965ba0faf83ece85be52
+    note: "Expected exact-path winner from a validated private fix or compatibility package. Keep the fix after its upstream mod and rebuild it after upstream updates."
+  - fingerprint: f588b51017adf9616d52a7d2c6eb3cfa3ab80bd68939fb72ca00a6f8386768a4
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."
+  - fingerprint: f65e0df01089a75c34e1d91bab74dd9dbaa8f202dc3340b6eb444833d8632c9c
+    note: "Acknowledged from HTML report."
+  - fingerprint: f7698e33ae08b4b320574ca1f4d31eef6d60bc5b5cf3745e39957865b5a218ff
+    note: "Expected exact-path winner from a validated private fix or compatibility package. Keep the fix after its upstream mod and rebuild it after upstream updates."
+  - fingerprint: faf1a3268062b734883e5a01858e9600c1cbfb840e3ff62e051a02c38c17ab28
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: fb822c239e2e887daebf8633a6261f1b5a7bd6c3b7237d63e67a842c36aec72d
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: fc44f76cee03911d6f0a824719f9d3584229c0e8628bc6ba793d5425d681974f
+    note: "Intentional Dodge_Button replacement. The mod preserves the controller binding and changes keyboard dodge from Left Control to Left Shift."
+  - fingerprint: fd7fa1bdacfbf059d8c8bc85e13cbb487e843a3d396ac3a694348b435c683dc9
+    note: "Shared CET observers are additive and all remain registered. Current runtime logs show no related callback failures; no compatibility patch or load-order rule is required."
+  - fingerprint: fdade1b0669afc30f998d9f82e2e148d72627de792cdf8400de997c291493320
+    note: "Intentional private repair override. The deployed winner removes only invalid or rejected TweakXL entries and was validated by a clean runtime rescan. Rebuild after updating the affected upstream mod."
+  - fingerprint: feb8cc2654cc0bf1ad0e6f3c91c863b448d06ece891e7c58cd3853d5f157f218
+    note: "Structurally compatible REDscript wrapper chain; every participant calls wrappedMethod, preserving all wrappers and the original method."

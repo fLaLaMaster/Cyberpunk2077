@@ -6,15 +6,838 @@ do not use it as a raw command transcript.
 
 ## Current state
 
-- Scanner version: `0.28.6`
+- Scanner version: `0.28.11`
 - Implemented ecosystems: ArchiveXL, TweakXL, REDscript, CET Lua, Input Loader XML, RED4ext/native frameworks, CET-to-REDscript hooks, and CET-to-TweakXL TweakDB cross-analysis
 - Primary report: `reports/current/compatibility-report.html`
-- Automated tests: 117 passing
-- Last complete scan: successful on 2026-08-05
+- Automated tests: 123 passing
+- Last complete scan: successful on 2026-08-06
 - The v0.27.0 frozen baseline was not modified by Codex; the user has now begun
   manual review and may change the mod collection
 
 ## History
+
+### 2026-08-06 — Immersive Relic / False Encumbrance compatibility
+
+Traced a behavioral conflict between Immersive Relic English 1.5.1 and False
+Encumbrance Fix 1.0. Immersive Relic intentionally applies
+`BaseStatusEffect.Encumbered` every 0.1 seconds during its malfunction. False
+Encumbrance Fix wraps `PlayerPuppet.OnStatusEffectApplied` and immediately
+reevaluates every Encumbered application, removing it whenever carried weight
+does not justify the status.
+
+Built the Vortex-ready package
+`C:\Games\Programs\Mods\cyberpunk2077-mods\Immersive Relic - False Encumbrance Fix Compatibility-1.0.0.zip`.
+It overrides only False Encumbrance Fix's
+`r6\scripts\FalseEncumbranceFix\FalseEncumbranceFix.reds` and retains the
+upstream file verbatim except for a narrow guard around that immediate
+reevaluation. The guard recognizes Immersive Relic's overlapping
+`IconicDetectorRushPlayerBuffLegendaryPlusPlus` and `JohnnySicknessHeavy`
+markers, which cover the forced-encumbrance interval. Outside that interval,
+False Encumbrance Fix follows its original behavior.
+
+Verified the ZIP contains only the README and expected REDscript path. The
+scanner's REDscript parser extracted one document and 12 annotations with zero
+findings. Package SHA-256 is
+`4EAD2F3EFA3B8876FE0135604AED7DD237551135A897F6BE6A1DB86DB3C9A233`.
+Runtime REDscript compilation and both intentional/stale encumbrance behaviors
+remain to be checked after the user imports and deploys the package after False
+Encumbrance Fix.
+
+### 2026-08-06 — CET override / REDscript chain cross-audit
+
+Audited all four active `XEC-CET-OVERRIDE-REDSCRIPT-CHAIN` findings at source
+level. Killstreak XP's `PlayerDevelopmentSystem.OnExperienceAdded` override
+modifies the request amount and always calls its `wrapped` callback; Better
+Leveling's REDscript wrapper remains reachable and refreshes its Street Cred
+discount after the effective XP operation.
+
+The other three findings are intentional settings-framework dispatch chains.
+Native Settings owns controls only while `nativeSettings.fromMods` is true;
+MCM's REDscript wrappers own only MCM-managed/active controls; mod_settings owns
+only its active settings screen. Non-owned branches delegate to `wrapped` or
+`wrappedMethod`. The grouped Native Settings/MCM finding covers seven compatible
+page-button and integer/float selector methods. No suppressed cross-framework
+behavior, compatibility patch, or load-order requirement was found. All four
+INFO findings are safe to acknowledge; this audit did not modify
+`acknowledgements.yaml`.
+
+### 2026-08-06 — CET observer / REDscript method cross-audit
+
+Audited every currently active `XEC-CET-OBSERVER-REDSCRIPT-METHOD` finding in
+`reports/current/compatibility-findings.json`: 30 consolidated findings spanning
+player lifecycle/input, quest state, settings and menu controllers, shards,
+vendors, damage processing, and HUD initialization. The report contains 74
+REDscript wrappers and four replacements across these findings. Every wrapper
+invokes `wrappedMethod`; the replacements are intentional menu/shard
+implementations, and all CET participants are additive observers around the
+effective REDscript method.
+
+Source-level review found no suppressed method implementation, competing
+replacement, or required compatibility patch. The menu/settings integrations
+operate on the final generated controls, while lifecycle and quest observers
+update separate mod-owned state. All 30 current INFO findings are safe to
+acknowledge. One intentional cumulative interaction remains on the gameplay
+checklist: Flashback Fixer's CET callback changes `hitEvent.attackComputed`
+before Damage Scaling and Balance Extended and Lifepath Bonuses process the same
+hit through REDscript. This is deterministic composition rather than a loader
+conflict, but representative scripted/vehicle combat should be sanity-checked.
+
+At the user's request, added acknowledgements for all 30 audited fingerprints
+directly to `acknowledgements.yaml`. Post-edit validation parsed the YAML as
+version 1 with 241 entries, found zero duplicate fingerprints and zero active
+observer/REDscript findings missing, and confirmed that none of the four active
+`XEC-CET-OVERRIDE-REDSCRIPT-CHAIN` findings was acknowledged by this operation.
+
+### 2026-08-06 — Beautiful Eyebrows 01/02 automatic merge verified
+
+Reviewed the ArchiveXL declarations, serialized customization references, and
+archive manifests for Beautiful Eyebrows 01 and 02. Both intentionally extend
+the female and male `head/name/eyebrows` switcher. Each pack contributes 2,880
+choice identities, 240 customization group entries, 240 scoped resources, and
+160 resource-patch identities; the two sets have zero identity intersections
+in all four categories. Their 402-member archives also have no shared internal
+paths. The only common declarations are four identical copy redirects for the
+male/female base eyebrow morph and mesh resources, already classified as INFO.
+ArchiveXL therefore performs the required merge itself; no private
+compatibility package or archive ordering rule is needed.
+
+### 2026-08-06 — WolvenKit Console upgraded to 8.20.0
+
+Verified that `C:\Games\Programs\WolvenKit-Console\WolvenKit.CLI.exe` now has
+file/product version `8.20.0.0` / `8.20.0` and reports `8.20.0` through the CLI.
+The configured executable path in `cp77compat.yaml` is unchanged, so no scanner
+configuration migration was required.
+
+Because 8.20.0 includes quest and scene graph handling changes, re-opened the
+private Immersive Gigs / Minor Activities compatibility archive with the new
+CLI, selectively extracted its merged questphase, and serialized it back to
+JSON. The extracted CR2W retained the previously validated SHA-256
+`053AE455A3A0C22939A10F90E6D7003D60B3BBB90F3AF95EA5D5097971F279A7`; the
+serialized graph still has 114 top-level nodes and the intended
+`VehicleQuestVisualDestructionEvent.frontLeft: 0` value. A manual invocation
+using the old `-p` option form emitted valid JSON but returned exit code 160;
+the scanner's actual positional `convert serialize <path> --print` invocation
+returned 0 and completed a real provider/cache integration successfully.
+
+Hardened serialization so complete, parseable JSON is accepted even if a
+future WolvenKit invocation supplies an erroneous nonzero status, while a
+nonzero status without valid JSON remains an error. Added both regression
+cases, bumped the scanner to v0.28.11, and passed all 123 tests.
+
+### 2026-08-06 — Immersive Gigs / Minor Activities compatibility archive built
+
+Built private Vortex package `Immersive Gigs - Minor Activities Quest Fixes
+Compatibility-1.0.0.zip`. Used the serialized Immersive Gigs 2.1 resource as
+the merge base and changed only nested phase node 171 / event node 25
+`VehicleQuestVisualDestructionEvent.frontLeft` from `1` to `0`, incorporating
+the Minor Activities Quest Fixes vehicle-damage correction without discarding
+Immersive Gigs' 16 added nodes and graph rewiring.
+
+WolvenKit successfully deserialized the merged JSON, serialized the resulting
+CR2W back to JSON, and produced an exact semantic match with 114 top-level
+nodes and `frontLeft: 0`. Packed the single resource into
+`! 00_immersive_gigs_minor_activities_compat.archive`, re-extracted it by its
+resource hash, and confirmed the extracted CR2W SHA-256 exactly matched the
+validated source. The final ZIP was extracted again and its embedded archive
+also matched exactly.
+
+The deployed game contains `archive/pc/mod/modlist.txt`, currently listing
+Immersive Gigs before Minor Activities Quest Fixes. That file overrides normal
+ASCII filename sorting, so after Vortex deployment the compatibility archive
+must be placed before both source archives through Archive Conflict Checker.
+Deployment, rescan, and deferred quest behavior testing remain pending. Keep
+the package private under the source author's personal-modification terms.
+
+### 2026-08-06 — Immersive Gigs / Minor Activities questphase three-way review
+
+Investigated the archive-member overlap on
+`ma_wat_nid_22_phase.questphase`. Extracted the resource separately from
+Immersive Gigs 2.1 and Minor Activities Quest Fixes 1.12.1, extracted current
+vanilla by its FNV1A resource hash from `basegame_4_gamedata.archive`, and
+serialized all three CR2W files to WolvenKit JSON.
+
+The Minor Activities version differs from vanilla in exactly one semantic
+value after excluding WolvenKit handle IDs: phase node 171 contains nested event
+node 25, where `VehicleQuestVisualDestructionEvent.frontLeft` is changed from
+`1` to `0`. Immersive Gigs retains `1`, adds 16 top-level nodes (263-278), and
+rewires the surrounding quest flow for its cyberpsycho call/randomizer logic.
+The mod authors' public guidance confirms the load-order tradeoff: letting
+Minor Activities win preserves its Six Feet Under vehicle fix but may cause a
+second briefing call with the Immersive Gigs cyberpsycho randomizer; letting
+Immersive Gigs win loses that vehicle fix.
+
+Concluded that this exact conflict is safely mergeable as a private package by
+using Immersive Gigs as the base and changing only `frontLeft` to `0`, then
+deserializing and packing with the already installed WolvenKit Console. No
+additional tool is needed. Package creation awaits an explicit user request;
+the Minor Activities author permits private modifications but not redistribution
+without consent.
+
+### 2026-08-06 — Upgrade Weapons Unlocked terminating-wrapper review
+
+Reviewed the four `RS-WRAPPER-SKIPS-WRAPPED-METHOD` references retained in the
+deployed Better Leveling/Upgrade Weapons Unlocked compatibility override:
+`UpgradingScreenController.GetUpgradableList`, `FillInventoryData`,
+`RPGManager.GetItemTierForUpgrades`, and
+`UpgradingScreenController.ApplyQualityModifier`.
+
+Each is an intentional full replacement. They respectively enumerate ordinary
+weapons rather than vanilla's iconic-only set, repair/filter item tier state,
+reconcile upgrade tier with the actual tier statistic, and implement the full
+quality/Plus transition logic. Calling vanilla as well would duplicate list
+processing, return the wrong tier result, or increment quality twice. The only
+duplicate references in staging are the overridden upstream file and its
+deployed exact-path compatibility winner; no unrelated installed mod targets
+the signatures. Classified the grouped finding as safe to acknowledge without
+another patch.
+
+### 2026-08-06 — Smaller Cyberware Slots terminating-wrapper review
+
+Reviewed the four `RS-WRAPPER-SKIPS-WRAPPED-METHOD` references in Smaller
+Cyberware Slots (7x3): `CyberwareInventoryMiniGrid.SetupData`, `UpdateData`,
+`SetPosition`, and `SetPosition_Animation`. All four copy the current vanilla
+method bodies and intentionally replace the wrapping-count or positioning
+formula for a maximum seven-column grid. Calling `wrappedMethod` would rebuild
+the same inventory grid or run competing positioning animations twice.
+
+The current REDscript reference inventory contains no other annotations for
+the four exact signatures. Cyberware-EX touches the same class but replaces the
+separate `GetSlotToEquipe` method, so it does not conflict here. Classified the
+grouped review finding as intentional and safe to acknowledge without a patch.
+
+### 2026-08-06 — Better Leveling Reflexes level-85 movement fix packaged
+
+Built `Better Leveling Addon - Reflexes Level 85 Gate Fix-1.0.0.zip` as a
+Vortex-ready one-file exact-path override for
+`03_BetterLeveling_ReflexesLevel85Bonus.reds`. The existing Cool level-85 jump
+bonus and attachment logic remain semantically unchanged. The two affected
+movement wrappers now invoke the existing method first and add only a second
+half-strength impulse when the player has Reflexes Skill level 85 or higher.
+Ground dash is untouched; exhausted air dash, normal air dash, and air dodge
+each use the matching vanilla static impulse parameter for the extra 50%.
+
+Validated the override with the official REDscript CLI `lint` command against
+the installed game's `r6/cache/final.redscripts` bundle. The package contains
+only the expected `r6/scripts/Better Leveling Addon/Skill Progression/`
+override and was written to
+`C:\Games\Programs\Mods\cyberpunk2077-mods\Better Leveling Addon - Reflexes
+Level 85 Gate Fix-1.0.0.zip`. Vortex deployment, rescan, and deferred
+below/at-level-85 gameplay checks remain pending.
+
+### 2026-08-06 — Better Leveling four-wrapper review and level-gate defect
+
+Reviewed the four `RS-WRAPPER-SKIPS-WRAPPED-METHOD` references in Better
+Leveling Addon - Skill Progression 1.0.1. The two
+`NewPerksSkillBarLogicController` wrappers (`UpdateSkillsCount` and
+`OnSkillLevelSpawned`) are intentional full vanilla-derived replacements: they
+extend the skill reward UI through level 150 and switch to a selected milestone
+window once the displayed proficiency reaches level 35. Calling vanilla too
+would repopulate the same controller set without that filtering.
+
+The two movement wrappers (`DodgeAirEvents.Dodge` and `DodgeEvents.Dash`) also
+copy current vanilla and change only eligible air impulse from `1.0` to `1.5`,
+so calling vanilla afterward would apply a second impulse and duplicate its
+side effects. Their omission of `wrappedMethod` is structurally deliberate, but
+the implementation has a real upstream gating defect: the file is named for
+the Reflexes level-85 bonus, `BTL.ReflexesLevel85` contains only UI data with no
+effector, and neither wrapper nor any adjacent code checks Reflexes proficiency.
+The 50% air movement bonus therefore applies from a fresh character rather than
+unlocking at Reflexes 85. No other installed script targets any of the four
+exact signatures. Decided not to acknowledge the grouped finding yet; retained
+a compatibility/fix package and before/after-level functional check as pending.
+
+### 2026-08-06 — They Will Remember detection terminating-wrapper review
+
+Reviewed the two `RS-WRAPPER-SKIPS-WRAPPED-METHOD` references in They Will
+Remember 2.5a: `SecurityTurret.SetAsIntrestingTarget(wref<GameObject>)->Bool`
+and `SenseComponent.OnDetectionReachedZero(ref<OnRemoveDetection>)->Bool`.
+
+The current vanilla turret override only returns
+`super.SetAsIntrestingTarget(target)`. TWR preserves that exact delegation for
+ordinary targets but returns `false` when its `NPCClassifier` marks the turret
+friendly and the target is the player. Calling vanilla afterward would discard
+that friendly-turret exclusion. The current vanilla zero-detection callback only
+calls `ReevaluateDetectionOverwrite(evt.target)`; TWR clears its own
+identification, faction-identification, and turf-protection monitoring flags and
+then performs the same reevaluation. Calling vanilla too would merely reevaluate
+the same target twice. No other installed script targets either exact method,
+so both references can be acknowledged without a compatibility package.
+Deferred friendly/hostile turret and reacquisition checks to the consolidated
+in-game validation pass.
+
+### 2026-08-06 — Inventory Adjustments Hub tooltip terminating-wrapper review
+
+Reviewed the two `RS-WRAPPER-SKIPS-WRAPPED-METHOD` references for
+`ItemTooltipModController.SetData`, covering the
+`MinimalItemTooltipModAttachmentData` and `UIInventoryItemModAttachment`
+overloads in Inventory Adjustments Hub 1.4. Both bodies copy the current
+vanilla widget population and deliberately alter it according to the configured
+mod-info scheme: description, name, or name plus description. Calling vanilla
+afterward would clear and repopulate the same container, defeating or
+duplicating the selected presentation. No other installed script annotates
+either exact overload, so the compatibility finding itself can be acknowledged
+without a package.
+
+Found a separate upstream disabled-state edge case: the global IAH switch can
+set `xIAHub.isEnabled` false while the default `modInfoScheme` remains `Name`.
+In that combination the wrappers clear the entries, skip the name because IAH
+is disabled, and skip descriptions because the scheme is `Name`, producing an
+empty non-empty attachment tooltip. This is not a cross-mod conflict and does
+not affect normal default operation because IAH is enabled by default. Deferred
+the three schemes plus global-disable behavior to the consolidated in-game pass;
+a small exact-path guard/fallback package can be made if disabled mode matters.
+
+### 2026-08-06 — Attachments Unrestricted slot-selector terminating-wrapper review
+
+Reviewed the two `RS-WRAPPER-SKIPS-WRAPPED-METHOD` references for
+`InventoryItemModeLogicController.GetMatchingSlot(...)` and
+`InventoryItemModeLogicController.IsMatchingSlot(...)` in Attachments
+Unrestricted 1. Both are intentional full selector replacements. They retain
+vanilla's attachment-list and standard item-type checks while also recognizing
+the mod's TweakXL-defined `HasScopeEquipped` and `HasMuzzleEquipped` stat
+markers, preferring empty native slots and permitting the selected compatible
+slot for the unrestricted behavior.
+
+The active `EquipItem` wrapper uses both selectors for attachment items,
+enforces the optional one-scope, one-silencer, and one-muzzle-brake policies,
+then invokes `EquipPart`; non-attachment items still call vanilla. Calling the
+vanilla selectors as well would discard the custom stat classification and
+cannot meaningfully merge two `TweakDBID`/`Bool` return decisions. No other
+installed script annotates either exact method. The flow composes with
+Retrievable Weapon Mods: Attachments Unrestricted selects the slot and the
+latter handles an occupied-slot swap. No compatibility package is needed;
+deferred representative custom-slot and limit checks to the consolidated
+in-game pass.
+
+### 2026-08-06 — Retrievable Weapon Mods EquipPart terminating-wrapper review
+
+Reviewed `RS-WRAPPER-SKIPS-WRAPPED-METHOD` for
+`InventoryItemModeLogicController.EquipPart(script_ref<InventoryItemData>,
+TweakDBID)->Void` in Retrievable Weapon Mods 1. The wrapper deliberately
+replaces vanilla's occupied-slot handling: instead of rejecting an occupied
+weapon-mod slot or using the destructive replacement path, it immediately
+queues the game's `SwapItemPart` request and records the normal installation
+telemetry.
+
+The current vanilla request removes the existing non-base part, sends the
+equipment/UI uninstall updates, and installs the selected part. Calling
+`wrappedMethod` afterward would run a second install/replacement transaction
+and could duplicate, consume, or reject the operation, so terminating the
+chain is required for the mod's purpose. Attachments Unrestricted contains an
+old wrapper for the same method only inside a block comment; it is not an
+active competitor. No compatibility package is needed. Deferred an in-game
+occupied-slot inventory-count check to the consolidated validation pass.
+
+### 2026-08-06 — NCA Prevention-alert terminating-wrapper review
+
+Reviewed `RS-WRAPPER-SKIPS-WRAPPED-METHOD` for
+`ReactionManagerComponent.CanTriggerAlertedFromHostileStim(ref<StimuliEvent>)`
+in NCA Standard Density 2.2.1. The locally decompiled vanilla body returns
+`false` immediately for every Prevention-system NPC and otherwise delegates to
+`StimFilters.CanTriggerAlertedDirectly`.
+
+NCA deliberately removes only that blanket Prevention exclusion and applies
+the same stimulus filter to all owners. Its adjacent reaction hooks form a
+coherent policy: Prevention NPCs are allowed to process selected stimuli, and
+non-player gunshots that would be Intruder reactions have their priorities
+downgraded to Investigate. Calling vanilla would preserve the early `false` and
+defeat this behavior. No other installed script targets the exact method and
+REDscript compiles successfully. The finding can be acknowledged without a
+compatibility package.
+
+### 2026-08-06 — Equipment-EX transmog terminating-wrapper review
+
+Reviewed `RS-WRAPPER-SKIPS-WRAPPED-METHOD` for
+`UIInventoryItemsManager.IsItemTransmog(ItemID)->Bool` in Equipment-EX 1.2.9.
+The vanilla method checks a cached list of the six active wardrobe override
+items. Equipment-EX intentionally replaces that ownership model with
+`OutfitSystem.IsActive() && OutfitSystem.IsEquipped(itemID)`.
+
+The surrounding implementation confirms a complete wardrobe subsystem swap:
+on first use it imports vanilla clothing sets as named Equipment-EX outfits; on
+restore it invalidates any active vanilla clothing set; vanilla wardrobe
+equip/unequip handlers are replaced with no-ops; and the inventory, wardrobe,
+preview, and photo-mode paths use Equipment-EX's persistent outfit state.
+Combining the stale vanilla cache with the custom state would misclassify items.
+No other installed script targets the exact method and REDscript compiles
+successfully. The finding can be acknowledged without a compatibility package.
+
+### 2026-08-06 — Dodging Fix AI-selector terminating-wrapper review
+
+Reviewed `RS-WRAPPER-SKIPS-WRAPPED-METHOD` for
+`TweakAIActionRecord.GetActionRecordFromSelector(...)` in Dodging Fix 0.11.
+Compared the complete 90-line mod body with the same method from the locally
+decompiled current vanilla script bundle.
+
+The mod preserves the vanilla selector traversal, alternatives limit, null
+handling, animation-variation blackboard state, iterator updates, and default
+action fallback. Its intended delta is inside the traversal: after normal
+`AICondition.ActivationCheck` rejects an action carrying `AITicketType.Dodge`,
+the mod accepts it when that action's own activation condition passes. This
+cannot be added by calling the already-completed vanilla method before or after
+the wrapper. No other installed script targets the exact method, and current
+REDscript compilation succeeds. The finding is an intentional full-method
+repair and can be acknowledged without another compatibility package.
+
+### 2026-08-06 — Cyberware-EX perk-level terminating-wrapper review
+
+Reviewed `RS-WRAPPER-SKIPS-WRAPPED-METHOD` for
+`PlayerDevelopmentData.HandleAddingPerkLevel(Int32,Int32)->Void` in the
+deployed Cyberware-EX / VanillaPlus Parkour compatibility override. Used the
+official redscript 0.5.31 CLI from `jac3km4/redscript` in the ignored scanner
+cache to decompile the local vanilla `final.redscripts` bundle.
+
+The vanilla method handles Technical Central Milestone 3 level 3 by powering up
+musculoskeletal cyberware slots 0, 1, and 2. Cyberware-EX deliberately replaces
+that body with `ApplyAreaPowerUps(MusculoskeletalSystemCW)`, which iterates all
+slots so its expanded slots receive the same treatment. It is the only active
+installed annotation for the exact signature. Calling `wrappedMethod` would
+repeat the vanilla effect on slots 0–2 and is not appropriate. No compatibility
+package is needed; acknowledge this as an intentional superseding wrapper.
+
+### 2026-08-06 — Always First Equip terminating-wrapper review
+
+Reviewed the single `RS-WRAPPER-SKIPS-WRAPPED-METHOD` finding for
+`EquipCycleDecisions.ToFirstEquip(ref<StateContext>,
+ref<StateGameScriptInterface>)->Bool` in Always First Equip 2.1.5. The wrapper
+unconditionally returns `false`, but this is deliberate: the mod disables the
+vanilla transition decision and implements its configurable first-equip choice
+through its `FirstEquipSystem.HasPlayedFirstEquip` wrapper and full
+`EquipmentBaseTransition.HandleWeaponEquip` replacement.
+
+No other installed `.reds` file annotates `EquipCycleDecisions`, and the current
+REDscript log compiled the mod successfully into `final.redscripts.modded`.
+Calling `wrappedMethod` here would re-enable the vanilla decision path and work
+against the mod's replacement design. No compatibility package is needed; the
+review finding can be acknowledged as an intentional terminating wrapper. A
+basic first-equip/cooldown/hotkey behavior check was added to the consolidated
+gameplay checklist.
+
+### 2026-08-05 — Missing CET GetMod target review
+
+Reviewed all six active `CET-GETMOD-TARGET-MISSING` call sites. Every absent
+target is an optional integration or a deliberate presence/conflict probe, and
+all usages are nil-safe:
+
+- Immersive First Person returns only a boolean presence check for
+  `BetterVehicleFirstPerson`.
+- Minimap Widgets uses `TimeIsRunningOut` to enable a fifth clock mode, falls
+  back to modes 1–4 when absent, and checks the handle again before use.
+- Personal Link Animations Patch checks for the obsolete predecessor `Jacking
+  Animation Patch`; absence is the desired state.
+- RadioExt stores the optional `trainSystem` handle, and `handleTS()` guards
+  both the handle and its `stationSys` member.
+- Redscript and CET Mods Settings checks for incompatible
+  `UnifiedModSettings`; absence is likewise the desired state.
+
+No package or dependency installation is needed. The consolidated review
+finding can be acknowledged as expected optional integrations with nil guards.
+
+The user also confirmed the Clothing Improved / Quickhack Fixes runtime-flat
+override report disappeared after deploying its compatibility package and
+rescanning.
+
+### 2026-08-05 — Clothing Improved / Quickhack Fixes Wreath compatibility
+
+Investigated the cross-ecosystem runtime overwrite of
+`Items.IntrinsicFabricEnhancer10_inline2.value`. Quickhack Fixes repurposes the
+record as a combined modifier with `value: 1`: it transfers
+`IntrinsicQuickHackUploadBonus` into `Transfer_USpeed_QHF`, then its Wreath GLP
+applies that custom stat to `QuickHackUploadTimeDecrease` with a separate
+`0.01` factor. Clothing Improved's CET `onInit` subsequently writes `-0.01` to
+the same flat. That reverses and reduces the transferred stat by 100 times
+before the GLP factor, largely breaking the Wreath upload-speed correction.
+
+Clothing Improved labels the field as unknown and writes the documented old
+vanilla value, so the write is redundant without Quickhack Fixes and harmful
+with it. Created
+`C:\Games\Programs\Mods\cyberpunk2077-mods\Clothing Improved - Quickhack Fixes Wreath Compatibility-1.0.0.zip`
+as a one-file exact CET entrypoint override that removes only this `SetFlat`
+call. Exact diff confirms the single-line removal. Focused CET and TweakXL
+parsing is clean, no active CET write remains for the target, the cross finding
+disappears in simulated deployment, and the CET/cross-ecosystem unit suites
+pass (13 tests). ZIP SHA-256:
+`C8774DA35019A5D6BFCA39E844FB8E0F693BFA6486ACEC63FCC4D7ACD9282FC2`.
+The user subsequently deployed the package and confirmed the cross-ecosystem
+report disappeared after launch and rescan. Wreath behavior remains on the
+consolidated gameplay checklist.
+
+### 2026-08-05 — Weapon-slot dangling collectible references
+
+The user confirmed the Better Leveling / Upgrade Weapons Unlocked terminated
+wrapper-chain report disappeared after deploying the compatibility package and
+rescanning.
+
+Resolved all 12 hash-only `TXL-RUNTIME-DANGLING-REFERENCE` events on
+`Items.TechMod2_Common.placementSlots`. Each hash maps exactly to an
+`AttachmentSlots.*_Collectible` name; the length displayed by TweakXL is
+hexadecimal. The missing set is the two Smart AR/SMG/LMG, two Tech AR/SMG/LMG,
+two Tech handgun, two Power precision/sniper, two Smart shotgun, and two Tech
+shotgun collectible slots. TweakXL's post-import validation proves those
+records remain absent after every installed config loads. More Mods More Fun
+and Attachments Unrestricted both append the same invalid set; creating new
+records would be ineffective because no weapon owns these nonexistent slots.
+
+Created the replacement package
+`C:\Games\Programs\Mods\cyberpunk2077-mods\More Mods More Fun - 6 More Weapon Mod Slots Ambiguous Record Fix-1.1.0.zip`.
+It retains all six 1.0.0 ambiguity-repair overrides, removes only the 12 invalid
+collectible references from `MoreModsMoreFun_Ranged.yaml`, and adds one exact
+`Attachments Unrestricted.yaml` override removing the same 12 references.
+All seven YAML documents parse without errors; 36,193 expanded references were
+extracted, the TweakXL unit suite passes (14 tests), and exact diffs confirm no
+other content change apart from the source file's final newline normalization.
+ZIP SHA-256:
+`9702C02680D0ACA6E1BEE798327E5BE400D807FD597AA5E31FB07765AB1889DE`.
+The user subsequently replaced 1.0.0 with 1.1.0 and confirmed the report is
+clear after launch and rescan. Functional slot/attachment verification remains
+deferred to the consolidated gameplay pass.
+
+### 2026-08-05 — Better Leveling / Upgrade Weapons Unlocked upgrade merge
+
+Investigated the terminated REDscript wrapper chain for
+`CraftingSystem.UpgradeItem(wref<GameObject>, ItemID)->Void`. Both Better
+Leveling Addon - Skill Progression and Upgrade Weapons Unlocked contain full
+standalone upgrade implementations and neither calls `wrappedMethod`; adding a
+call would execute two material-removal, XP, and item-upgrade routines and is
+therefore unsafe.
+
+Created
+`C:\Games\Programs\Mods\cyberpunk2077-mods\Better Leveling Addon - Upgrade Weapons Unlocked Compatibility-1.0.0.zip`
+as a two-file exact-path overlay. It removes Better Leveling's duplicate
+`UpgradeItem` annotation while retaining its Technical 150 helper, converts
+Upgrade Weapons Unlocked's complete implementation from a terminating wrapper
+to an explicit replacement, and folds in Better Leveling's Technical 150
+double upgrade-marker step plus persistent per-upgrade weapon damage bonus.
+The Upgrade Weapons Unlocked material, quality/plus, iconic, XP, and
+upgrade-to-max logic otherwise remains intact.
+
+Focused scanner validation found one active `method.replace` reference for the
+exact signature, no parse findings, and no comparison finding for it. The
+REDscript unit suite passes (3 tests). ZIP SHA-256:
+`8337E7B9ADE0C68FFBD0E27F20CA5A5CE7F58390ED5102EBBB5B6935AC4F4867`.
+The user subsequently deployed the package and confirmed the report
+disappeared after the next launch and rescan. Full upgrade-behavior testing
+remains deferred to the consolidated gameplay pass.
+
+### 2026-08-05 — Night City Skies intentional schema override review
+
+Verified the remaining `CFG-PATH-OVERRIDE` for
+`NightCitySkies.schema.json`. The local repair is the deployed winner and is a
+valid three-byte `{}` JSON document; the upstream provider is correctly marked
+overridden and still fails at line 51 because it concatenates two root objects.
+This is not a new compatibility defect. The finding is technically accurate
+configuration provenance but expected for the deliberate repair and should be
+acknowledged with that reason rather than patched again.
+
+The user also confirmed the Missing Persons Spanish UTF-8 warning disappeared
+after deploying its one-file repair and rescanning.
+
+### 2026-08-05 — Missing Persons Spanish UTF-8 repair
+
+Investigated Missing Persons 2.3.0's `languages\es-es.json` encoding warning.
+The source is structurally valid JSON, but the entire localized document is
+Windows-1252: 16 non-ASCII bytes encode the title's en dash and all accented
+characters. This is not safely repairable by replacing only byte `0x96`.
+
+Created
+`C:\Games\Programs\Mods\cyberpunk2077-mods\Missing Persons - Spanish UTF-8 Fix-1.0.0.zip`
+as a one-file exact-path override. Strict UTF-8 parsing succeeds without a BOM
+or replacement characters. The converted document has the same 25 entries and
+the exact same scanner semantic hash as the CP-1252 source. Simulated deployment
+has zero `CFG-NON-UTF8` findings and only the expected informational identical
+path notice. ZIP SHA-256:
+`72CC1D07716FD69D17D4634579E57A70D333C651D8203203EB4BF48D2C6B3017`.
+
+The user confirmed the preceding Breaching obsolete-hook runtime finding
+disappeared after deployment and rescan.
+
+### 2026-08-05 — Breaching obsolete pause-menu Credits hook repair
+
+Attributed CET's otherwise anonymous runtime failure for
+`MenuScenario_PauseMenu.OnSwitchToCredits`. Five deployed mods contain an old
+GameUI table with that row, but reachability and subscription analysis isolates
+the emitter to `CsBreachingBreached`: it alone calls `GameUI.Listen("MenuNav")`
+and therefore initializes the menu-observer table. Weather Switcher, Missing
+Persons, Pacifica Typhoon, and RadioExt load their copies only for session
+events. Multiple newer installed GameUI variants already omit the obsolete
+method, and CET confirms it is absent from current RTTI.
+
+Created
+`C:\Games\Programs\Mods\cyberpunk2077-mods\Breaching - Obsolete Credits Hook Fix-1.0.0.zip`.
+It bundles the complete three-file `CsBreachingBreached` CET root to avoid a
+cross-package module notice, removes only the `OnSwitchToCredits` table row,
+and leaves `init.lua` plus `GameSettings.lua` byte-identical to upstream. All
+literal imports resolve and both upstream/patched roots retain the same
+unrelated optional `GetMod` review finding. ZIP SHA-256:
+`EDDFC756A070DA52359EA847F3188346C890DC1744AA0FB9627F737FF9C03D1B`.
+
+The user confirmed the preceding No Shooting Delay missing-module report
+disappeared after deploying its repair and rescanning.
+
+### 2026-08-05 — No Shooting Delay stale module import repair
+
+Investigated No Shooting Delay 1.2-fix's `CET-MODULE-MISSING` finding. Its
+entrypoint requires `Modules/main.lua`, but the source and deployed roots
+contain only `functions.lua`, `Language File.lua`, and `Native Settings.lua`.
+The allegedly missing implementation is not missing: the same `init.lua`
+defines the complete global `main()` function later in the file and invokes it
+from `onInit`. The per-mod runtime log is empty, consistent with CET continuing
+past the ignored module return. Pre-fix `buffer.json` creation and later
+`config.json` updates prove that the registered `onInit` callback ran under CET
+1.37.1, so the upstream mod was likely functional despite this warning. The
+literal require remains structurally invalid and fragile across loader changes.
+
+Created
+`C:\Games\Programs\Mods\cyberpunk2077-mods\No Shooting Delay - Missing Module Require Fix-1.0.0.zip`.
+It removes only `require("Modules/main.lua")` from the upstream entrypoint and
+bundles all three unchanged upstream module files. Bundling the complete
+four-file root avoids introducing a scanner cross-package dependency after the
+exact-path override. Focused validation parsed all four Lua documents, resolved
+the three remaining requires, and produced zero CET findings; hashes confirm
+all bundled module files are byte-identical to upstream. ZIP SHA-256:
+`0A00EF9A151C7216344E1887469A8E1630C4A65600688466BFBAA2F9BC3E0961`.
+
+The user also confirmed cleanup 1.1.1 removed the seven NCEE localization
+warnings after deployment and rescan.
+
+### 2026-08-05 — NCEE localization fallback correction and cleanup 1.1.1
+
+The user confirmed cleanup 1.1.0 removed the missing Italian resource finding,
+but its next game session produced seven ArchiveXL localization-overwrite
+warnings. Exact rotated-log context showed the standalone Italian-only config
+loaded `localization\it-it\onscreens\ncee_onscreens.json` under an English game
+session, after which NCEE's main config loaded `en-us` and overwrote the seven
+custom secondary-key entries (`clouds_reaberta`, `Micky`, `ncee_maelsripper`,
+and four Rocky Ridge/Panam keys). ArchiveXL uses a config's sole locale as a
+fallback, so the separate one-locale `.xl` architecture was incorrect. The
+reported Mod Settings participant came from stale `Loading` context rather than
+the localization resource actually preceding the warnings.
+
+Created
+`C:\Games\Programs\Mods\cyberpunk2077-mods\HG Enemies and NCEE - Missing NG Plus Hook Cleanup-1.1.1.zip`.
+It keeps `hidden_gem_enemies.xl`, `ncee_inimigos.xl`, and `ncee_npcs.xl`
+byte-identical to cleanup 1.0.0, retains the valid one-resource Italian archive,
+and removes the standalone Italian `.xl`. Italian is therefore selected only
+through NCEE's complete 19-locale map. Simulated ownership and resolution show
+no parse, resource, quest, or archive-collision findings. ZIP SHA-256:
+`780099E4A39D1A31214CEA07051CFE2B6D6A418D1126ED4409B817A07A9CE640`.
+
+Extended archive-resource resolution so a logical original mod reference can
+be satisfied by a companion archive belonging to the package that supplied the
+active exact-path `.xl` override. Also added precise parsing of ArchiveXL's
+`Merging entries from` / `Item #... overwrites entry` sequence: overwrite
+events now carry the actual resource path and key instead of inheriting stale
+config attribution. Bumped the scanner to v0.28.10. All 121 tests pass, and the
+user's exact log now parses as seven NCEE `en-us` overwrite events with no Mod
+Settings attribution. The user later deployed cleanup 1.1.1 and confirmed the
+seven warnings disappeared after launch and rescan.
+
+### 2026-08-05 — NCEE NPC missing Italian localization and cleanup 1.1.0
+
+Investigated NCEE NPC 2.0.3's missing
+`localization\it-it\onscreens\ncee_onscreens.json`. Its active NG-cleaned
+`ncee_npcs.xl` declares 19 locales, but the source archive contains 18 and omits
+only Italian. No alternate Italian resource exists in the installed collection
+or local downloads. The current mod file on Nexus is version 2.0.3.
+
+Created a proper 14-entry Italian CR2W localization from the mod's English
+source entries, preserving identifiers, primary keys, Cyberpunk terminology,
+names, and line breaks. WolvenKit 8.19.0 compiled the resource, packed it into a
+one-member archive, unpacked it, and successfully serialized it again with all
+14 expected entries.
+
+Because `ncee_npcs.xl` was already overridden by the optional NG+ cleanup,
+created
+`C:\Games\Programs\Mods\cyberpunk2077-mods\HG Enemies and NCEE - Missing NG Plus Hook Cleanup-1.1.0.zip`
+as a replacement for version 1.0.0. It retains `hidden_gem_enemies.xl` and
+`ncee_inimigos.xl` byte-for-byte, removes only the missing Italian declaration
+from the cleaned `ncee_npcs.xl`, and re-registers Italian through a separate
+patch-owned `.xl` and archive. A simulated deployment after removal of cleanup
+1.0.0 resolves all 19 localizations and all 18 retained quest attachments with
+no parse, missing-resource, implicit cross-mod, quest, or archive-collision
+findings. ZIP SHA-256:
+`9D16106E9ACCC34B32FA22586649B44874A6DEA528983BC412E53AA76A4E75A4`.
+
+The user must uninstall cleanup 1.0.0 from Vortex before importing 1.1.0, then
+make 1.1.0 win the original three `.xl` conflicts. The user also confirmed the
+preceding Better Armor Tooltip localization finding disappeared.
+
+### 2026-08-05 — Better Armor Tooltip missing es-mx localization repair
+
+Investigated Better Armor Tooltip 1.0.1's
+`AXL-RESOURCE-NOT-INDEXED` finding. `BetterArmorTooltip.archive.xl` declares
+19 locales, while the 16 KiB archive contains exactly 18 cooked localization
+resources and omits only
+`better_armor_tooltip\localization\es-mx.json`. The author describes the
+corrected tooltip as available in all languages, so deleting the declaration
+without replacement would suppress the warning while leaving Latin American
+Spanish users with the original inaccurate tooltip text.
+
+Created
+`C:\Games\Programs\Mods\cyberpunk2077-mods\Better Armor Tooltip - Missing Latin American Spanish Fix-1.0.0.zip`.
+Its exact-path `BetterArmorTooltip.archive.xl` override removes only the bad
+line. A separate `BetterArmorTooltip-es-mx-fix.archive.xl` registers that locale
+from a one-member companion archive containing a cooked copy of the author's
+existing `es-es` translation. This keeps every valid original localization in
+the original archive and gives the repair package explicit ownership of the
+new resource.
+
+WolvenKit 8.19.0 indexed the generated archive with exactly one resolved member.
+Its unpacked member is byte-identical to the packed input (SHA-256
+`483A6E58D44A5BCB9826F56C53113EB13FF441761765C3570B99D005F005DC2C`).
+The real ArchiveXL parser and a simulated active deployment resolve all 19
+localization declarations with no parse, missing-resource, implicit cross-mod,
+or archive-collision findings. ZIP SHA-256:
+`3B8A39C73CF693E9859A0874680B7F0AA4D9EB68A90096F8947A2526BAC829AB`.
+Deployment/rescan and optional Latin American Spanish UI validation remain with
+the user. The user also reported that the preceding They Will Remember repair
+looks good.
+
+### 2026-08-05 — They Will Remember Maelstrom redemption phase repair
+
+Investigated They Will Remember 2.5a's two missing-child declarations. The
+source `.xl` points both the base-game and Phantom Liberty roots at nonexistent
+`mod\they_will_remember\quest\retaliation_quests\retaliation_maelstrom_pt1.questphase`.
+The mod archive instead contains the otherwise undeclared
+`redemption_quests\redemption_maelstrom_pt1.questphase`. Selective WolvenKit
+serialization shows that phase consumes the Maelstrom degree-one fact and sets
+`twr_redemption_part1_0`, matching the mod's REDscript redemption database and
+flow. This is a directory/name copy-paste typo rather than an optional missing
+dependency.
+
+Created
+`C:\Games\Programs\Mods\cyberpunk2077-mods\They Will Remember - Maelstrom Redemption Phase Fix-1.0.0.zip`.
+Its full exact-path `they_will_remember.xl` override changes only the two bad
+paths to `redemption_quests\redemption_maelstrom_pt1.questphase`. The real
+ArchiveXL parser accepts the document with no findings; archive-manifest
+resolution reports 32 owned child phases, zero missing children, 32 official
+parents, and zero missing parents. ZIP SHA-256:
+`3FA8F2122A1EA8A8209C50DF98A54C3AB99FAA0D15BE53B397CBF5D079B8CD10`.
+Deployment, refreshed runtime verification, and later Maelstrom redemption
+gameplay validation remain with the user.
+
+The user also confirmed that the previously deployed HG Enemies/NCEE optional
+NG+ hook cleanup removed its report findings.
+
+### 2026-08-05 — HG Enemies/NCEE optional NG+ hook cleanup
+
+Investigated three missing quest parents shared by HG Enemies 1.0.0, NCEE
+Enemies 2.6.0, and NCEE NPC 2.0.3. Their `.xl` files attach 23 distinct child
+phases to both `base\quest\cyberpunk2077.quest` and
+`ep1\quest\ep1_standalone.quest`, then repeat every child against three absent
+`mod\quest\newgameplus*` roots. This produces 69 skipped declarations,
+consolidated by ArchiveXL into three warnings. The latest runtime session
+confirms all 23 normal child phases merged successfully. None of the authors'
+current Nexus requirements list a New Game Plus provider; NCEE Enemies 2.5
+explicitly added compatibility with Hidden Gems Enemies.
+
+Created
+`C:\Games\Programs\Mods\cyberpunk2077-mods\HG Enemies and NCEE - Missing NG Plus Hook Cleanup-1.0.0.zip`.
+It contains only `hidden_gem_enemies.xl`, `ncee_inimigos.xl`, and
+`ncee_npcs.xl`. Automated exact-line comparison confirms every override differs
+from its installed source only by removal of the NG+ path/parent pairs. The real
+ArchiveXL parser accepts all three documents with no findings, retains 46 child
+and 46 parent references, and contains no NG+ reference. ZIP SHA-256:
+`2C4EEA79B60A61ED454D6C6FF4897C1E213BD42FA55D636311E2E4DF33F7C362`.
+
+Extended ArchiveXL exact-path logical ownership to accept arbitrarily large
+deletion-only overrides when there is one unique source provider. This keeps
+the cleanup's surviving declarations attributed to their original mods rather
+than creating false cross-mod dependencies. Bumped the scanner to v0.28.9 and
+added regression coverage; all 119 tests pass. Deployment and refreshed runtime
+verification remain with the user. The package must be disabled or rebuilt if
+an actual NG+ provider is installed or any affected source mod updates.
+
+### 2026-08-05 — ArchiveXL quest scope-alias resolution
+
+Investigated Immersive Gigs' reported missing parent `cyberpunk2077.quest`.
+The declaration is valid: ArchiveXL's deployed `Bundle/QuestBaseScope.xl`
+defines that identifier as a resource scope combining the base-game and
+Phantom Liberty quest roots. The latest runtime log confirms ArchiveXL merged
+`mod\manual_gigs\quest\manual_gigs_update_2_1.questphase` successfully from
+`!Immersive_gigs.archive.xl`.
+
+Updated quest-parent resolution to index active `resource.scope` declarations.
+Framework-bundled scopes are classified as official parents; custom scopes
+retain own-provider or cross-mod dependency semantics. Added a regression case
+for the bundled quest root and bumped the scanner to v0.28.8. All 118 tests
+pass. A full current-corpus scan completed successfully and removed the
+Immersive Gigs finding. The three genuinely absent New Game Plus parent
+resources used by HG Enemies/NCEE remain active, confirming that missing-parent
+detection was not weakened. No compatibility package is needed for Immersive
+Gigs.
+
+### 2026-08-05 — INCF streaming-mutation syntax repair and unsupported operations
+
+Investigated the 10 `AXL-NODE-MUTATION-IGNORED` and nine
+`AXL-NODE-MUTATION-UNKNOWN-FIELD` occurrences in the active lantern-fixed
+`INCF.xl`. Cloned the official ArchiveXL source at commit
+`55f48569f415b443debba4f4ad4cf241194cd06e`; its declared version is 1.27.1,
+matching the installed runtime/file version. The implementation parses only
+mapping-shaped actor/instance mutations, applies element transforms only to
+collision/instanced mesh/destructible nodes, ignores unknown `nodeRefHash`, and
+explicitly applies `nbNodesUnderProxyDiff` only when it is positive.
+
+Seven negative proxy-count mutations and their seven `nodeRefHash` fields have
+no safe ArchiveXL equivalent. Three scalar `actorMutations` entries target a
+`worldFoliageNode`; translating them to partial deletions would be unsafe because
+ArchiveXL 1.27.1 falls through to deleting the whole unsupported node type.
+These 17 evidence records therefore remain visible for acknowledgement and an
+author report rather than being hidden by a behavior-changing guess.
+
+Two unknown fields are unambiguous spelling mistakes. Selectively extracted and
+serialized the seven affected vanilla sectors with WolvenKit 8.19.0. Setup 815
+in `exterior_-13_12_0_0` is the expected `worldStaticMeshNode`, and `sscale`
+was corrected to `scale`. Setup 2353 in `exterior_-31_42_0_0` resolves to the
+expected `worldCollisionNode` with 64 instances, and element 42's `rientation`
+was corrected to `orientation`.
+
+Created
+`C:\Games\Programs\Mods\cyberpunk2077-mods\Immersive Night City Fixes - Combined Streaming Fixes-1.1.0.zip`.
+It supersedes the former lantern-only package and differs from upstream INCF
+0.31-HF by exactly three semantic lines: the lantern index 18,812 to 1,812 plus
+the two spelling corrections. Scanner parsing produces both corrected mutation
+references, reduces unknown mutation fields from nine to seven, and preserves
+the 10 intentionally unresolved ignored operations. The ZIP contains only
+`archive/pc/mod/INCF.xl` and has SHA-256
+`DC71E52496BC13CB436F56560B0A7180E66F9FED482D18BB4AD60FD6D197D67F`.
+The user disabled/replaced the older lantern-only package, deployed the combined
+package as the sole winner, and rescanned. The result matched the prediction:
+the two repairable unknown fields disappeared, the unsupported operations
+remained without new unexpected errors, and the user acknowledged the residual
+findings with their ArchiveXL limitation documented.
+
+### 2026-08-05 — Cyberware-EX / VanillaPlus Parkour REDscript compatibility
+
+Investigated the competing
+`DoubleJumpDecisions.EnterCondition(ref<StateContext>,
+ref<StateGameScriptInterface>)->Bool` replacements. VanillaPlus Parkour's
+effective body already preserves Cyberware-EX's compatibility behavior: both
+allow modded charge/hover cyberware to coexist with double jump. Parkour also
+intentionally removes the fall-speed rejection. Its later replacement is
+therefore a functional superset of the Cyberware-EX body, but REDscript still
+reports the earlier annotation as overwritten.
+
+Created the Vortex-ready package
+`C:\Games\Programs\Mods\cyberpunk2077-mods\Cyberware-EX - VanillaPlus Parkour Compatibility-1.0.0.zip`.
+It overrides only `r6/scripts/CyberwareEx/CyberwareEx.Global.reds` from
+Cyberware-EX 1.5.6 and removes exactly the redundant 28-line replacement block;
+all other Cyberware-EX code is preserved. VanillaPlus Parkour remains the sole
+active replacement. This full-file override is version-specific and must be
+removed or rebuilt when Cyberware-EX updates.
+
+Simulated Vortex deployment with the upstream Cyberware-EX file overridden,
+the compatibility copy deployed, and VanillaPlus Parkour deployed. The parser
+found one active target reference, owned by VanillaPlus Parkour, with no target
+finding and no REDscript conflicts. REDscript exact-path winners now inherit a
+unique upstream logical owner when the winning file is a small edit (no more
+than 64 changed lines and 10% of the source), while retaining the physical
+compatibility package in provenance. This prevents full-file repair overlays
+from appearing as unrelated mods. Bumped the scanner to v0.28.7 and added a
+regression test. All 118 automated tests pass with warnings as errors. The ZIP
+contains the one intended script and has SHA-256
+`A72B8D965EA82FF607C36152A3A27D000CF3852FBD312139DB805D1979066039`.
+The author packages and deployed game were not modified.
 
 ### 2026-08-05 — ArchiveXL exact-path winner and repair-lineage correction
 

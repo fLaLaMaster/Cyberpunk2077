@@ -26,6 +26,57 @@ def artifact(path: Path, mod: str = "Example") -> Artifact:
 
 
 class RedscriptTests(unittest.TestCase):
+    def test_small_exact_path_override_inherits_logical_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            original_path = root / "original" / "shared.reds"
+            winner_path = root / "fix" / "shared.reds"
+            original_path.parent.mkdir()
+            winner_path.parent.mkdir()
+            padding = "\n".join(f"// padding {index}" for index in range(30))
+            original_path.write_text(
+                f"""{padding}
+@addMethod(Target)
+public func Kept() -> Bool {{ return true; }}
+@replaceMethod(Target)
+public func Removed() -> Bool {{ return false; }}
+""",
+                encoding="utf-8",
+            )
+            winner_path.write_text(
+                f"""{padding}
+@addMethod(Target)
+public func Kept() -> Bool {{ return true; }}
+""",
+                encoding="utf-8",
+            )
+
+            original = artifact(original_path, "Original")
+            original.relative_path = r"r6\scripts\shared.reds"
+            original.deployed_state = "overridden"
+            winner = artifact(winner_path, "Compatibility Fix")
+            winner.relative_path = r"r6\scripts\shared.reds"
+
+            documents, references, findings = parse_redscript_documents(
+                [original, winner]
+            )
+
+            self.assertEqual([], findings)
+            self.assertEqual(2, len(documents))
+            self.assertEqual("Original", documents[1].mod_name)
+            active = [
+                item for item in references
+                if item.details["deployed_state"] != "overridden"
+            ]
+            self.assertEqual(1, len(active))
+            self.assertEqual("Original", active[0].mod_name)
+            self.assertEqual(str(winner_path), active[0].source_path)
+            self.assertEqual(
+                "Compatibility Fix", active[0].details["deployed_mod_name"]
+            )
+            self.assertEqual("Original", active[0].details["override_origin"])
+            self.assertEqual([], compare_redscript_references(references))
+
     def test_extracts_full_method_signatures_fields_and_wrapper_calls(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "example.reds"

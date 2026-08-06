@@ -401,13 +401,23 @@ class WolvenKitArchivePayloadProvider:
                     "stderr": completed.stderr[-4000:],
                 }
             )
+            try:
+                data = json.loads(completed.stdout.lstrip("\ufeff").strip())
+            except json.JSONDecodeError as exc:
+                if completed.returncode != 0:
+                    raise RuntimeError(
+                        completed.stderr.strip()
+                        or (
+                            f"WolvenKit exited with code {completed.returncode} "
+                            "and did not emit valid serialized JSON"
+                        )
+                    ) from exc
+                raise
             if completed.returncode != 0:
-                raise RuntimeError(
-                    completed.stderr.strip()
-                    or completed.stdout.strip()
-                    or f"WolvenKit exited with code {completed.returncode}"
-                )
-            data = json.loads(completed.stdout.lstrip("\ufeff").strip())
+                # WolvenKit 8.20.0 can emit a complete serialized document but
+                # still return 160. Valid JSON is stronger evidence that this
+                # read-only conversion succeeded than the erroneous status.
+                conversion["accepted_nonzero_returncode"] = True
             self._write_json(serialized_path, data)
             conversion.update(
                 {

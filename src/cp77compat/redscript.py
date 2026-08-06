@@ -4,6 +4,7 @@ import hashlib
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -30,6 +31,11 @@ class _Token:
 class RedscriptDocument:
     artifact: Artifact
     annotation_counts: dict[str, int]
+    logical_mod_name: str | None = None
+
+    @property
+    def mod_name(self) -> str:
+        return self.logical_mod_name or self.artifact.mod_name
 
 
 def _lex(source: str) -> list[_Token]:
@@ -475,9 +481,12 @@ def parse_redscript_documents(
     references: list[Reference] = []
     findings: list[Finding] = []
     loaded: list[tuple[Artifact, list[_Token]]] = []
-    for artifact in artifacts:
-        if artifact.extension.casefold() != ".reds":
-            continue
+    text_by_path: dict[Path, str] = {}
+    redscript_artifacts = [
+        artifact for artifact in artifacts
+        if artifact.extension.casefold() == ".reds"
+    ]
+    for artifact in redscript_artifacts:
         try:
             source = artifact.absolute_path.read_text(encoding="utf-8-sig")
         except (OSError, UnicodeError) as exc:
@@ -493,7 +502,33 @@ def parse_redscript_documents(
                 )
             )
             continue
+        text_by_path[artifact.absolute_path] = source
         loaded.append((artifact, _lex(source)))
+
+    by_deployed_path: dict[str, list[Artifact]] = defaultdict(list)
+    for artifact, _tokens in loaded:
+        by_deployed_path[artifact.normalized_path].append(artifact)
+    logical_owners: dict[Path, str] = {}
+    for group in by_deployed_path.values():
+        winners = [item for item in group if item.deployed_state != "overridden"]
+        overridden = [item for item in group if item.deployed_state == "overridden"]
+        if len(winners) != 1 or len(overridden) != 1:
+            continue
+        winner = winners[0]
+        original = overridden[0]
+        winner_lines = text_by_path[winner.absolute_path].splitlines()
+        original_lines = text_by_path[original.absolute_path].splitlines()
+        changed_lines = sum(
+            (winner_end - winner_start) + (original_end - original_start)
+            for opcode, original_start, original_end, winner_start, winner_end
+            in SequenceMatcher(
+                None, original_lines, winner_lines, autojunk=False
+            ).get_opcodes()
+            if opcode != "equal"
+        )
+        source_lines = max(len(original_lines), len(winner_lines), 1)
+        if changed_lines <= 64 and changed_lines / source_lines <= 0.10:
+            logical_owners[winner.absolute_path] = original.mod_name
 
     modules = {
         module
@@ -502,6 +537,7 @@ def parse_redscript_documents(
         for module in _declared_modules(tokens)
     }
     for artifact, tokens in loaded:
+        logical_mod_name = logical_owners.get(artifact.absolute_path)
         counts: Counter[str] = Counter()
         parse_evidence: list[dict[str, Any]] = []
         index = 0
@@ -554,9 +590,15 @@ def parse_redscript_documents(
                     "reason": "a matching method or field declaration was not parsed",
                 })
             else:
+                if logical_mod_name is not None:
+                    reference.mod_name = logical_mod_name
+                    reference.details["deployed_mod_name"] = artifact.mod_name
+                    reference.details["override_origin"] = logical_mod_name
                 references.append(reference)
             index = close + 1
-        documents.append(RedscriptDocument(artifact, dict(counts)))
+        documents.append(
+            RedscriptDocument(artifact, dict(counts), logical_mod_name)
+        )
         if parse_evidence:
             findings.append(
                 Finding(

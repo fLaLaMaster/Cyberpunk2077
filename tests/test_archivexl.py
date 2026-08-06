@@ -584,8 +584,20 @@ class ArchiveXLTests(unittest.TestCase):
 
     def test_quest_resolution_distinguishes_owned_official_cross_mod_and_missing(self) -> None:
         references = [
+            Reference(
+                "archivexl",
+                "resource.scope",
+                "cyberpunk2077.quest#cyberpunk2077_main.quest",
+                "ArchiveXL",
+                r"C:\Game\red4ext\plugins\ArchiveXL\Bundle\QuestBaseScope.xl",
+                details={
+                    "scope": "cyberpunk2077.quest",
+                    "member": "cyberpunk2077_main.quest",
+                },
+            ),
             Reference("archivexl", "quest.phase", r"mod\owned.questphase", "A", "a.xl"),
             Reference("archivexl", "quest.parent", r"base\quest\cyberpunk2077.quest", "A", "a.xl"),
+            Reference("archivexl", "quest.parent", "cyberpunk2077.quest", "A", "a.xl"),
             Reference("archivexl", "quest.phase", r"mod\foreign.questphase", "A", "a.xl"),
             Reference("archivexl", "quest.parent", r"mod\foreign.quest", "A", "a.xl"),
             Reference("archivexl", "quest.phase", r"mod\missing.questphase", "A", "a.xl"),
@@ -617,7 +629,7 @@ class ArchiveXLTests(unittest.TestCase):
         self.assertEqual(1, stats["phase_own"])
         self.assertEqual(1, stats["phase_cross_mod"])
         self.assertEqual(1, stats["phase_missing"])
-        self.assertEqual(1, stats["parent_official"])
+        self.assertEqual(2, stats["parent_official"])
         self.assertEqual(1, stats["parent_cross_mod"])
         self.assertEqual(1, stats["parent_missing"])
         self.assertEqual(2, stats["missing_targets"])
@@ -1300,6 +1312,63 @@ streaming:
             )
             self.assertFalse(compare_references(references))
 
+    def test_large_deletion_only_override_inherits_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            original_path = root / "original" / "quests.xl"
+            winner_path = root / "fix" / "quests.xl"
+            original_path.parent.mkdir()
+            winner_path.parent.mkdir()
+            retained = [
+                "quest:",
+                "  phases:",
+                r"    - path: mod\retained.questphase",
+                r"      parent: base\quest\cyberpunk2077.quest",
+            ]
+            optional = [
+                line
+                for index in range(30)
+                for line in (
+                    rf"    - path: mod\optional_{index}.questphase",
+                    r"      parent: mod\quest\newgameplus.quest",
+                )
+            ]
+            original_path.write_text(
+                "\n".join([*retained, *optional, ""]), encoding="utf-8"
+            )
+            winner_path.write_text("\n".join([*retained, ""]), encoding="utf-8")
+
+            documents, references, findings = parse_documents(
+                [
+                    artifact(
+                        original_path,
+                        "Quest Original",
+                        "overridden",
+                        "Quest Cleanup",
+                    ),
+                    artifact(
+                        winner_path,
+                        "Quest Cleanup",
+                        "deployed",
+                        "Quest Cleanup",
+                    ),
+                ]
+            )
+
+            self.assertEqual(1, len(documents))
+            self.assertEqual("Quest Original", documents[0].mod_name)
+            self.assertEqual(
+                {"Quest Original"}, {reference.mod_name for reference in references}
+            )
+            self.assertTrue(
+                all(
+                    reference.details.get("deployed_mod_name") == "Quest Cleanup"
+                    and reference.details.get("override_origin") == "Quest Original"
+                    for reference in references
+                )
+            )
+            self.assertFalse(findings)
+
     def test_partial_node_deletion_preserves_actor_and_shape_identities(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "partial-deletions.xl"
@@ -1501,6 +1570,42 @@ streaming:
                 "example.xl",
             )
             self.assertEqual([], resolve_archive_references([reference], [], [loose]))
+
+    def test_exact_path_override_can_supply_companion_archive_resource(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "original.archive.xl"
+            path.write_text("localization: {}\n", encoding="utf-8")
+            winner = artifact(path, "Compatibility Patch", deployed_state="deployed")
+            reference = Reference(
+                "archivexl",
+                "localization.onscreens",
+                r"localization\it-it\onscreens\example.json",
+                "Original Mod",
+                str(path),
+                details={"override_origin": "Original Mod"},
+            )
+            patch_manifest = ArchiveManifest(
+                mod_name="Compatibility Patch",
+                archive_path=str(Path(temp) / "patch.archive"),
+                sha256="0" * 64,
+                size=1,
+                wolvenkit_version="test",
+                members=[
+                    ArchiveMember(
+                        r"localization\it-it\onscreens\example.json"
+                    )
+                ],
+            )
+
+            self.assertEqual(
+                [],
+                resolve_archive_references(
+                    [reference], [patch_manifest], [winner]
+                ),
+            )
+            findings = resolve_archive_references([reference], [patch_manifest])
+            self.assertEqual("AXL-CROSS-MOD-RESOURCE", findings[0].rule_id)
+
 
 
 if __name__ == "__main__":

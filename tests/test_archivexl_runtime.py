@@ -26,6 +26,30 @@ def artifact(path: Path, mod: str, relative_path: str) -> Artifact:
 
 
 class ArchiveXLRuntimeTests(unittest.TestCase):
+    def test_parser_attributes_localization_overwrite_to_preceding_resource(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "ArchiveXL-2026-01-01-00-00-00.log"
+            path.write_text(
+                """[2026-01-01 00:00:00.000] [1] [info] Loading "ModSettings.archive.xl"...
+[2026-01-01 00:00:00.001] [1] [info] [Localization] Merging entries from "localization\\en-us\\onscreens\\example.json"...
+[2026-01-01 00:00:00.002] [1] [warning] [Localization] Item #3 overwrites entry 12345 ("example_key").
+""",
+                encoding="utf-8",
+            )
+
+            events, lines = parse_archivexl_runtime_logs([path])
+
+            self.assertEqual(3, lines)
+            self.assertEqual(1, len(events))
+            self.assertEqual("AXL-RUNTIME-LOCALIZATION-OVERWRITE", events[0].rule_id)
+            self.assertEqual(
+                r"localization\en-us\onscreens\example.json", events[0].identity
+            )
+            self.assertIsNone(events[0].config_name)
+            self.assertEqual(3, events[0].details["item_index"])
+            self.assertEqual(12345, events[0].details["entry_hash"])
+            self.assertEqual("example_key", events[0].details["entry_key"])
+
     def test_parser_extracts_customization_type_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "ArchiveXL-2026-01-01-00-00-00.log"

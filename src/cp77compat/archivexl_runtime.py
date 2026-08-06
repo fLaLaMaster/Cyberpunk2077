@@ -36,6 +36,14 @@ LOCALIZATION_FAILED_PATTERN = re.compile(
     r'^Resource "(?P<identity>.+)" failed to load\.$'
 )
 LOCALIZATION_SUMMARY_PATTERN = re.compile(r"^Translations merged with issues\.$")
+LOCALIZATION_MERGING_PATTERN = re.compile(
+    r'\[info] \[Localization] Merging entries from "(?P<identity>.+)"\.\.\.$',
+    re.IGNORECASE,
+)
+LOCALIZATION_OVERWRITE_PATTERN = re.compile(
+    r'^Item #(?P<index>\d+) overwrites entry (?P<entry>\d+) '
+    r'\("(?P<key>.*)"\)\.$'
+)
 WORLD_EXPECTATION_PATTERN = re.compile(
     r"^(?P<config>.+\.xl): The target sector has (?P<actual>\d+) node\(s\), "
     r"but the mod expects (?P<expected>\d+)\.$",
@@ -108,6 +116,7 @@ def parse_archivexl_runtime_logs(
     events: list[ArchiveXLRuntimeEvent] = []
     current_config: dict[str, str] = {}
     current_sector: dict[str, str] = {}
+    current_localization: dict[str, str] = {}
     pending_localization: dict[str, int] = {}
     pending_world: dict[str, int] = {}
     pending_journal: dict[str, int] = {}
@@ -132,6 +141,13 @@ def parse_archivexl_runtime_logs(
                     thread_match = re.match(r"^\[[^]]+] \[(?P<thread>[^]]+)]", line)
                     if thread_match:
                         current_sector[thread_match.group("thread")] = match.group("sector")
+                    continue
+                if match := LOCALIZATION_MERGING_PATTERN.search(line):
+                    thread_match = re.match(r"^\[[^]]+] \[(?P<thread>[^]]+)]", line)
+                    if thread_match:
+                        current_localization[thread_match.group("thread")] = match.group(
+                            "identity"
+                        )
                     continue
 
                 match = LOG_LINE_PATTERN.match(line)
@@ -165,6 +181,19 @@ def parse_archivexl_runtime_logs(
                         details["related_log_path"] = events[pending_index].log_path
                         details["related_log_line"] = events[pending_index].log_line
                         details["consequence"] = True
+                elif component == "Localization" and (
+                    specific := LOCALIZATION_OVERWRITE_PATTERN.match(message)
+                ):
+                    rule_id = "AXL-RUNTIME-LOCALIZATION-OVERWRITE"
+                    identity = current_localization.get(thread)
+                    config_name = None
+                    details.update(
+                        {
+                            "item_index": int(specific.group("index")),
+                            "entry_hash": int(specific.group("entry")),
+                            "entry_key": specific.group("key"),
+                        }
+                    )
                 elif component == "WorldStreaming" and (
                     specific := WORLD_EXPECTATION_PATTERN.match(message)
                 ):
@@ -590,6 +619,14 @@ def analyze_archivexl_runtime_logs(
             "localization resources failed to load",
             "ArchiveXL found the declared localization resource but failed to load it at "
             "runtime. The affected translations are not reliably available.",
+        ),
+        "AXL-RUNTIME-LOCALIZATION-OVERWRITE": (
+            "warning",
+            "high",
+            "localization resources overwrite existing entries",
+            "ArchiveXL loaded a localization resource whose custom secondary keys were "
+            "already registered. The later resource wins for those entries; the scanner "
+            "attributes the warning to the resource immediately preceding it in the log.",
         ),
         "AXL-RUNTIME-STREAMING-EXPECTED-NODES": (
             "error",

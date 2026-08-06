@@ -126,6 +126,90 @@ class ArchivePayloadTests(unittest.TestCase):
             self.assertFalse(second.from_cache)
             self.assertEqual(2, calls)
 
+    def test_valid_serialization_survives_wolvenkit_nonzero_exit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            archive = root / "example.archive"
+            archive.write_bytes(b"archive")
+
+            def runner(
+                command: list[str], **_kwargs: object
+            ) -> subprocess.CompletedProcess[str]:
+                if "unbundle" in command:
+                    output_root = Path(command[command.index("--outpath") + 1])
+                    output = (
+                        output_root
+                        / "base"
+                        / "localization"
+                        / "en-us"
+                        / "onscreens"
+                        / "example.json"
+                    )
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_bytes(b"CR2W")
+                    return subprocess.CompletedProcess(command, 0, "extracted", "")
+                return subprocess.CompletedProcess(
+                    command,
+                    160,
+                    json.dumps({"Data": {"RootChunk": {"value": 1}}}),
+                    "Input path does not exist.",
+                )
+
+            provider = WolvenKitArchivePayloadProvider(
+                root / "WolvenKit.CLI.exe",
+                root / "cache",
+                "8.20.0",
+                runner=runner,
+            )
+            result = provider.serialize_json(manifest(archive), RESOURCE)
+
+            self.assertTrue(result.ok)
+            self.assertEqual(1, result.data["Data"]["RootChunk"]["value"])
+            metadata = json.loads(
+                result.payload.metadata_path.read_text(encoding="utf-8")
+            )
+            self.assertEqual(160, metadata["conversion"]["returncode"])
+            self.assertTrue(
+                metadata["conversion"]["accepted_nonzero_returncode"]
+            )
+
+    def test_nonzero_exit_without_valid_json_is_still_an_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            archive = root / "example.archive"
+            archive.write_bytes(b"archive")
+
+            def runner(
+                command: list[str], **_kwargs: object
+            ) -> subprocess.CompletedProcess[str]:
+                if "unbundle" in command:
+                    output_root = Path(command[command.index("--outpath") + 1])
+                    output = (
+                        output_root
+                        / "base"
+                        / "localization"
+                        / "en-us"
+                        / "onscreens"
+                        / "example.json"
+                    )
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_bytes(b"CR2W")
+                    return subprocess.CompletedProcess(command, 0, "extracted", "")
+                return subprocess.CompletedProcess(
+                    command, 160, "not json", "conversion failed"
+                )
+
+            provider = WolvenKitArchivePayloadProvider(
+                root / "WolvenKit.CLI.exe",
+                root / "cache",
+                "8.20.0",
+                runner=runner,
+            )
+            result = provider.serialize_json(manifest(archive), RESOURCE)
+
+            self.assertFalse(result.ok)
+            self.assertEqual("conversion failed", result.error)
+
     def test_unknown_or_unsafe_member_never_invokes_wolvenkit(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

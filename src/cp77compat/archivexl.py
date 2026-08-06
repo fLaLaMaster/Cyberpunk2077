@@ -571,19 +571,25 @@ def _small_override_origin(
     overridden: list[Artifact],
     text_by_path: dict[Path, str],
 ) -> str | None:
-    """Return a unique logical owner for a minimally edited exact-path winner."""
+    """Return a unique logical owner for a small or deletion-only override."""
     if len(overridden) != 1:
         return None
     original = overridden[0]
     winner_lines = text_by_path[winner.absolute_path].splitlines()
     original_lines = text_by_path[original.absolute_path].splitlines()
+    opcodes = SequenceMatcher(
+        None, original_lines, winner_lines, autojunk=False
+    ).get_opcodes()
     changed_lines = sum(
         (winner_end - winner_start) + (original_end - original_start)
         for opcode, original_start, original_end, winner_start, winner_end
-        in SequenceMatcher(None, original_lines, winner_lines, autojunk=False).get_opcodes()
+        in opcodes
         if opcode != "equal"
     )
-    return original.mod_name if changed_lines <= 20 else None
+    deletion_only = any(opcode == "delete" for opcode, *_rest in opcodes) and all(
+        opcode in {"equal", "delete"} for opcode, *_rest in opcodes
+    )
+    return original.mod_name if changed_lines <= 20 or deletion_only else None
 
 
 def parse_documents(artifacts: Iterable[Artifact]) -> tuple[list[ArchiveXLDocument], list[Reference], list[Finding]]:
@@ -2860,6 +2866,7 @@ def resolve_quest_references(
     artifacts: Iterable[Artifact] = (),
 ) -> tuple[list[Finding], dict[str, Any]]:
     """Resolve quest child phases and custom parent targets against mod resources."""
+    reference_list = list(references)
     by_mod: dict[str, set[str]] = defaultdict(set)
     global_members: dict[str, set[str]] = defaultdict(set)
     for manifest in manifests:
@@ -2877,8 +2884,26 @@ def resolve_quest_references(
             by_mod[artifact.mod_name].add(candidate)
             global_members[candidate].add(artifact.mod_name)
 
-    phase_refs = [reference for reference in references if reference.kind == "quest.phase"]
-    parent_refs = [reference for reference in references if reference.kind == "quest.parent"]
+    phase_refs = [
+        reference for reference in reference_list if reference.kind == "quest.phase"
+    ]
+    parent_refs = [
+        reference for reference in reference_list if reference.kind == "quest.parent"
+    ]
+    scope_providers: dict[str, set[str]] = defaultdict(set)
+    framework_scopes: set[str] = set()
+    for reference in reference_list:
+        if reference.kind != "resource.scope":
+            continue
+        scope = reference.details.get("scope")
+        if not isinstance(scope, str):
+            continue
+        normalized_scope = normalize_game_path(scope)
+        scope_providers[normalized_scope].add(reference.mod_name)
+        if "red4ext\\plugins\\archivexl\\bundle\\" in normalize_game_path(
+            reference.source_path
+        ):
+            framework_scopes.add(normalized_scope)
     stats: dict[str, Any] = {
         "name": "quest.phases",
         "documents": len({reference.source_path for reference in phase_refs}),
@@ -2904,8 +2929,19 @@ def resolve_quest_references(
     for reference in [*phase_refs, *parent_refs]:
         identity = reference.normalized_identity
         role = "phase" if reference.kind == "quest.phase" else "parent"
-        if role == "parent" and identity.startswith(("base\\", "ep1\\", "dlc\\")):
+        if role == "parent" and (
+            identity.startswith(("base\\", "ep1\\", "dlc\\"))
+            or identity in framework_scopes
+        ):
             stats["parent_official"] += 1
+            continue
+        if role == "parent" and identity in scope_providers:
+            providers = tuple(sorted(scope_providers[identity], key=str.casefold))
+            if reference.mod_name in providers:
+                stats["parent_own"] += 1
+            else:
+                stats["parent_cross_mod"] += 1
+                grouped[("cross-parent", identity, providers)].append(reference)
             continue
         if identity in by_mod.get(reference.mod_name, set()):
             stats[f"{role}_own"] += 1
@@ -2993,8 +3029,12 @@ def resolve_archive_references(
 
     loose_by_mod: dict[str, set[str]] = defaultdict(set)
     loose_global: dict[str, set[str]] = defaultdict(set)
+    source_providers: dict[str, str] = {}
     archive_prefix = "archive\\pc\\mod\\"
     for artifact in artifacts:
+        source_providers[str(artifact.absolute_path).replace("/", "\\").casefold()] = (
+            artifact.mod_name
+        )
         normalized = artifact.normalized_path
         candidates = {normalized}
         if normalized.startswith(archive_prefix):
@@ -3014,7 +3054,17 @@ def resolve_archive_references(
         if ref.kind not in resolvable_kinds:
             continue
         identity = ref.normalized_identity
-        if identity in by_mod.get(ref.mod_name, {}) or identity in loose_by_mod.get(ref.mod_name, set()):
+        declaring_mods = {ref.mod_name}
+        source_provider = source_providers.get(
+            ref.source_path.replace("/", "\\").casefold()
+        )
+        if source_provider is not None:
+            declaring_mods.add(source_provider)
+        if any(
+            identity in by_mod.get(mod_name, {})
+            or identity in loose_by_mod.get(mod_name, set())
+            for mod_name in declaring_mods
+        ):
             continue
         providers = sorted(
             global_members.get(identity, set()) | loose_global.get(identity, set()),
